@@ -15,20 +15,20 @@
 
 #	include <libkern/OSByteOrder.h>
 
-#	define htobe16 OSSwapHostToBigInt16
-#	define htole16 OSSwapHostToLittleInt16
-#	define be16toh OSSwapBigToHostInt16
-#	define le16toh OSSwapLittleToHostInt16
+#	define htobe16(x) OSSwapHostToBigInt16(x)
+#	define htole16(x) OSSwapHostToLittleInt16(x)
+#	define be16toh(x) OSSwapBigToHostInt16(x)
+#	define le16toh(x) OSSwapLittleToHostInt16(x)
  
-#	define htobe32 OSSwapHostToBigInt32
-#	define htole32 OSSwapHostToLittleInt32
-#	define be32toh OSSwapBigToHostInt32
-#	define le32toh OSSwapLittleToHostInt32
+#	define htobe32(x) OSSwapHostToBigInt32(x)
+#	define htole32(x) OSSwapHostToLittleInt32(x)
+#	define be32toh(x) OSSwapBigToHostInt32(x)
+#	define le32toh(x) OSSwapLittleToHostInt32(x)
  
-#	define htobe64 OSSwapHostToBigInt64
-#	define htole64 OSSwapHostToLittleInt64
-#	define be64toh OSSwapBigToHostInt64
-#	define le64toh OSSwapLittleToHostInt64
+#	define htobe64(x) OSSwapHostToBigInt64(x)
+#	define htole64(x) OSSwapHostToLittleInt64(x)
+#	define be64toh(x) OSSwapBigToHostInt64(x)
+#	define le64toh(x) OSSwapLittleToHostInt64(x)
 
 #	define __BYTE_ORDER    BYTE_ORDER
 #	define __BIG_ENDIAN    BIG_ENDIAN
@@ -43,14 +43,14 @@
 
 #	include <sys/endian.h>
 
-#	define be16toh betoh16
-#	define le16toh letoh16
+#	define be16toh(x) betoh16(x)
+#	define le16toh(x) letoh16(x)
 
-#	define be32toh betoh32
-#	define le32toh letoh32
+#	define be32toh(x) betoh32(x)
+#	define le32toh(x) letoh32(x)
 
-#	define be64toh betoh64
-#	define le64toh letoh64
+#	define be64toh(x) betoh64(x)
+#	define le64toh(x) letoh64(x)
 
 #elif defined(__WINDOWS__)
 
@@ -59,19 +59,19 @@
 
 #	if BYTE_ORDER == LITTLE_ENDIAN
 
-#		define htobe16 htons
+#		define htobe16(x) htons(x)
 #		define htole16(x) (x)
-#		define be16toh ntohs
+#		define be16toh(x) ntohs(x)
 #		define le16toh(x) (x)
  
-#		define htobe32 htonl
+#		define htobe32(x) htonl(x)
 #		define htole32(x) (x)
-#		define be32toh ntohl
+#		define be32toh(x) ntohl(x)
 #		define le32toh(x) (x)
  
-#		define htobe64 htonll
+#		define htobe64(x) htonll(x)
 #		define htole64(x) (x)
-#		define be64toh ntohll
+#		define be64toh(x) ntohll(x)
 #		define le64toh(x) (x)
 
 #	elif BYTE_ORDER == BIG_ENDIAN
