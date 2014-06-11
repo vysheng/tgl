@@ -1,3 +1,6 @@
+// "License": Public Domain
+// I, Mathias Panzenböck, place this file hereby into the public domain. Use it at your own risk for whatever you like.
+
 #ifndef PORTABLE_ENDIAN_H__
 #define PORTABLE_ENDIAN_H__
 
