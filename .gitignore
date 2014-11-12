@@ -1,0 +1,12 @@
+Makefile
+autom4te.cache
+config.h
+config.log
+config.status
+.idea/
+nbproject/
+bin/
+objs/
+dep/
+auto/
+libs/

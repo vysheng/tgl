@@ -1,0 +1,83 @@
+srcdir=@srcdir@
+
+CFLAGS=@CFLAGS@
+LDFLAGS=@LDFLAGS@ @OPENSSL_LDFLAGS@
+CPPFLAGS=@CPPFLAGS@ @OPENSSL_INCLUDES@
+DEFS=@DEFS@
+COMPILE_FLAGS=${CFLAGS} ${CPFLAGS} ${CPPFLAGS} ${DEFS} -Wall -Wextra -Werror -Wno-deprecated-declarations -fno-strict-aliasing -fno-omit-frame-pointer -ggdb -Wno-unused-parameter -fPIC
+
+EXTRA_LIBS=@LIBS@ @EXTRA_LIBS@ @OPENSSL_LIBS@
+LOCAL_LDFLAGS=-rdynamic -ggdb -levent ${EXTRA_LIBS}
+LINK_FLAGS=${LDFLAGS} ${LOCAL_LDFLAGS}
+
+DEP=${srcdir}/dep
+AUTO=${srcdir}/auto
+OBJ=${srcdir}/objs
+LIB=${srcdir}/libs
+DIR_LIST=${DEP} ${AUTO} ${EXE} ${OBJ} ${LIB} ${DEP}/auto ${OBJ}/auto
+
+LIB_LIST=${LIB}/libtgl.a
+
+TGL_OBJECTS=${OBJ}/mtproto-common.o ${OBJ}/mtproto-client.o ${OBJ}/queries.o ${OBJ}/structures.o ${OBJ}/binlog.o ${OBJ}/auto/auto.o ${OBJ}/tgl.o ${OBJ}/updates.o
+TLD_OBJECTS=${OBJ}/dump-tl-file.o
+GENERATE_OBJECTS=${OBJ}/generate.o
+COMMON_OBJECTS=${OBJ}/tools.o
+OBJ_C=${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS} ${TLD_OBJECTS}
+
+DEPENDENCE=$(subst ${OBJ}/,${DEP}/,$(patsubst %.o,%.d,${OBJ_LIST}))
+DEPENDENCE_LIST=${DEPENDENCE}
+
+INCLUDE=-I. -I${srcdir}
+CC=@CC@
+
+.SUFFIXES:
+
+.SUFFIXES: .c .h .o
+
+all: ${LIB_LIST}
+create_dirs_and_headers: ${DIR_LIST} ${AUTO}/auto.c ${AUTO}/auto-header.h ${AUTO}/constants.h
+create_dirs: ${DIR_LIST}
+dump-tl: ${EXE}/dump-tl-file
+
+include tl-parser/MAKEFILE
+
+${DIR_LIST}:
+	@test -d $@ || mkdir -p $@
+
+-include ${DEPENDENCE_LIST}
+
+${TGL_OBJECTS}: ${AUTO}/constants.h ${AUTO}/auto-header.h
+
+${OBJ_C}: ${OBJ}/%.o: %.c | create_dirs
+	${CC} ${INCLUDE} ${COMPILE_FLAGS} -c -MP -MD -MF ${DEP}/$*.d -MQ ${OBJ}/$*.o -o $@ $<
+
+${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS}
+	ar ruv $@ ${TGL_OBJECTS} ${COMMON_OBJECTS}
+
+${EXE}/generate: ${GENERATE_OBJECTS} ${COMMON_OBJECTS}
+	${CC} ${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS} -o $@
+
+${AUTO}/scheme.tlo: ${AUTO}/scheme.tl ${EXE}/tlc
+	${EXE}/tlc -e $@ ${AUTO}/scheme.tl
+
+${AUTO}/scheme.tl: ${srcdir}/scheme.tl ${srcdir}/encrypted_scheme.tl ${srcdir}/binlog.tl ${srcdir}/append.tl | ${AUTO}
+	cat $^ > $@
+
+${AUTO}/scheme2.tl: ${AUTO}/scheme.tl ${EXE}/tlc
+	${EXE}/tlc -E ${AUTO}/scheme.tl 2> $@  || ( cat $@ && rm $@ && false )
+
+${AUTO}/auto.c: ${AUTO}/scheme.tlo ${EXE}/generate
+	${EXE}/generate ${AUTO}/scheme.tlo > $@
+
+${AUTO}/auto-header.h: ${AUTO}/scheme.tlo ${EXE}/generate
+	${EXE}/generate -H ${AUTO}/scheme.tlo > $@
+
+${AUTO}/constants.h: ${AUTO}/scheme2.tl ${srcdir}/gen_constants_h.awk
+	awk -f ${srcdir}/gen_constants_h.awk < $< > $@
+
+${EXE}/dump-tl-file: ${OBJ}/auto/auto.o ${TLD_OBJECTS}
+	${CC} ${OBJ}/auto/auto.o ${TLD_OBJECTS} ${LINK_FLAGS} -o $@
+
+clean:
+	rm -rf ${DIR_LIST} config.log config.status > /dev/null || echo "all clean"
+
