@@ -20,7 +20,7 @@
 #ifndef __TGL_H__
 #define __TGL_H__
 
-#include <tgl-layout.h>
+#include "tgl-layout.h"
 #include <string.h>
 #include <stdlib.h>
 
