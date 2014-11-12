@@ -10,7 +10,7 @@ Documentation for MTproto protocol is available here: http://core.telegram.org/m
 
 Clone GitHub Repository
 
-     git clone https://github.com/vysheng/tgl.git && cd tgl
+     git clone --recursive  https://github.com/vysheng/tgl.git && cd tgl
 
 or download and extract zip
 
