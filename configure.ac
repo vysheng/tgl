@@ -19,6 +19,7 @@ AC_CHECK_LIB([m], [sqrt])
 AC_SEARCH_LIBS([clock_gettime], [rt])
 
 EVENT_VER=""
+EXTRA_OBJECTS=""
 
 #     OPENSSL_INCLUDES to the include directives required
 #     OPENSSL_LIBS to the -l directives required
@@ -42,6 +43,7 @@ AC_ARG_ENABLE(libevent,[include libevent-based net and timers],
     AC_CHECK_HEADER(event2/event.h, [AC_DEFINE([EVENT_V2], [1], [Use libevent v2])], [
       AC_CHECK_HEADER(event.h, [AC_DEFINE([EVENT_V1], [1], [Use libevent v1])], [AC_MSG_ERROR([no libevent found])])
     ])
+    EXTRA_OBJECTS="${EXTRA_OBJECTS} objs/tgl-net.o objs/tgl-timers.o"
   fi
   ],[
   ])
@@ -62,6 +64,7 @@ AC_CHECK_FUNCS([alarm endpwent memset memmove mkdir select socket strdup strndup
 AX_GCC_BUILTIN(__builtin_bswap32)
 
 AC_SUBST(EXTRA_LIBS)
+AC_SUBST(EXTRA_OBJECTS)
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 

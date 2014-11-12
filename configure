@@ -620,6 +620,7 @@ ac_includes_default="\
 #endif"
 
 ac_subst_vars='LTLIBOBJS
+EXTRA_OBJECTS
 EXTRA_LIBS
 LIBOBJS
 EGREP
@@ -3299,6 +3300,7 @@ fi
 
 
 EVENT_VER=""
+EXTRA_OBJECTS=""
 
 #     OPENSSL_INCLUDES to the include directives required
 #     OPENSSL_LIBS to the -l directives required
@@ -4070,6 +4072,7 @@ fi
 fi
 
 
+    EXTRA_OBJECTS="${EXTRA_OBJECTS} objs/tgl-net.o objs/tgl-timers.o"
   fi
 
 fi
@@ -4364,6 +4367,7 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 fi
+
 
 
 
