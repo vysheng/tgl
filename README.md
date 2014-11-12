@@ -12,11 +12,6 @@ Clone GitHub Repository
 
      git clone --recursive  https://github.com/vysheng/tgl.git && cd tgl
 
-or download and extract zip
-
-     wget https://github.com/vysheng/tgl/archive/master.zip -O tlg-master.zip
-     unzip tgl-master.zip && cd tgl-master
-
 #### Linux and BSDs
 
 Install libs: openssl, zlib
