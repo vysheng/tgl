@@ -38,7 +38,7 @@
 #include "tree.h"
 #include "mtproto-common.h"
 //#include "telegram.h"
-#include "structures.h"
+#include "tgl-structures.h"
 //#include "interface.h"
 //#include "net.h"
 #include <openssl/bn.h>
@@ -48,7 +48,7 @@
 #include <openssl/md5.h>
 
 #include "no-preview.h"
-#include "binlog.h"
+#include "tgl-binlog.h"
 #include "updates.h"
 #include "auto.h"
 #include "tgl.h"

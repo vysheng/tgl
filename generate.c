@@ -34,7 +34,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "tl-tl.h"
+#include "tl-parser/tl-tl.h"
 #include "generate.h"
 
 #include "tree.h"

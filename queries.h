@@ -20,7 +20,7 @@
 //#include "net.h"
 #ifndef __QUERIES_H__
 #define __QUERIES_H__
-#include "structures.h"
+#include "tgl-structures.h"
 #include "auto.h"
 #include "tgl-layout.h"
 

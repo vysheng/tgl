@@ -10,10 +10,11 @@ EXTRA_LIBS=@LIBS@ @EXTRA_LIBS@ @OPENSSL_LIBS@
 LOCAL_LDFLAGS=-rdynamic -ggdb -levent ${EXTRA_LIBS}
 LINK_FLAGS=${LDFLAGS} ${LOCAL_LDFLAGS}
 
-DEP=${srcdir}/dep
-AUTO=${srcdir}/auto
-OBJ=${srcdir}/objs
-LIB=${srcdir}/libs
+DEP=dep
+AUTO=auto
+OBJ=objs
+LIB=libs
+EXE=bin
 DIR_LIST=${DEP} ${AUTO} ${EXE} ${OBJ} ${LIB} ${DEP}/auto ${OBJ}/auto
 
 LIB_LIST=${LIB}/libtgl.a
@@ -39,7 +40,7 @@ create_dirs_and_headers: ${DIR_LIST} ${AUTO}/auto.c ${AUTO}/auto-header.h ${AUTO
 create_dirs: ${DIR_LIST}
 dump-tl: ${EXE}/dump-tl-file
 
-include tl-parser/MAKEFILE
+include Makefile.tl-parser
 
 ${DIR_LIST}:
 	@test -d $@ || mkdir -p $@
@@ -57,14 +58,14 @@ ${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS}
 ${EXE}/generate: ${GENERATE_OBJECTS} ${COMMON_OBJECTS}
 	${CC} ${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS} -o $@
 
-${AUTO}/scheme.tlo: ${AUTO}/scheme.tl ${EXE}/tlc
-	${EXE}/tlc -e $@ ${AUTO}/scheme.tl
+${AUTO}/scheme.tlo: ${AUTO}/scheme.tl ${EXE}/tl-parser
+	${EXE}/tl-parser -e $@ ${AUTO}/scheme.tl
 
 ${AUTO}/scheme.tl: ${srcdir}/scheme.tl ${srcdir}/encrypted_scheme.tl ${srcdir}/binlog.tl ${srcdir}/append.tl | ${AUTO}
 	cat $^ > $@
 
-${AUTO}/scheme2.tl: ${AUTO}/scheme.tl ${EXE}/tlc
-	${EXE}/tlc -E ${AUTO}/scheme.tl 2> $@  || ( cat $@ && rm $@ && false )
+${AUTO}/scheme2.tl: ${AUTO}/scheme.tl ${EXE}/tl-parser
+	${EXE}/tl-parser -E ${AUTO}/scheme.tl 2> $@  || ( cat $@ && rm $@ && false )
 
 ${AUTO}/auto.c: ${AUTO}/scheme.tlo ${EXE}/generate
 	${EXE}/generate ${AUTO}/scheme.tlo > $@

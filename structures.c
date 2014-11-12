@@ -24,7 +24,7 @@
 
 #include <assert.h>
 #include <string.h>
-#include "structures.h"
+#include "tgl-structures.h"
 #include "mtproto-common.h"
 //#include "telegram.h"
 #include "tree.h"
@@ -32,7 +32,7 @@
 #include <openssl/bn.h>
 #include <openssl/sha.h>
 #include "queries.h"
-#include "binlog.h"
+#include "tgl-binlog.h"
 #include "updates.h"
 #include "mtproto-client.h"
 

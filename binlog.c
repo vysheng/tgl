@@ -34,7 +34,7 @@
 #include <assert.h>
 #include <openssl/bn.h>
 
-#include "binlog.h"
+#include "tgl-binlog.h"
 #include "mtproto-common.h"
 //#include "net.h"
 #include "mtproto-client.h"
@@ -42,7 +42,7 @@
 #include "tgl.h"
 #include "auto.h"
 
-#include "structures.h"
+#include "tgl-structures.h"
 
 #include <openssl/sha.h>
 

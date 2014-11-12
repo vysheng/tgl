@@ -25,7 +25,7 @@
 #include "tgl.h"
 #include "tools.h"
 #include "mtproto-client.h"
-#include "structures.h"
+#include "tgl-structures.h"
 //#include "net.h"
 
 #include <assert.h>

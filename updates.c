@@ -20,9 +20,9 @@
 #include "tgl.h"
 #include "updates.h"
 #include "mtproto-common.h"
-#include "binlog.h"
+#include "tgl-binlog.h"
 #include "auto.h"
-#include "structures.h"
+#include "tgl-structures.h"
 
 #include <assert.h>
 
