@@ -892,6 +892,29 @@ void tgl_do_send_encr_msg_action (struct tgl_state *TLS, struct tgl_message *M, 
     out_int (CODE_decrypted_message_action_set_message_t_t_l);
     out_int (M->action.ttl);
     break;
+  case tgl_message_action_request_key:
+    out_int (CODE_decrypted_message_action_request_key);
+    out_long (M->action.exchange_id);
+    out_cstring ((void *)M->action.g_a, 256);
+    break;
+  case tgl_message_action_accept_key:
+    out_int (CODE_decrypted_message_action_accept_key);
+    out_long (M->action.exchange_id);
+    out_cstring ((void *)M->action.g_a, 256);    
+    out_long (M->action.key_fingerprint);
+    break;
+  case tgl_message_action_commit_key:
+    out_int (CODE_decrypted_message_action_commit_key);
+    out_long (M->action.exchange_id);
+    out_long (M->action.key_fingerprint);
+    break;
+  case tgl_message_action_abort_key:
+    out_int (CODE_decrypted_message_action_abort_key);
+    out_long (M->action.exchange_id);
+    break;
+  case tgl_message_action_noop:
+    out_int (CODE_decrypted_message_action_noop);
+    break;
   default:
     assert (0);
   }
@@ -3512,9 +3535,10 @@ void tgl_do_visualize_key (struct tgl_state *TLS, tgl_peer_id_t id, unsigned cha
     vlogprintf (E_WARNING, "Chat is not initialized yet\n");
     return;
   }
-  unsigned char res[20];
-  SHA1 ((void *)P->encr_chat.key, 256, res);
-  memcpy (buf, res, 16);
+  //unsigned char res[20];
+  //SHA1 ((void *)P->encr_chat.key, 256, res);
+  //memcpy (buf, res, 16);
+  memcpy (buf, P->encr_chat.first_key_sha, 16);
 }
 /* }}} */
 
@@ -3924,6 +3948,11 @@ void tgl_do_request_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E) 
   tglt_secure_random (&t, 8);
 
   bl_do_send_message_action_encr (TLS, t, TLS->our_id, tgl_get_peer_type (E->id), tgl_get_peer_id (E->id), time (0), 68, action);
+  
+  struct tgl_message *M = tgl_message_get (TLS, t);
+  assert (M);
+  assert (M->action.type == tgl_message_action_request_key);
+  tgl_do_send_msg (TLS, M, 0, 0);
 }
 
 void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, long long exchange_id, unsigned char ga[]) {
@@ -3975,6 +4004,11 @@ void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, l
   BN_clear_free (g_a);
   BN_clear_free (p);
   BN_clear_free (r);
+  
+  struct tgl_message *M = tgl_message_get (TLS, t);
+  assert (M);
+  assert (M->action.type == tgl_message_action_accept_key);
+  tgl_do_send_msg (TLS, M, 0, 0);
 }
   
 void tgl_do_confirm_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, int sen_nop) {
@@ -3986,6 +4020,11 @@ void tgl_do_confirm_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, 
     tglt_secure_random (&t, 8);
 
     bl_do_send_message_action_encr (TLS, t, TLS->our_id, tgl_get_peer_type (E->id), tgl_get_peer_id (E->id), time (0), 1, &action);
+
+    struct tgl_message *M = tgl_message_get (TLS, t);
+    assert (M);
+    assert (M->action.type == tgl_message_action_noop);
+    tgl_do_send_msg (TLS, M, 0, 0);
   }
 }
 
@@ -4024,6 +4063,11 @@ void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, u
   tglt_secure_random (&t, 8);
 
   bl_do_send_message_action_encr (TLS, t, TLS->our_id, tgl_get_peer_type (E->id), tgl_get_peer_id (E->id), time (0), 5, action);
+  
+  struct tgl_message *M = tgl_message_get (TLS, t);
+  assert (M);
+  assert (M->action.type == tgl_message_action_commit_key);
+  tgl_do_send_msg (TLS, M, 0, 0);
   
   bl_do_encr_chat_exchange_commit (TLS, E, s);
 }

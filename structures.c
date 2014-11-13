@@ -1046,19 +1046,19 @@ void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_mess
     fetch256 (M->g_a);
     break;
   case CODE_decrypted_message_action_accept_key:
-    M->type = tgl_message_action_request_key;
+    M->type = tgl_message_action_accept_key;
     M->exchange_id = fetch_long ();
     M->g_a = talloc (256);
     fetch256 (M->g_a);
     M->key_fingerprint = fetch_long ();
     break;
   case CODE_decrypted_message_action_commit_key:
-    M->type = tgl_message_action_request_key;
+    M->type = tgl_message_action_commit_key;
     M->exchange_id = fetch_long ();
     M->key_fingerprint = fetch_long ();
     break;
   case CODE_decrypted_message_action_abort_key:
-    M->type = tgl_message_action_request_key;
+    M->type = tgl_message_action_abort_key;
     M->exchange_id = fetch_long ();
     break;
   default:
@@ -1523,11 +1523,7 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS) {
     struct tgl_secret_chat *E = &_E->encr_chat;
     if (M->action.type == tgl_message_action_request_key) {
       if (E->exchange_state == tgl_sce_none || (E->exchange_state == tgl_sce_requested && E->exchange_id > M->action.exchange_id )) {
-        if (tglmp_check_g (TLS, TLS->encr_prime, (void *)M->action.g_a) < 0) {
-          vlogprintf (E_WARNING, "Exchange: Incorrect g_a\n");
-        } else {        
-          tgl_do_accept_exchange (TLS, E, M->action.exchange_id, M->action.g_a);
-        }
+        tgl_do_accept_exchange (TLS, E, M->action.exchange_id, M->action.g_a);
       } else {
         vlogprintf (E_WARNING, "Exchange: Incorrect state (received request, state = %d)\n", E->exchange_state);
       }
