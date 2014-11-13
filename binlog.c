@@ -1884,7 +1884,7 @@ void bl_do_encr_chat_set_key (struct tgl_state *TLS, struct tgl_secret_chat *E, 
 
 void bl_do_encr_chat_set_sha (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char sha[]) {
   int *ev = alloc_log_event (28);
-  ev[0] = CODE_binlog_encr_chat_set_key;
+  ev[0] = CODE_binlog_encr_chat_set_sha;
   ev[1] = tgl_get_peer_id (E->id);
   memcpy (ev + 2, sha, 20);
   add_log_event (TLS, ev, 28);
