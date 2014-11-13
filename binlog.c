@@ -1290,7 +1290,7 @@ static int fetch_comb_binlog_encr_chat_exchange_accept (struct tgl_state *TLS, v
   static unsigned char sha_buffer[20];
   SHA1 ((unsigned char *)P->encr_chat.exchange_key, 256, sha_buffer);
 
-  P->encr_chat.exchange_key_fingerprint = *(long long *)sha_buffer;
+  P->encr_chat.exchange_key_fingerprint = *(long long *)(sha_buffer + 12);
   return 0;
 }
 
@@ -1298,7 +1298,7 @@ static int fetch_comb_binlog_encr_chat_exchange_commit (struct tgl_state *TLS, v
   tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (fetch_int ()));
   assert (P);
 
-  memcpy (P->encr_chat.key, P->encr_chat.exchange_key, 256);
+  memcpy (P->encr_chat.exchange_key, P->encr_chat.key, 256);
   P->encr_chat.exchange_key_fingerprint = P->encr_chat.key_fingerprint;
 
   fetch_ints (P->encr_chat.key, 64);
@@ -1307,7 +1307,7 @@ static int fetch_comb_binlog_encr_chat_exchange_commit (struct tgl_state *TLS, v
   static unsigned char sha_buffer[20];
   SHA1 ((unsigned char *)P->encr_chat.key, 256, sha_buffer);
 
-  P->encr_chat.key_fingerprint = *(long long *)sha_buffer;
+  P->encr_chat.key_fingerprint = *(long long *)(sha_buffer + 12);
   return 0;
 }
 

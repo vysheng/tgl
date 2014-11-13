@@ -4052,12 +4052,14 @@ void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, u
   BN_clear_free (g_b);
   BN_clear_free (r);
   BN_clear_free (a);
-  
+ 
+  static unsigned char sh[20];
+  SHA1 (s, 256, sh);
   
   int action[4];
   action[0] = CODE_decrypted_message_action_commit_key;
   *(long long *)(action + 1) = E->exchange_id;
-  *(long long *)(action + 3) = E->key_fingerprint;
+  *(long long *)(action + 3) = *(long long *)(sh + 12);
   
   long long t;
   tglt_secure_random (&t, 8);
