@@ -41,6 +41,12 @@ binlog.encrChatSetTtl id:int ttl:int = binlog.Update;
 binlog.encrChatSetLayer id:int layer:int = binlog.Update;
 binlog.encrChatSetState id:int state:int = binlog.Update;
 binlog.encrChatSetKey id:int key:64*[int] fingerprint:long = binlog.Update;
+binlog.encrChatSetSha id:int sha:5*[int] = binlog.Update;
+binlog.encrChatExchangeRequest id:int exchange_id:long a:64*[int] = binlog.Update;
+binlog.encrChatExchangeAccept id:int exchange_id:long key:64*[int] = binlog.Update;
+binlog.encrChatExchangeCommit id:int key:64*[int] = binlog.Update;
+binlog.encrChatExchangeConfirm id:int = binlog.Update;
+binlog.encrChatExchangeAbort id:int = binlog.Update;
 
 binlog.encrChatUpdateSeq id:int in_seq_no:int out_seq_no:int = binlog.Update;
 binlog.encrChatSetSeq id:int in_seq_no:int last_in_seq_no:int out_seq_no:int = binlog.Update;

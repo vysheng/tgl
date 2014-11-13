@@ -3095,6 +3095,7 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
   sha1 (kk, 256, sha_buffer);
 
   bl_do_encr_chat_set_key (TLS, E, kk, *(long long *)(sha_buffer + 12));
+  bl_do_encr_chat_set_sha (TLS, E, sha_buffer);
 
   clear_packet ();
   out_int (CODE_messages_accept_encryption);
@@ -3149,6 +3150,7 @@ void tgl_do_create_keys_end (struct tgl_state *TLS, struct tgl_secret_chat *U) {
     U->state = sc_deleted;
   }
 
+  memcpy (U->first_key_sha, sha_buffer, 20);
   tfree_secure (t, 256);
   
   BN_clear_free (p);
@@ -3876,4 +3878,156 @@ void tgl_do_update_status (struct tgl_state *TLS, int online, void (*callback)(s
   out_int (CODE_account_update_status);
   out_int (online ? CODE_bool_false : CODE_bool_true);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &update_status_methods, 0, callback, callback_extra);
+}
+
+
+void tgl_do_request_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E) {
+  static unsigned char s[256];
+  tglt_secure_random (s, 256);
+
+  long long id;
+  tglt_secure_random (&id, 8);
+
+  bl_do_encr_chat_exchange_request (TLS, E, id, s);
+  
+  BIGNUM *a = BN_bin2bn (s, 256, 0);
+  ensure_ptr (a);
+  BIGNUM *p = BN_bin2bn (TLS->encr_prime, 256, 0); 
+  ensure_ptr (p);
+ 
+  BIGNUM *g = BN_new ();
+  ensure_ptr (g);
+
+  ensure (BN_set_word (g, TLS->encr_root));
+
+  BIGNUM *r = BN_new ();
+  ensure_ptr (r);
+
+  ensure (BN_mod_exp (r, g, a, p, TLS->BN_ctx));
+  
+  static unsigned char kk[256];
+  memset (kk, 0, sizeof (kk));
+  BN_bn2bin (r, kk + (256 - BN_num_bytes (r)));
+
+  BN_clear_free (a);
+  BN_clear_free (g);
+  BN_clear_free (p);
+  BN_clear_free (r);
+  
+  static int action[70];  
+  action[0] = CODE_decrypted_message_action_request_key;
+  *(long long *)(action + 1) = E->exchange_id;
+  action[3] = 0x100fe;
+  memcpy (action + 4, kk, 256);
+
+  long long t;
+  tglt_secure_random (&t, 8);
+
+  bl_do_send_message_action_encr (TLS, t, TLS->our_id, tgl_get_peer_type (E->id), tgl_get_peer_id (E->id), time (0), 68, action);
+}
+
+void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, long long exchange_id, unsigned char ga[]) {
+  static unsigned char s[256];
+  tglt_secure_random (s, 256);
+
+  BIGNUM *b = BN_bin2bn (s, 256, 0);
+  ensure_ptr (b);
+  BIGNUM *g_a = BN_bin2bn (ga, 256, 0);
+  ensure_ptr (g_a);
+
+  assert (tglmp_check_g (TLS, TLS->encr_prime, g_a) >= 0);
+  //if (!ctx) {
+  //  ctx = BN_CTX_new ();
+  //  ensure_ptr (ctx);
+  //}
+  BIGNUM *p = BN_bin2bn (TLS->encr_prime, 256, 0); 
+  ensure_ptr (p);
+  BIGNUM *r = BN_new ();
+  ensure_ptr (r);
+  ensure (BN_mod_exp (r, g_a, b, p, TLS->BN_ctx));
+
+  static unsigned char kk[256];
+  memset (kk, 0, sizeof (kk));
+  BN_bn2bin (r, kk + (256 - BN_num_bytes (r)));
+
+  bl_do_encr_chat_exchange_accept (TLS, E, exchange_id, kk);
+  
+  ensure (BN_set_word (g_a, TLS->encr_root));
+  ensure (BN_mod_exp (r, g_a, b, p, TLS->BN_ctx));
+  
+  static unsigned char buf[256];
+  memset (buf, 0, sizeof (buf));
+  BN_bn2bin (r, buf + (256 - BN_num_bytes (r)));
+  
+  static int action[70];  
+  action[0] = CODE_decrypted_message_action_accept_key;
+  *(long long *)(action + 1) = E->exchange_id;
+  action[3] = 0x100fe;
+  memcpy (action + 4, buf, 256);
+  *(long long *)(action + 68) = E->exchange_key_fingerprint;
+
+  long long t;
+  tglt_secure_random (&t, 8);
+
+  bl_do_send_message_action_encr (TLS, t, TLS->our_id, tgl_get_peer_type (E->id), tgl_get_peer_id (E->id), time (0), 70, action);
+
+  BN_clear_free (b);
+  BN_clear_free (g_a);
+  BN_clear_free (p);
+  BN_clear_free (r);
+}
+  
+void tgl_do_confirm_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, int sen_nop) {
+  bl_do_encr_chat_exchange_confirm (TLS, E);
+  if (sen_nop) {
+    int action = CODE_decrypted_message_action_noop;
+  
+    long long t;
+    tglt_secure_random (&t, 8);
+
+    bl_do_send_message_action_encr (TLS, t, TLS->our_id, tgl_get_peer_type (E->id), tgl_get_peer_id (E->id), time (0), 1, &action);
+  }
+}
+
+void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char gb[]) {
+  assert (TLS->encr_prime);
+  
+  BIGNUM *g_b = BN_bin2bn (gb, 256, 0);  
+  ensure_ptr (g_b);
+  assert (tglmp_check_g (TLS, TLS->encr_prime, g_b) >= 0);
+
+  BIGNUM *p = BN_bin2bn (TLS->encr_prime, 256, 0); 
+  ensure_ptr (p);
+  BIGNUM *r = BN_new ();
+  ensure_ptr (r);
+  BIGNUM *a = BN_bin2bn ((void *)E->exchange_key, 256, 0);
+  ensure_ptr (a);
+  ensure (BN_mod_exp (r, g_b, a, p, TLS->BN_ctx));
+
+  static unsigned char s[256];
+  memset (s, 0, 256);
+  
+  BN_bn2bin (r, s + (256 - BN_num_bytes (r)));
+  
+  BN_clear_free (p);
+  BN_clear_free (g_b);
+  BN_clear_free (r);
+  BN_clear_free (a);
+  
+  
+  int action[4];
+  action[0] = CODE_decrypted_message_action_commit_key;
+  *(long long *)(action + 1) = E->exchange_id;
+  *(long long *)(action + 3) = E->key_fingerprint;
+  
+  long long t;
+  tglt_secure_random (&t, 8);
+
+  bl_do_send_message_action_encr (TLS, t, TLS->our_id, tgl_get_peer_type (E->id), tgl_get_peer_id (E->id), time (0), 5, action);
+  
+  bl_do_encr_chat_exchange_commit (TLS, E, s);
+}
+
+void tgl_do_abort_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E) {
+  bl_do_encr_chat_exchange_abort (TLS, E);
 }

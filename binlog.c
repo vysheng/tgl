@@ -505,6 +505,15 @@ static int fetch_comb_binlog_encr_chat_set_key (struct tgl_state *TLS, void *ext
   return 0;
 }
 
+static int fetch_comb_binlog_encr_chat_set_sha (struct tgl_state *TLS, void *extra) {
+  tgl_peer_id_t id = TGL_MK_ENCR_CHAT (fetch_int ());
+  tgl_peer_t *_U = tgl_peer_get (TLS, id);
+  assert (_U);
+  struct tgl_secret_chat *U = &_U->encr_chat;
+  fetch_ints (U->first_key_sha, 5);
+  return 0;
+}
+
 static int fetch_comb_binlog_encr_chat_update_seq (struct tgl_state *TLS, void *extra) {
   tgl_peer_id_t id = TGL_MK_ENCR_CHAT (fetch_int ());
   tgl_peer_t *_U = tgl_peer_get (TLS, id);
@@ -1262,6 +1271,68 @@ static int fetch_comb_binlog_reset_authorization (struct tgl_state *TLS, void *e
   return 0;
 }
 
+static int fetch_comb_binlog_encr_chat_exchange_request (struct tgl_state *TLS, void *extra) {
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (fetch_int ()));
+  assert (P);
+  P->encr_chat.exchange_id = fetch_long ();
+  fetch_ints (P->encr_chat.exchange_key, 64);
+  P->encr_chat.exchange_state = tgl_sce_requested;
+  return 0;
+}
+
+static int fetch_comb_binlog_encr_chat_exchange_accept (struct tgl_state *TLS, void *extra) {
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (fetch_int ()));
+  assert (P);
+  P->encr_chat.exchange_id = fetch_long ();
+  fetch_ints (P->encr_chat.exchange_key, 64);
+  P->encr_chat.exchange_state = tgl_sce_accepted;
+
+  static unsigned char sha_buffer[20];
+  SHA1 ((unsigned char *)P->encr_chat.exchange_key, 256, sha_buffer);
+
+  P->encr_chat.exchange_key_fingerprint = *(long long *)sha_buffer;
+  return 0;
+}
+
+static int fetch_comb_binlog_encr_chat_exchange_commit (struct tgl_state *TLS, void *extra) {
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (fetch_int ()));
+  assert (P);
+
+  memcpy (P->encr_chat.key, P->encr_chat.exchange_key, 256);
+  P->encr_chat.exchange_key_fingerprint = P->encr_chat.key_fingerprint;
+
+  fetch_ints (P->encr_chat.key, 64);
+  P->encr_chat.exchange_state = tgl_sce_committed;
+
+  static unsigned char sha_buffer[20];
+  SHA1 ((unsigned char *)P->encr_chat.key, 256, sha_buffer);
+
+  P->encr_chat.key_fingerprint = *(long long *)sha_buffer;
+  return 0;
+}
+
+static int fetch_comb_binlog_encr_chat_exchange_confirm (struct tgl_state *TLS, void *extra) {
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (fetch_int ()));
+  assert (P);
+  if (P->encr_chat.exchange_state != tgl_sce_committed) {
+    memcpy (P->encr_chat.key, P->encr_chat.exchange_key, 256);
+    P->encr_chat.key_fingerprint = P->encr_chat.exchange_key_fingerprint;
+  }
+  P->encr_chat.exchange_state = tgl_sce_none;
+  return 0;
+}
+
+static int fetch_comb_binlog_encr_chat_exchange_abort (struct tgl_state *TLS, void *extra) {
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (fetch_int ()));
+  assert (P);
+  if (P->encr_chat.exchange_state == tgl_sce_committed) {
+    memcpy (P->encr_chat.key, P->encr_chat.exchange_key, 256);
+    P->encr_chat.key_fingerprint = P->encr_chat.exchange_key_fingerprint;
+  }
+  P->encr_chat.exchange_state = tgl_sce_none;
+  return 0;
+}
+
 #define FETCH_COMBINATOR_FUNCTION(NAME) \
   case CODE_ ## NAME:\
     ok = fetch_comb_ ## NAME (TLS, 0); \
@@ -1319,6 +1390,7 @@ static void replay_log_event (struct tgl_state *TLS) {
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_set_state)
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_accepted)
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_set_key)
+  FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_set_sha)
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_update_seq)
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_set_seq)
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_init)
@@ -1356,6 +1428,11 @@ static void replay_log_event (struct tgl_state *TLS) {
   FETCH_COMBINATOR_FUNCTION (binlog_msg_seq_update)
   FETCH_COMBINATOR_FUNCTION (binlog_msg_update)
   FETCH_COMBINATOR_FUNCTION (binlog_reset_authorization)
+  FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_request)
+  FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_accept)
+  FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_commit)
+  FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_confirm)
+  FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_abort)
   default:
     vlogprintf (E_ERROR, "Unknown op 0x%08x\n", op);
     assert (0);
@@ -1805,6 +1882,14 @@ void bl_do_encr_chat_set_key (struct tgl_state *TLS, struct tgl_secret_chat *E, 
   add_log_event (TLS, ev, 272);
 }
 
+void bl_do_encr_chat_set_sha (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char sha[]) {
+  int *ev = alloc_log_event (28);
+  ev[0] = CODE_binlog_encr_chat_set_key;
+  ev[1] = tgl_get_peer_id (E->id);
+  memcpy (ev + 2, sha, 20);
+  add_log_event (TLS, ev, 28);
+}
+
 void bl_do_encr_chat_update_seq (struct tgl_state *TLS, struct tgl_secret_chat *E, int in_seq_no, int out_seq_no) {
   int *ev = alloc_log_event (16);
   ev[0] = CODE_binlog_encr_chat_update_seq;
@@ -2246,6 +2331,46 @@ void bl_do_msg_update (struct tgl_state *TLS, long long id) {
 void bl_do_reset_authorization (struct tgl_state *TLS)  {
   clear_packet ();
   out_int (CODE_binlog_reset_authorization);
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
+
+void bl_do_encr_chat_exchange_request (struct tgl_state *TLS, struct tgl_secret_chat *E, long long id, unsigned char a[]) {
+  clear_packet ();
+  out_int (CODE_binlog_encr_chat_exchange_request);
+  out_int (tgl_get_peer_id (E->id));
+  out_long (id);
+  out_ints ((void *)a, 64);
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
+void bl_do_encr_chat_exchange_accept (struct tgl_state *TLS, struct tgl_secret_chat *E, long long id, unsigned char key[]) {
+  clear_packet ();
+  out_int (CODE_binlog_encr_chat_exchange_accept);
+  out_int (tgl_get_peer_id (E->id));
+  out_long (id);
+  out_ints ((void *)key, 64);
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+void bl_do_encr_chat_exchange_commit (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char key[]) {
+  clear_packet ();
+  out_int (CODE_binlog_encr_chat_exchange_commit);
+  out_int (tgl_get_peer_id (E->id));
+  out_ints ((void *)key, 64);
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
+void bl_do_encr_chat_exchange_confirm (struct tgl_state *TLS, struct tgl_secret_chat *E) {
+  clear_packet ();
+  out_int (CODE_binlog_encr_chat_exchange_confirm);
+  out_int (tgl_get_peer_id (E->id));
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
+void bl_do_encr_chat_exchange_abort (struct tgl_state *TLS, struct tgl_secret_chat *E) {
+  clear_packet ();
+  out_int (CODE_binlog_encr_chat_exchange_abort);
+  out_int (tgl_get_peer_id (E->id));
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 /*void bl_do_add_dc (int id, const char *ip, int l, int port, long long auth_key_id, const char *auth_key) {

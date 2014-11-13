@@ -345,6 +345,7 @@ static inline void fetch256 (void *buf) {
   char *s = fetch_str (l);
   if (l < 256) {
     memcpy (buf + 256 - l, s, l);
+    memset (buf, 0, 256 - l);
   } else {
     memcpy (buf, s + (l - 256), 256);
   }

@@ -50,9 +50,15 @@ void bl_do_encr_chat_set_ttl (struct tgl_state *TLS, struct tgl_secret_chat *U, 
 void bl_do_encr_chat_set_layer (struct tgl_state *TLS, struct tgl_secret_chat *U, int layer);
 void bl_do_encr_chat_accepted (struct tgl_state *TLS, struct tgl_secret_chat *U, const unsigned char g_key[], const unsigned char nonce[], long long key_fingerprint);
 void bl_do_encr_chat_set_key (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char key[], long long key_fingerprint);
+void bl_do_encr_chat_set_sha (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char sha[]);
 void bl_do_encr_chat_init (struct tgl_state *TLS, int id, int user_id, unsigned char random[], unsigned char g_a[]);
 void bl_do_encr_chat_update_seq (struct tgl_state *TLS, struct tgl_secret_chat *E, int in_seq_no, int out_seq_no);
 void bl_do_encr_chat_set_seq (struct tgl_state *TLS, struct tgl_secret_chat *E, int in_seq_no, int last_in_seq_no, int out_seq_no);
+void bl_do_encr_chat_exchange_request (struct tgl_state *TLS, struct tgl_secret_chat *E, long long id, unsigned char a[]);
+void bl_do_encr_chat_exchange_accept (struct tgl_state *TLS, struct tgl_secret_chat *E, long long id, unsigned char key[]);
+void bl_do_encr_chat_exchange_commit (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char key[]);
+void bl_do_encr_chat_exchange_confirm (struct tgl_state *TLS, struct tgl_secret_chat *E);
+void bl_do_encr_chat_exchange_abort (struct tgl_state *TLS, struct tgl_secret_chat *E);
 
 void bl_do_dc_signed (struct tgl_state *TLS, int id);
 void bl_do_set_working_dc (struct tgl_state *TLS, int num);

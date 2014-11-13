@@ -1036,6 +1036,31 @@ void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_mess
     M->start_seq_no = fetch_int ();
     M->end_seq_no = fetch_int ();
     break;
+  case CODE_decrypted_message_action_noop:
+    M->type = tgl_message_action_noop;
+    break;
+  case CODE_decrypted_message_action_request_key:
+    M->type = tgl_message_action_request_key;
+    M->exchange_id = fetch_long ();
+    M->g_a = talloc (256);
+    fetch256 (M->g_a);
+    break;
+  case CODE_decrypted_message_action_accept_key:
+    M->type = tgl_message_action_request_key;
+    M->exchange_id = fetch_long ();
+    M->g_a = talloc (256);
+    fetch256 (M->g_a);
+    M->key_fingerprint = fetch_long ();
+    break;
+  case CODE_decrypted_message_action_commit_key:
+    M->type = tgl_message_action_request_key;
+    M->exchange_id = fetch_long ();
+    M->key_fingerprint = fetch_long ();
+    break;
+  case CODE_decrypted_message_action_abort_key:
+    M->type = tgl_message_action_request_key;
+    M->exchange_id = fetch_long ();
+    break;
   default:
     vlogprintf (E_ERROR, "x = 0x%08x\n", x);
     assert (0);
@@ -1147,21 +1172,24 @@ static int decrypt_encrypted_message (struct tgl_secret_chat *E) {
   static unsigned char sha1d_buffer[20];
  
   static unsigned char buf[64];
+
+  int *e_key = E->exchange_state != tgl_sce_committed ? E->key : E->exchange_key;
+
   memcpy (buf, msg_key, 16);
-  memcpy (buf + 16, E->key, 32);
+  memcpy (buf + 16, e_key, 32);
   sha1 (buf, 48, sha1a_buffer);
   
-  memcpy (buf, E->key + 8, 16);
+  memcpy (buf, e_key + 8, 16);
   memcpy (buf + 16, msg_key, 16);
-  memcpy (buf + 32, E->key + 12, 16);
+  memcpy (buf + 32, e_key + 12, 16);
   sha1 (buf, 48, sha1b_buffer);
   
-  memcpy (buf, E->key + 16, 32);
+  memcpy (buf, e_key + 16, 32);
   memcpy (buf + 32, msg_key, 16);
   sha1 (buf, 48, sha1c_buffer);
   
   memcpy (buf, msg_key, 16);
-  memcpy (buf + 16, E->key + 24, 32);
+  memcpy (buf + 16, e_key + 24, 32);
   sha1 (buf, 48, sha1d_buffer);
 
   static unsigned char key[32];
@@ -1216,7 +1244,12 @@ void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M)
   decr_end = decr_ptr + (len / 4);
   int ok = 0;
   if (P) {
-    if (*(long long *)decr_ptr != P->encr_chat.key_fingerprint) {
+    if (P->encr_chat.exchange_state == tgl_sce_committed && P->encr_chat.key_fingerprint == *(long long *)decr_ptr) {
+      tgl_do_confirm_exchange (TLS, (void *)P, 0);
+      assert (P->encr_chat.exchange_state == tgl_sce_none);
+    }
+    long long key_fingerprint = P->encr_chat.exchange_state != tgl_sce_committed ? P->encr_chat.key_fingerprint : P->encr_chat.exchange_key_fingerprint;
+    if (*(long long *)decr_ptr != key_fingerprint) {
       vlogprintf (E_WARNING, "Encrypted message with bad fingerprint to chat %s\n", P->print_name);
       P = 0;
     }
@@ -1483,6 +1516,44 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS) {
     assert (tgl_message_get (TLS, M->id) == M);
   }
   tglf_fetch_encrypted_message (TLS, M);
+
+  if (M->flags & FLAG_CREATED) {
+    tgl_peer_t *_E = tgl_peer_get (TLS, M->to_id);
+    assert (_E);
+    struct tgl_secret_chat *E = &_E->encr_chat;
+    if (M->action.type == tgl_message_action_request_key) {
+      if (E->exchange_state == tgl_sce_none || (E->exchange_state == tgl_sce_requested && E->exchange_id > M->action.exchange_id )) {
+        if (tglmp_check_g (TLS, TLS->encr_prime, (void *)M->action.g_a) < 0) {
+          vlogprintf (E_WARNING, "Exchange: Incorrect g_a\n");
+        } else {        
+          tgl_do_accept_exchange (TLS, E, M->action.exchange_id, M->action.g_a);
+        }
+      } else {
+        vlogprintf (E_WARNING, "Exchange: Incorrect state (received request, state = %d)\n", E->exchange_state);
+      }
+    }
+    if (M->action.type == tgl_message_action_accept_key) {
+      if (E->exchange_state == tgl_sce_requested && E->exchange_id == M->action.exchange_id) {
+        tgl_do_commit_exchange (TLS, E, M->action.g_a);
+      } else {
+        vlogprintf (E_WARNING, "Exchange: Incorrect state (received accept, state = %d)\n", E->exchange_state);
+      }
+    }
+    if (M->action.type == tgl_message_action_commit_key) {
+      if (E->exchange_state == tgl_sce_accepted && E->exchange_id == M->action.exchange_id) {
+        tgl_do_confirm_exchange (TLS, E, 1);
+      } else {
+        vlogprintf (E_WARNING, "Exchange: Incorrect state (received commit, state = %d)\n", E->exchange_state);
+      }
+    }
+    if (M->action.type == tgl_message_action_abort_key) {
+      if (E->exchange_state != tgl_sce_none && E->exchange_id == M->action.exchange_id) {
+        tgl_do_abort_exchange (TLS, E);
+      } else {
+        vlogprintf (E_WARNING, "Exchange: Incorrect state (received abort, state = %d)\n", E->exchange_state);
+      }
+    }
+  }
   return M;
 }
 
@@ -1668,17 +1739,17 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
 void tgls_free_message_action (struct tgl_state *TLS, struct tgl_message_action *M) {
   switch (M->type) {
   case tgl_message_action_none:
-    break;
+    return;
   case tgl_message_action_chat_create:
     tfree_str (M->title);
     tfree (M->users, M->user_num * 4);
-    break;
+    return;
   case tgl_message_action_chat_edit_title:
     tfree_str (M->new_title);
-    break;
+    return;
   case tgl_message_action_chat_edit_photo:
     tgls_free_photo (TLS, &M->photo);
-    break;
+    return;
   case tgl_message_action_chat_delete_photo:
   case tgl_message_action_chat_add_user:
   case tgl_message_action_chat_delete_user:
@@ -1689,14 +1760,23 @@ void tgls_free_message_action (struct tgl_state *TLS, struct tgl_message_action 
   case tgl_message_action_delete_messages:
   case tgl_message_action_screenshot_messages:
   case tgl_message_action_flush_history:
+  case tgl_message_action_typing:
   case tgl_message_action_resend:
   case tgl_message_action_notify_layer:
-    break;
-  
-  default:
+  case tgl_message_action_commit_key:
+  case tgl_message_action_abort_key:
+  case tgl_message_action_noop:
+    return;
+  case tgl_message_action_request_key:
+  case tgl_message_action_accept_key:
+    tfree (M->g_a, 256);
+    return;
+/*  default:
     vlogprintf (E_ERROR, "type = 0x%08x\n", M->type);
-    assert (0);
+    assert (0);*/
   }
+  vlogprintf (E_ERROR, "type = 0x%08x\n", M->type);
+  assert (0);
 }
 
 void tgls_clear_message (struct tgl_state *TLS, struct tgl_message *M) {
