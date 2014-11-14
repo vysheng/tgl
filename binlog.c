@@ -1673,8 +1673,8 @@ void bl_do_set_user_profile_photo (struct tgl_state *TLS, struct tgl_user *U, lo
 }
 
 void bl_do_user_set_name (struct tgl_state *TLS, struct tgl_user *U, const char *f, int fl, const char *l, int ll) {
-  if ((U->first_name && (int)strlen (U->first_name) == fl && !strncmp (U->first_name, f, fl)) && 
-      (U->last_name  && (int)strlen (U->last_name)  == ll && !strncmp (U->last_name,  l, ll))) {
+  if ((U->first_name && tstrlen (U->first_name) == fl && !strncmp (U->first_name, f, fl)) &&
+      (U->last_name  && tstrlen (U->last_name)  == ll && !strncmp (U->last_name,  l, ll))) {
     return;
   }
   clear_packet ();
@@ -1686,7 +1686,7 @@ void bl_do_user_set_name (struct tgl_state *TLS, struct tgl_user *U, const char 
 }
 
 void bl_do_user_set_username (struct tgl_state *TLS, struct tgl_user *U, const char *f, int l) {
-  if ((U->username && (int)strlen (U->username) == l && !strncmp (U->username, f, l)) || 
+  if ((U->username && tstrlen (U->username) == l && !strncmp (U->username, f, l)) ||
       (!l && !U->username)) {
     return;
   }
@@ -1707,7 +1707,7 @@ void bl_do_user_set_access_hash (struct tgl_state *TLS, struct tgl_user *U, long
 }
 
 void bl_do_user_set_phone (struct tgl_state *TLS, struct tgl_user *U, const char *p, int pl) {
-  if (U->phone && (int)strlen (U->phone) == pl && !strncmp (U->phone, p, pl)) {
+  if (U->phone && tstrlen (U->phone) == pl && !strncmp (U->phone, p, pl)) {
     return;
   }
   clear_packet ();
@@ -1773,8 +1773,8 @@ void bl_do_user_set_blocked (struct tgl_state *TLS, struct tgl_user *U, int bloc
 }
 
 void bl_do_user_set_real_name (struct tgl_state *TLS, struct tgl_user *U, const char *f, int fl, const char *l, int ll) {
-  if ((U->real_first_name && (int)strlen (U->real_first_name) == fl && !strncmp (U->real_first_name, f, fl)) && 
-      (U->real_last_name  && (int)strlen (U->real_last_name)  == ll && !strncmp (U->real_last_name,  l, ll))) {
+  if ((U->real_first_name && tstrlen (U->real_first_name) == fl && !strncmp (U->real_first_name, f, fl)) &&
+      (U->real_last_name  && tstrlen (U->real_last_name)  == ll && !strncmp (U->real_last_name,  l, ll))) {
     return;
   }
   clear_packet ();
@@ -1999,7 +1999,7 @@ void bl_do_chat_forbid (struct tgl_state *TLS, struct tgl_chat *C, int on) {
 }
 
 void bl_do_chat_set_title (struct tgl_state *TLS, struct tgl_chat *C, const char *s, int l) {
-  if (C->title && (int)strlen (C->title) == l && !strncmp (C->title, s, l)) { return; }
+  if (C->title && tstrlen (C->title) == l && !strncmp (C->title, s, l)) { return; }
   clear_packet ();
   out_int (CODE_binlog_chat_set_title);
   out_int (tgl_get_peer_id (C->id));

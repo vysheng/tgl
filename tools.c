@@ -33,6 +33,7 @@
 #include <zlib.h>
 #include <time.h>
 #include <sys/time.h>
+#include <limits.h>
 
 //#include "interface.h"
 #include "tools.h"
@@ -165,8 +166,13 @@ void *tgl_alloc0 (size_t size) {
   return p;
 }
 
+int tgl_strlen (const char *s) {
+    size_t l = strlen (s);
+    return l < INT_MAX ? (int)(l) : INT_MAX;
+}
+
 char *tgl_strdup (const char *s) {
-  int l = strlen (s);
+  int l = tstrlen (s);
   char *p = talloc (l + 1);
   memcpy (p, s, l + 1);
   return p;

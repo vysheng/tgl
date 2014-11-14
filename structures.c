@@ -73,7 +73,7 @@ char *tgls_default_create_print_name (struct tgl_state *TLS, tgl_peer_id_t id, c
     s++;
   }
   s = buf;
-  int fl = strlen (s);
+  int fl = tstrlen (s);
   int cc = 0;
   while (1) {
     tgl_peer_t *P = tgl_peer_get_by_name (TLS, s);
@@ -1154,7 +1154,7 @@ void tglf_tglf_fetch_geo_message (struct tgl_state *TLS, struct tgl_message *M) 
     tglf_fetch_message_action (TLS, &M->action);
   } else {
     M->message = fetch_str_dup ();
-    M->message_len = strlen (M->message);
+    M->message_len = tstrlen (M->message);
     tglf_fetch_message_media (TLS, &M->media);
   }
 }
