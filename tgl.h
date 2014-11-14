@@ -227,6 +227,7 @@ int tgl_complete_user_list (struct tgl_state *TLS, int index, const char *text, 
 int tgl_complete_chat_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_complete_encr_chat_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_complete_peer_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
+int tgl_secret_chat_for_user (struct tgl_state *TLS, tgl_peer_id_t user_id);
 
 #define TGL_PEER_USER 1
 #define TGL_PEER_CHAT 2
