@@ -515,8 +515,17 @@ static int sign_in_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int sign_in_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, char *error) {
+    vlogprintf (E_ERROR, "error_code = %d, error = %.*s\n", error_code, l, error);
+    if (q->callback) {
+        ((void (*)(void *, int, struct tgl_user *))q->callback) (q->callback_extra, 0, NULL);
+    }
+    return 0;
+}
+
 static struct query_methods sign_in_methods  = {
   .on_answer = sign_in_on_answer,
+  .on_error = sign_in_on_error,
   .type = TYPE_TO_PARAM(auth_authorization)
 };
 
