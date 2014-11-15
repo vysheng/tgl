@@ -312,8 +312,8 @@ static void out_random (int n) {
 
 int allow_send_linux_version;
 void tgl_do_insert_header (void) {
-  out_int (CODE_invoke_with_layer18);  
-  //out_int (0x50858a19);
+  out_int (CODE_invoke_with_layer);
+  out_int (TGL_SCHEME_LAYER);
   out_int (CODE_init_connection);
   out_int (TG_APP_ID);
   if (allow_send_linux_version) {

@@ -528,7 +528,7 @@ int gen_field_fetch (struct arg *arg, int *vars, int num, int empty) {
   return 0;
 }
 
-int gen_field_store (struct arg *arg, int *vars, int num, int from_func) {
+int gen_field_store (struct arg *arg, int *vars, int num, int from_func, int empty) {
   assert (arg);
   char *offset = "  ";
   int o = 0;
@@ -539,7 +539,7 @@ int gen_field_store (struct arg *arg, int *vars, int num, int from_func) {
   }
   char *fail = from_func ? "0" : "-1";
   char *expect = from_func ? "expect_token_ptr" : "expect_token";
-  if (arg->id && strlen (arg->id) > 0) {
+  if (arg->id && strlen (arg->id) > 0 && !empty) {
     printf ("%sif (cur_token_len >= 0 && cur_token_len == %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_len)) {\n", offset, (int)(strlen (arg->id)), arg->id);
     printf ("%s  local_next_token ();\n", offset);
     printf ("%s  %s (\":\", 1);\n", offset, expect);
@@ -609,7 +609,7 @@ int gen_field_store (struct arg *arg, int *vars, int num, int from_func) {
   return 0;
 }
 
-int gen_field_autocomplete (struct arg *arg, int *vars, int num, int from_func) {
+int gen_field_autocomplete (struct arg *arg, int *vars, int num, int from_func, int empty) {
   assert (arg);
   char *offset = "  ";
   int o = 0;
@@ -620,7 +620,7 @@ int gen_field_autocomplete (struct arg *arg, int *vars, int num, int from_func) 
   }
   char *fail = from_func ? "0" : "-1";
   char *expect = from_func ? "expect_token_ptr_autocomplete" : "expect_token_autocomplete";
-  if (arg->id && strlen (arg->id) > 0) {
+  if (arg->id && strlen (arg->id) > 0 && !empty) {
     printf ("%sif (cur_token_len == -3 && cur_token_real_len <= %d && !cur_token_quoted && !memcmp (cur_token, \"%s\", cur_token_real_len)) {\n", offset, (int)(strlen (arg->id)), arg->id);
     printf ("%s  set_autocomplete_string (\"%s\");\n", offset, arg->id);
     printf ("%s  return %s;\n", offset, fail);
@@ -922,8 +922,9 @@ void gen_constructor_store (struct tl_combinator *c) {
     return;
   }
 
+  int empty = is_empty (((struct tl_tree_type *)c->result)->type);
   for (i = 0; i < c->args_num; i++) if (!(c->args[i]->flags & FLAG_OPT_VAR)) {
-    assert (gen_field_store (c->args[i], vars, i + 1, 0) >= 0);
+    assert (gen_field_store (c->args[i], vars, i + 1, 0, empty) >= 0);
   }
 
   free (vars);
@@ -984,8 +985,9 @@ void gen_constructor_autocomplete (struct tl_combinator *c) {
     return;
   }
 
+  int empty = is_empty (((struct tl_tree_type *)c->result)->type);
   for (i = 0; i < c->args_num; i++) if (!(c->args[i]->flags & FLAG_OPT_VAR)) {
-    assert (gen_field_autocomplete (c->args[i], vars, i + 1, 0) >= 0);
+    assert (gen_field_autocomplete (c->args[i], vars, i + 1, 0, empty) >= 0);
   }
 
   free (vars);
@@ -1077,6 +1079,9 @@ void gen_type_store (struct tl_type *t) {
   for (k = 0; k < 2; k++) {
     printf ("int store_type_%s%s (struct paramed_type *T) {\n", k == 0 ? "" : "bare_", t->print_id);
     if (empty) {
+      if (!k) {
+        printf ("    out_int (0x%08x);\n", t->constructors[0]->name);
+      }
       printf ("  if (store_constructor_%s (T) < 0) { return -1; }\n", t->constructors[0]->print_id);
       printf ("  return 0;\n");
       printf ("}\n");
@@ -1158,7 +1163,7 @@ void gen_function_store (struct tl_combinator *f) {
     if (f->args[i]->flags & FLAG_EXCL) {
       assert (gen_field_store_excl (f->args[i], vars, i + 1, 1) >= 0);
     } else {
-      assert (gen_field_store (f->args[i], vars, i + 1, 1) >= 0);
+      assert (gen_field_store (f->args[i], vars, i + 1, 1, 0) >= 0);
     }
   }
 
@@ -1183,7 +1188,7 @@ void gen_function_autocomplete (struct tl_combinator *f) {
     if (f->args[i]->flags & FLAG_EXCL) {
       assert (gen_field_autocomplete_excl (f->args[i], vars, i + 1, 1) >= 0);
     } else {
-      assert (gen_field_autocomplete (f->args[i], vars, i + 1, 1) >= 0);
+      assert (gen_field_autocomplete (f->args[i], vars, i + 1, 1, 0) >= 0);
     }
   }
 

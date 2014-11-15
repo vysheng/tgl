@@ -426,6 +426,11 @@ void tglu_work_update (struct tgl_state *TLS, struct connection *c, long long ms
       }
     }
     break;
+  case CODE_update_privacy:
+    assert (skip_type_privacy_key (TYPE_TO_PARAM (privacy_key)) >= 0);
+    assert (skip_type_vector (TYPE_TO_PARAM_1 (vector, TYPE_TO_PARAM (privacy_rule))) >= 0);
+    vlogprintf (E_NOTICE, "privacy change update\n");
+    break;
   default:
     vlogprintf (E_ERROR, "Unknown update type %08x\n", op);
     ;
