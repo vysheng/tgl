@@ -209,7 +209,8 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
             vlogprintf (E_ERROR, "error = '%s'\n", error);
             wait = 10;
           } else {
-            wait = atoll (error + 11);
+              long long llwait = atoll (error + 11);
+              wait = llwait < INT8_MAX ? (int)(llwait) : INT8_MAX;
           }
         } else {
           wait = 10;
@@ -819,7 +820,8 @@ static int msg_send_on_error (struct tgl_state *TLS, struct query *q, int error_
   //vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", q->msg_id, error_code, error_len, error);
   if (error_code == 420) {
     assert (!strncmp (error, "FLOOD_WAIT_", 11));
-    int wait = atoll (error + 11);
+    long long llwait = atoll (error + 11);
+    int wait = llwait < INT8_MAX ? (int)(llwait) : INT8_MAX;
     q->flags &= ~QUERY_ACK_RECEIVED;
 
     TLS->timer_methods->insert (q->ev, wait);
