@@ -150,7 +150,7 @@ struct tgl_state {
   int verbosity;
   int unread_messages;
   int active_queries;
-  int max_msg_id;
+  long long max_msg_id;
   int started;
 
   long long locks; 

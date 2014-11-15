@@ -74,7 +74,7 @@ void tglu_work_update (struct tgl_state *TLS, struct connection *c, long long ms
   case CODE_update_message_i_d:
     {
       int id = fetch_int (); // id
-      int new = fetch_long (); // random_id
+      long new = fetch_long (); // random_id
       struct tgl_message *M = tgl_message_get (TLS, new);
       if (M) {
         bl_do_set_msg_id (TLS, M, id);
