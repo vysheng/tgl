@@ -51,7 +51,7 @@ struct connection {
   int out_bytes;
   int packet_num;
   int out_packet_num;
-  int last_connect_time;
+  time_t last_connect_time;
   int in_fail_timer;
   struct mtproto_methods *methods;
   struct tgl_state *TLS;
