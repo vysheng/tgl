@@ -68,7 +68,7 @@ struct tgl_dc;
 struct tgl_allocator {
   void *(*alloc)(size_t size);
   void *(*realloc)(void *ptr, size_t old_size, size_t size);
-  void (*free)(void *ptr, int size);
+  void (*free)(void *ptr, size_t size);
   void (*check)(void);
   void (*exists)(void *ptr, int size);
 };
