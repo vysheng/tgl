@@ -77,8 +77,8 @@ int tgl_strlen (const char *s);
 char *tgl_strdup (const char *s);
 char *tgl_strndup (const char *s, size_t n);
 
-void tgl_free_debug (void *ptr, int size);
-void tgl_free_release (void *ptr, int size);
+void tgl_free_debug (void *ptr, size_t size);
+void tgl_free_release (void *ptr, size_t size);
 //void tgl_free_str (void *ptr);
 //void tgl_free_secure (void *ptr, int size);
 
