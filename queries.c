@@ -199,7 +199,7 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
     }
     TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     int res = 0;
-    if (q->methods && q->methods->on_error && error_code != 500) {
+    if (q->methods && q->methods->on_error && error_code != 500 && error_code != 420) {
       res = q->methods->on_error (TLS, q, error_code, error_len, error);
     } else {
       if (error_code == 420 || error_code == 500) {
@@ -817,15 +817,6 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static int msg_send_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
   //vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", q->msg_id, error_code, error_len, error);
-  if (error_code == 420) {
-    assert (!strncmp (error, "FLOOD_WAIT_", 11));
-    int wait = atoll (error + 11);
-    q->flags &= ~QUERY_ACK_RECEIVED;
-
-    TLS->timer_methods->insert (q->ev, wait);
-    q->session_id = 0;
-    return 1;
-  }
   long long x = *(long long *)q->extra;
   tfree (q->extra, 8);
   struct tgl_message *M = tgl_message_get (TLS, x);
