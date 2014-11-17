@@ -1,6 +1,6 @@
 #include <string.h>
 #include <assert.h>
-#define MAX_MIME_TYPES_NUM 1000
+#define MAX_MIME_TYPES_NUM 10000
 
 extern char _binary_mime_types_start[];
 extern char _binary_mime_types_end[];
