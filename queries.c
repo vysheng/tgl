@@ -311,11 +311,11 @@ static void out_random (int n) {
 }
 
 int allow_send_linux_version;
-void tgl_do_insert_header (void) {
+void tgl_do_insert_header (struct tgl_state *TLS) {
   out_int (CODE_invoke_with_layer);
   out_int (TGL_SCHEME_LAYER);
   out_int (CODE_init_connection);
-  out_int (TG_APP_ID);
+  out_int (TLS->app_id);
   if (allow_send_linux_version) {
     struct utsname st;
     uname (&st);
@@ -384,14 +384,14 @@ static struct query_methods help_get_config_methods  = {
 
 void tgl_do_help_get_config (struct tgl_state *TLS, void (*callback)(struct tgl_state *,void *, int), void *callback_extra) {
   clear_packet ();  
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_help_get_config);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &help_get_config_methods, 0, callback, callback_extra);
 }
 
 void tgl_do_help_get_config_dc (struct tgl_state *TLS, struct tgl_dc *D, void (*callback)(struct tgl_state *, void *, int), void *callback_extra) {
   clear_packet ();  
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_help_get_config);
   tglq_send_query_ex (TLS, D, packet_ptr - packet_buffer, packet_buffer, &help_get_config_methods, 0, callback, callback_extra, 2);
 }
@@ -457,12 +457,12 @@ void tgl_do_send_code (struct tgl_state *TLS, const char *user, void (*callback)
   vlogprintf (E_DEBUG, "sending code to dc %d\n", TLS->dc_working_num);
   //suser = tstrdup (user);
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_auth_send_code);
   out_string (user);
   out_int (0);
-  out_int (TG_APP_ID);
-  out_string (TG_APP_HASH);
+  out_int (TLS->app_id);
+  out_string (TLS->app_hash);
   out_string ("en");
 
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_code_methods, tstrdup (user), callback, callback_extra);
@@ -487,7 +487,7 @@ void tgl_do_phone_call (struct tgl_state *TLS, const char *user, const char *has
   //suser = tstrdup (user);
   //want_dc_num = 0;
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_auth_send_call);
   out_string (user);
   out_string (hash);
@@ -2726,7 +2726,7 @@ static int export_auth_on_answer (struct tgl_state *TLS, struct query *q) {
   memcpy (s, fetch_str (l), l);
   
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_auth_import_authorization);
   out_int (TLS->our_id);
   out_cstring (s, l);
@@ -3481,7 +3481,7 @@ void tgl_do_lookup_state (struct tgl_state *TLS) {
     return;
   }
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_updates_get_state);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &lookup_state_methods, 0, 0, 0);
 }
@@ -3497,7 +3497,7 @@ void tgl_do_get_difference (struct tgl_state *TLS, int sync_from_start, void (*c
   }
   TLS->locks |= TGL_LOCK_DIFF;
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   if (TLS->pts > 0 || sync_from_start) {
     if (TLS->pts == 0) { TLS->pts = 1; }
     //if (TLS->qts == 0) { TLS->qts = 1; }
