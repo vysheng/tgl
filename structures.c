@@ -152,11 +152,13 @@ int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, st
     {
       int when = fetch_int ();
       if (S->online != 1) {
+        S->when = when;
         tgl_insert_status_update (TLS, U);
         tgl_insert_status_expire (TLS, U);
         S->online = 1;
       } else {
         if (when != S->when) {
+          S->when = when;
           tgl_remove_status_expire (TLS, U);
           tgl_insert_status_expire (TLS, U);
         }
