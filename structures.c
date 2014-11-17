@@ -141,7 +141,9 @@ int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, st
   case CODE_user_status_empty:
     if (S->online) {
       tgl_insert_status_update (TLS, U);
-      tgl_remove_status_expire (TLS, U);
+      if (S->online == 1) {
+        tgl_remove_status_expire (TLS, U);
+      }
     }
     S->online = 0;
     S->when = 0;
