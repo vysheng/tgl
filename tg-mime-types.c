@@ -53,12 +53,14 @@ char *tg_mime_by_filename (const char *filename) {
             c ++;
           }
           assert (c != _binary_mime_types_end);
+          int br = (*c == '\n');
           *c = 0;
           c ++;
           assert (mime_type_number < MAX_MIME_TYPES_NUM);
           mime_type_names[mime_type_number] = name;
           mime_type_extensions[mime_type_number] = ext;
           mime_type_number ++;
+          if (br) { break; }
         }
       }
     }
