@@ -137,12 +137,13 @@ int tglf_fetch_file_location (struct tgl_state *TLS, struct tgl_file_location *l
 
 int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, struct tgl_user *U) {
   unsigned x = fetch_int ();
-  assert (x == CODE_user_status_empty || x == CODE_user_status_online || x == CODE_user_status_offline);
   switch (x) {
   case CODE_user_status_empty:
     if (S->online) {
       tgl_insert_status_update (TLS, U);
-      tgl_remove_status_expire (TLS, U);
+      if (S->online == 1) {
+        tgl_remove_status_expire (TLS, U);
+      }
     }
     S->online = 0;
     S->when = 0;
@@ -151,11 +152,13 @@ int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, st
     {
       int when = fetch_int ();
       if (S->online != 1) {
+        S->when = when;
         tgl_insert_status_update (TLS, U);
         tgl_insert_status_expire (TLS, U);
         S->online = 1;
       } else {
         if (when != S->when) {
+          S->when = when;
           tgl_remove_status_expire (TLS, U);
           tgl_insert_status_expire (TLS, U);
         }
@@ -172,7 +175,35 @@ int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, st
     S->online = -1;
     S->when = fetch_int ();
     break;
+  case CODE_user_status_recently:
+    if (S->online != -2) {
+      tgl_insert_status_update (TLS, U);
+      if (S->online == 1) {
+        tgl_remove_status_expire (TLS, U);
+      }
+    }
+    S->online = -2;
+    break;
+  case CODE_user_status_last_week:
+    if (S->online != -3) {
+      tgl_insert_status_update (TLS, U);
+      if (S->online == 1) {
+        tgl_remove_status_expire (TLS, U);
+      }
+    }
+    S->online = -3;
+    break;
+  case CODE_user_status_last_month:
+    if (S->online != -4) {
+      tgl_insert_status_update (TLS, U);
+      if (S->online == 1) {
+        tgl_remove_status_expire (TLS, U);
+      }
+    }
+    S->online = -4;
+    break;
   default:
+    vlogprintf (E_ERROR, "x = 0x%08x\n", x);
     assert (0);
   }
   return 0;
@@ -2061,6 +2092,18 @@ int tgl_complete_peer_list (struct tgl_state *TLS, int index, const char *text, 
   } else {
     return -1;
   }
+}
+
+int tgl_secret_chat_for_user (struct tgl_state *TLS, tgl_peer_id_t user_id) {
+    int index = 0;
+    while (index < TLS->peer_num && (tgl_get_peer_type (TLS->Peers[index]->id) != TGL_PEER_ENCR_CHAT || TLS->Peers[index]->encr_chat.user_id != tgl_get_peer_id (user_id) || TLS->Peers[index]->encr_chat.state != sc_ok)) {
+        index ++;
+    }
+    if (index < TLS->peer_num) {
+        return tgl_get_peer_id (TLS->Peers[index]->encr_chat.id);
+    } else {
+        return -1;
+    }
 }
 
 void tgls_free_peer_gw (tgl_peer_t *P, void *TLS) {

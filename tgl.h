@@ -42,6 +42,7 @@
 #define TGL_VERSION "1.1.1"
 
 #define TGL_ENCRYPTED_LAYER 17
+#define TGL_SCHEME_LAYER 19
 
 struct connection;
 struct mtproto_methods;
@@ -209,6 +210,9 @@ struct tgl_state {
   struct tree_user *online_updates;
 
   struct tgl_timer *online_updates_timer;
+
+  int app_id;
+  char *app_hash;
 };
 #pragma pack(pop)
 //extern struct tgl_state tgl_state;
@@ -227,6 +231,7 @@ int tgl_complete_user_list (struct tgl_state *TLS, int index, const char *text, 
 int tgl_complete_chat_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_complete_encr_chat_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_complete_peer_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
+int tgl_secret_chat_for_user (struct tgl_state *TLS, tgl_peer_id_t user_id);
 
 #define TGL_PEER_USER 1
 #define TGL_PEER_CHAT 2
@@ -385,6 +390,7 @@ struct paramed_type *tglf_extf_store (struct tgl_state *TLS, const char *data, i
 char *tglf_extf_fetch (struct tgl_state *TLS, struct paramed_type *T);
 
 void tgl_free_all (struct tgl_state *TLS);
+void tgl_register_app_id (struct tgl_state *TLS, int app_id, char *app_hash);
 
 static inline struct tgl_state *tgl_state_alloc (void) {
   struct tgl_state *TLS = malloc (sizeof (*TLS));

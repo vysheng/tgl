@@ -199,7 +199,7 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
     }
     TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     int res = 0;
-    if (q->methods && q->methods->on_error && error_code != 500) {
+    if (q->methods && q->methods->on_error && error_code != 500 && error_code != 420) {
       res = q->methods->on_error (TLS, q, error_code, error_len, error);
     } else {
       if (error_code == 420 || error_code == 500) {
@@ -312,11 +312,11 @@ static void out_random (int n) {
 }
 
 int allow_send_linux_version;
-void tgl_do_insert_header (void) {
-  out_int (CODE_invoke_with_layer18);  
-  //out_int (0x50858a19);
+void tgl_do_insert_header (struct tgl_state *TLS) {
+  out_int (CODE_invoke_with_layer);
+  out_int (TGL_SCHEME_LAYER);
   out_int (CODE_init_connection);
-  out_int (TG_APP_ID);
+  out_int (TLS->app_id);
   if (allow_send_linux_version) {
     struct utsname st;
     uname (&st);
@@ -385,14 +385,14 @@ static struct query_methods help_get_config_methods  = {
 
 void tgl_do_help_get_config (struct tgl_state *TLS, void (*callback)(struct tgl_state *,void *, int), void *callback_extra) {
   clear_packet ();  
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_help_get_config);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &help_get_config_methods, 0, callback, callback_extra);
 }
 
 void tgl_do_help_get_config_dc (struct tgl_state *TLS, struct tgl_dc *D, void (*callback)(struct tgl_state *, void *, int), void *callback_extra) {
   clear_packet ();  
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_help_get_config);
   tglq_send_query_ex (TLS, D, packet_ptr - packet_buffer, packet_buffer, &help_get_config_methods, 0, callback, callback_extra, 2);
 }
@@ -458,12 +458,12 @@ void tgl_do_send_code (struct tgl_state *TLS, const char *user, void (*callback)
   vlogprintf (E_DEBUG, "sending code to dc %d\n", TLS->dc_working_num);
   //suser = tstrdup (user);
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_auth_send_code);
   out_string (user);
   out_int (0);
-  out_int (TG_APP_ID);
-  out_string (TG_APP_HASH);
+  out_int (TLS->app_id);
+  out_string (TLS->app_hash);
   out_string ("en");
 
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_code_methods, tstrdup (user), callback, callback_extra);
@@ -488,7 +488,7 @@ void tgl_do_phone_call (struct tgl_state *TLS, const char *user, const char *has
   //suser = tstrdup (user);
   //want_dc_num = 0;
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_auth_send_call);
   out_string (user);
   out_string (hash);
@@ -516,8 +516,17 @@ static int sign_in_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int sign_in_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, char *error) {
+    vlogprintf (E_ERROR, "error_code = %d, error = %.*s\n", error_code, l, error);
+    if (q->callback) {
+        ((void (*)(void *, int, struct tgl_user *))q->callback) (q->callback_extra, 0, NULL);
+    }
+    return 0;
+}
+
 static struct query_methods sign_in_methods  = {
   .on_answer = sign_in_on_answer,
+  .on_error = sign_in_on_error,
   .type = TYPE_TO_PARAM(auth_authorization)
 };
 
@@ -740,6 +749,23 @@ static int msg_send_encr_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int msg_send_encr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+    struct tgl_message *M = q->extra;
+    tgl_peer_t *P = tgl_peer_get (TLS, M->to_id);
+    if (error_code == 400) {
+        if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
+            bl_do_encr_chat_delete(TLS, &P->encr_chat);
+        }
+    }
+    if (q->callback) {
+        ((void (*)(struct tgl_state *TLS, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 0, M);
+    }
+    if (M) {
+        bl_do_delete_msg (TLS, M);
+    }
+    return 0;
+}
+
 static int msg_send_on_answer (struct tgl_state *TLS, struct query *q) {
   unsigned x = fetch_int ();
   assert (x == CODE_messages_sent_message || x == CODE_messages_sent_message_link);
@@ -818,16 +844,6 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static int msg_send_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
   //vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", q->msg_id, error_code, error_len, error);
-  if (error_code == 420) {
-    assert (!strncmp (error, "FLOOD_WAIT_", 11));
-    long long llwait = atoll (error + 11);
-    int wait = llwait < INT8_MAX ? (int)(llwait) : INT8_MAX;
-    q->flags &= ~QUERY_ACK_RECEIVED;
-
-    TLS->timer_methods->insert (q->ev, wait);
-    q->session_id = 0;
-    return 1;
-  }
   long long x = *(long long *)q->extra;
   tfree (q->extra, 8);
   struct tgl_message *M = tgl_message_get (TLS, x);
@@ -848,6 +864,7 @@ static struct query_methods msg_send_methods = {
 
 static struct query_methods msg_send_encr_methods = {
   .on_answer = msg_send_encr_on_answer,
+  .on_error = msg_send_encr_on_error,
   .type = TYPE_TO_PARAM(messages_sent_encrypted_message)
 };
 
@@ -2710,7 +2727,7 @@ static int export_auth_on_answer (struct tgl_state *TLS, struct query *q) {
   memcpy (s, fetch_str (l), l);
   
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_auth_import_authorization);
   out_int (TLS->our_id);
   out_cstring (s, l);
@@ -3465,7 +3482,7 @@ void tgl_do_lookup_state (struct tgl_state *TLS) {
     return;
   }
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   out_int (CODE_updates_get_state);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &lookup_state_methods, 0, 0, 0);
 }
@@ -3481,7 +3498,7 @@ void tgl_do_get_difference (struct tgl_state *TLS, int sync_from_start, void (*c
   }
   TLS->locks |= TGL_LOCK_DIFF;
   clear_packet ();
-  tgl_do_insert_header ();
+  tgl_do_insert_header (TLS);
   if (TLS->pts > 0 || sync_from_start) {
     if (TLS->pts == 0) { TLS->pts = 1; }
     //if (TLS->qts == 0) { TLS->qts = 1; }

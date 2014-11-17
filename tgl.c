@@ -72,6 +72,11 @@ void tgl_init (struct tgl_state *TLS) {
   TLS->message_list.prev_use = &TLS->message_list;
 
   tglmp_on_start (TLS);
+  
+  if (!TLS->app_id) {
+    TLS->app_id = TG_APP_ID;
+    TLS->app_hash = tstrdup (TG_APP_HASH);
+  }
 }
 
 int tgl_authorized_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
@@ -82,5 +87,10 @@ int tgl_authorized_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
 int tgl_signed_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
   assert (DC);
   return DC->has_auth;
+}
+
+void tgl_register_app_id (struct tgl_state *TLS, int app_id, char *app_hash) {
+  TLS->app_id = app_id;
+  TLS->app_hash = tstrdup (app_hash);
 }
 

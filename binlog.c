@@ -199,7 +199,7 @@ static int fetch_comb_binlog_user_add (struct tgl_state *TLS, void *extra) {
   }
       
   if (TLS->callback.user_update) {
-    TLS->callback.user_update (TLS, U, TGL_UPDATE_CREATED);
+    TLS->callback.user_update (TLS, U, TGL_UPDATE_CREATED | TGL_UPDATE_NAME | TGL_UPDATE_PHONE | TGL_UPDATE_ACCESS_HASH | TGL_UPDATE_CONTACT);
   }
   return 0;
 }
@@ -598,7 +598,7 @@ static int fetch_comb_binlog_chat_create (struct tgl_state *TLS, void *extra) {
   fetch_data (&C->photo_small, sizeof (struct tgl_file_location));
       
   if (TLS->callback.chat_update) {
-    TLS->callback.chat_update (TLS, C, TGL_UPDATE_CREATED);
+    TLS->callback.chat_update (TLS, C, TGL_UPDATE_CREATED | TGL_UPDATE_TITLE | TGL_UPDATE_PHOTO);
   }
   return 0;
 }
