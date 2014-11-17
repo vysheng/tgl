@@ -37,8 +37,8 @@
 struct connection;
 struct tgl_dc;
 //#include "queries.h"
-#define TG_APP_HASH "36722c72256a24c1225de00eb6a1ca74"
-#define TG_APP_ID 2899
+#define TG_APP_HASH "844584f2b1fd2daecee726166dcc1ef8"
+#define TG_APP_ID 10534
 
 #define ACK_TIMEOUT 1
 #define MAX_DC_ID 10
