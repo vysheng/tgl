@@ -52,6 +52,7 @@
 #include "updates.h"
 #include "auto.h"
 #include "tgl.h"
+#include "tg-mime-types.h"
 
 #define sha1 SHA1
 
@@ -1683,15 +1684,15 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
         out_int (100);
         out_int (100);
         out_int (100);
-        out_string ("video");
+        out_string (tg_mime_by_filename (f->file_name));
       }
       if (f->media_type == CODE_input_media_uploaded_document || f->media_type == CODE_input_media_uploaded_thumb_document) {
         out_string (s + 1);
-        out_string ("text");
+        out_string (tg_mime_by_filename (f->file_name));
       }
       if (f->media_type == CODE_input_media_uploaded_audio) {
         out_int (60);
-        out_string ("audio");
+        out_string (tg_mime_by_filename (f->file_name));
       }
 
       long long r;
