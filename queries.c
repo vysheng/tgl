@@ -515,8 +515,17 @@ static int sign_in_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int sign_in_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, char *error) {
+    vlogprintf (E_ERROR, "error_code = %d, error = %.*s\n", error_code, l, error);
+    if (q->callback) {
+        ((void (*)(void *, int, struct tgl_user *))q->callback) (q->callback_extra, 0, NULL);
+    }
+    return 0;
+}
+
 static struct query_methods sign_in_methods  = {
   .on_answer = sign_in_on_answer,
+  .on_error = sign_in_on_error,
   .type = TYPE_TO_PARAM(auth_authorization)
 };
 
@@ -739,6 +748,23 @@ static int msg_send_encr_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int msg_send_encr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+    struct tgl_message *M = q->extra;
+    tgl_peer_t *P = tgl_peer_get (TLS, M->to_id);
+    if (error_code == 400) {
+        if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
+            bl_do_encr_chat_delete(TLS, &P->encr_chat);
+        }
+    }
+    if (q->callback) {
+        ((void (*)(struct tgl_state *TLS, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 0, M);
+    }
+    if (M) {
+        bl_do_delete_msg (TLS, M);
+    }
+    return 0;
+}
+
 static int msg_send_on_answer (struct tgl_state *TLS, struct query *q) {
   unsigned x = fetch_int ();
   assert (x == CODE_messages_sent_message || x == CODE_messages_sent_message_link);
@@ -837,6 +863,7 @@ static struct query_methods msg_send_methods = {
 
 static struct query_methods msg_send_encr_methods = {
   .on_answer = msg_send_encr_on_answer,
+  .on_error = msg_send_encr_on_error,
   .type = TYPE_TO_PARAM(messages_sent_encrypted_message)
 };
 
