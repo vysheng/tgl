@@ -111,6 +111,15 @@ struct tgl_net_methods {
   struct connection *(*create_connection) (struct tgl_state *TLS, const char *host, int port, struct tgl_session *session, struct tgl_dc *dc, struct mtproto_methods *methods);
 };
 
+struct tgl_serialize_methods {
+    int (*load_auth) (struct tgl_state *TLS);
+    int (*load_state) (struct tgl_state *TLS);
+    int (*load_secret_chats) (struct tgl_state *TLS);
+    int (*store_auth) (struct tgl_state *TLS);
+    int (*store_state) (struct tgl_state *TLS);
+    int (*store_secret_chats) (struct tgl_state *TLS);
+};
+
 struct mtproto_methods {
   int (*ready) (struct tgl_state *TLS, struct connection *c);
   int (*close) (struct tgl_state *TLS, struct connection *c);
@@ -173,6 +182,7 @@ struct tgl_state {
 
   struct tgl_update_callback callback;
   struct tgl_net_methods *net_methods;
+  struct tgl_serialize_methods *serialize_methods;
   void *ev_base;
 
   char *rsa_key_list[TGL_MAX_RSA_KEYS_NUM];
