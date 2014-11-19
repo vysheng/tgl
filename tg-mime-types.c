@@ -15,14 +15,14 @@ static char *end = _section$__DATA__auto_mime_types + getsectbyname("__DATA", "_
 extern char binary_auto_mime_types_start[];
 extern char binary_auto_mime_types_end[];
 static char *start = binary_auto_mime_types_start;
-static char *end =  binary_auto_mime_types_start;
+static char *end =  binary_auto_mime_types_end;
 
 #else /* gnu ld */
 
 extern char _binary_auto_mime_types_start[];
 extern char _binary_auto_mime_types_end[];
 static char *start = _binary_auto_mime_types_start;
-static char *end =  _binary_auto_mime_types_start;
+static char *end =  _binary_auto_mime_types_end;
 
 #endif
 
