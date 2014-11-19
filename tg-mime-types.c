@@ -2,10 +2,29 @@
 #include <assert.h>
 #define MAX_MIME_TYPES_NUM 10000
 
+
+#ifdef __APPLE__
+#include <mach-o/getsect.h>
+
+extern char _section$__DATA_auto_mime_types[];
+static char *start = _section$__DATA_auto_mime_types[];
+static char *end = _section$__DATA__auto_mime_types + getsectbyname("__DATA", "_auto_mime_types")->size
+
+#elif (defined __WIN32__)  /* mingw */
+
+extern char binary_auto_mime_types_start[];
+extern char binary_auto_mime_types_end[];
+static char *start = binary_auto_mime_types_start;
+static char *end =  binary_auto_mime_types_start;
+
+#else /* gnu ld */
+
 extern char _binary_auto_mime_types_start[];
 extern char _binary_auto_mime_types_end[];
 static char *start = _binary_auto_mime_types_start;
 static char *end =  _binary_auto_mime_types_start;
+
+#endif
 
 char *tg_mime_by_filename (const char *filename) {
   int l = strlen (filename);
