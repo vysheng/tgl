@@ -53,7 +53,7 @@ ${OBJ_C}: ${OBJ}/%.o: ${srcdir}/%.c | create_dirs
 	${CC} ${INCLUDE} ${COMPILE_FLAGS} -c -MP -MD -MF ${DEP}/$*.d -MQ ${OBJ}/$*.o -o $@ $<
 
 ${OBJ}/mime-types.o: ${srcdir}/mime.types
-	ld -r -b binary -o $@ $^
+	cp $^ ${AUTO}/mime.types && ld -r -b binary -o $@ ${AUTO}/mime.types
 
 
 ${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS} ${OBJ}/mime-types.o
