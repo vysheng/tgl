@@ -1425,7 +1425,7 @@ void tglmp_regenerate_temp_auth_key (struct tgl_state *TLS, struct tgl_dc *D) {
   tglt_secure_random (&S->session_id, 8);
   S->seq_no = 0;
 
-  TLS->timer_methods->delete (S->ev);
+  TLS->timer_methods->remove (S->ev);
   S->ack_tree = tree_clear_long (S->ack_tree);
   
   if (D->state != st_authorized) {

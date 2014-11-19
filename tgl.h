@@ -122,7 +122,7 @@ struct tgl_timer;
 struct tgl_timer_methods {
   struct tgl_timer *(*alloc) (struct tgl_state *TLS, void (*cb)(struct tgl_state *TLS, void *arg), void *arg);
   void (*insert) (struct tgl_timer *t, double timeout);
-  void (*delete) (struct tgl_timer *t);
+  void (*remove) (struct tgl_timer *t);
   void (*free) (struct tgl_timer *t);
 };
 

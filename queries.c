@@ -118,7 +118,7 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
 void tglq_query_restart (struct tgl_state *TLS, long long id) {
   struct query *q = tglq_query_get (TLS, id);
   if (q) {
-    TLS->timer_methods->delete (q->ev);
+    TLS->timer_methods->remove (q->ev);
     alarm_query (TLS, q);
   }
 }
@@ -181,7 +181,7 @@ void tglq_query_ack (struct tgl_state *TLS, long long id) {
   if (q && !(q->flags & QUERY_ACK_RECEIVED)) { 
     assert (q->msg_id == id);
     q->flags |= QUERY_ACK_RECEIVED; 
-    TLS->timer_methods->delete (q->ev);
+    TLS->timer_methods->remove (q->ev);
   }
 }
 
@@ -196,7 +196,7 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
     vlogprintf (E_WARNING, "No such query\n");
   } else {
     if (!(q->flags & QUERY_ACK_RECEIVED)) {
-      TLS->timer_methods->delete (q->ev);
+      TLS->timer_methods->remove (q->ev);
     }
     TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     int res = 0;
@@ -266,7 +266,7 @@ void tglq_query_result (struct tgl_state *TLS, long long id) {
     in_ptr = in_end;
   } else {
     if (!(q->flags & QUERY_ACK_RECEIVED)) {
-      TLS->timer_methods->delete (q->ev);
+      TLS->timer_methods->remove (q->ev);
     }
     TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     if (q->methods && q->methods->on_answer) {
