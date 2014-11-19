@@ -52,11 +52,7 @@ ${TGL_OBJECTS}: ${AUTO}/constants.h ${AUTO}/auto-header.h
 ${OBJ_C}: ${OBJ}/%.o: ${srcdir}/%.c | create_dirs
 	${CC} ${INCLUDE} ${COMPILE_FLAGS} -c -MP -MD -MF ${DEP}/$*.d -MQ ${OBJ}/$*.o -o $@ $<
 
-${OBJ}/mime-types.o: ${srcdir}/mime.types
-	cp $^ ${AUTO}/mime.types && ld -r -b binary -o $@ ${AUTO}/mime.types
-
-
-${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS} ${OBJ}/mime-types.o
+${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS}
 	ar ruv $@ ${TGL_OBJECTS} ${COMMON_OBJECTS}
 
 ${EXE}/generate: ${GENERATE_OBJECTS} ${COMMON_OBJECTS}
