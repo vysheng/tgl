@@ -393,7 +393,7 @@ void tgl_free_all (struct tgl_state *TLS);
 void tgl_register_app_id (struct tgl_state *TLS, int app_id, char *app_hash);
 
 static inline struct tgl_state *tgl_state_alloc (void) {
-  struct tgl_state *TLS = malloc (sizeof (*TLS));
+  struct tgl_state *TLS = (struct tgl_state *)malloc (sizeof (*TLS));
   if (!TLS) { return NULL; }
   memset (TLS, 0, sizeof (*TLS));
   return TLS;
