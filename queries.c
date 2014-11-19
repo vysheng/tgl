@@ -964,7 +964,7 @@ void tgl_do_send_encr_msg (struct tgl_state *TLS, struct tgl_message *M, void (*
   out_long (M->id);
   encr_start ();
   if (P->encr_chat.layer <= 16) {
-    out_int (CODE_decrypted_message_service_l16);
+    out_int (CODE_decrypted_message_l16);
   } else {
     out_int (CODE_decrypted_message_layer);
     out_random (15 + 4 * (lrand48 () % 3));
@@ -1713,7 +1713,7 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
       out_long (r);
       encr_start ();
       if (P->encr_chat.layer <= 16) {
-        out_int (CODE_decrypted_message_service_l16);
+        out_int (CODE_decrypted_message_l16);
       } else {
         out_int (CODE_decrypted_message_layer);
         out_random (15 + 4 * (lrand48 () % 3));
@@ -2169,7 +2169,7 @@ void tgl_do_send_location(struct tgl_state *TLS, tgl_peer_id_t id, double latitu
     out_long (r);
     encr_start ();
     if (P->encr_chat.layer <= 16) {
-      out_int (CODE_decrypted_message_service_l16);
+      out_int (CODE_decrypted_message_l16);
     } else {
       out_int (CODE_decrypted_message_layer);
       out_random (15 + 4 * (lrand48 () % 3));
