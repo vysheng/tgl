@@ -297,6 +297,10 @@ static inline void tgl_set_test_mode (struct tgl_state *TLS) {
   TLS->test_mode ++;
 }
 
+static inline void tgl_set_serialize_methods (struct tgl_state *TLS, struct tgl_serialize_methods *methods) {
+  TLS->serialize_methods = methods;
+}
+
 static inline void tgl_set_net_methods (struct tgl_state *TLS, struct tgl_net_methods *methods) {
   TLS->net_methods = methods;
 }
