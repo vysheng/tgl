@@ -1532,7 +1532,7 @@ void tgl_replay_log (struct tgl_state *TLS) {
         rptr = binlog_buffer;
       }
       int l = (binlog_buffer + BINLOG_BUFFER_SIZE - wptr) * 4;
-      int k = read (fd, wptr, l);
+      ssize_t k = read (fd, wptr, l);
       if (k < 0) {
         perror ("read binlog");
         exit (2);
@@ -2283,7 +2283,7 @@ void bl_do_set_unread (struct tgl_state *TLS, struct tgl_message *M, int unread)
   if (unread || !M->unread) { return; }
   clear_packet ();
   out_int (CODE_binlog_message_set_unread);
-  out_int (M->id);
+  out_int ((int)M->id);
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 
