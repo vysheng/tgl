@@ -1580,6 +1580,9 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS) {
         vlogprintf (E_WARNING, "Exchange: Incorrect state (received abort, state = %d)\n", E->exchange_state);
       }
     }
+    if (M->action.type == tgl_message_action_notify_layer) {
+      bl_do_encr_chat_set_layer (TLS, E, M->action.layer);      
+    }
   }
   return M;
 }
