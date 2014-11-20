@@ -29,6 +29,6 @@ struct tgl_serialize_callback {
 };
 
 extern struct tgl_serialize_methods tgl_file_methods;
-extern struct tgl_serialize_callback tgl_file_config;
+extern struct tgl_serialize_callback tgl_file_callback;
 
 #endif /* defined(__TGL_SERIALIZE_H__) */

@@ -37,7 +37,7 @@
 
 
 int read_state_file (struct tgl_state *TLS) {
-    int state_file_fd = open (tgl_file_config.get_state_filename (), O_CREAT | O_RDWR, 0600);
+    int state_file_fd = open (tgl_file_callback.get_state_filename (), O_CREAT | O_RDWR, 0600);
     if (state_file_fd < 0) {
         return -1;
     }
@@ -70,9 +70,9 @@ int write_state_file (struct tgl_state *TLS) {
     static int wdate;
     if (wseq >= TLS->seq && wpts >= TLS->pts && wqts >= TLS->qts && wdate >= TLS->date) { return -1; }
     wseq = TLS->seq; wpts = TLS->pts; wqts = TLS->qts; wdate = TLS->date;
-    int state_file_fd = open (tgl_file_config.get_state_filename (), O_CREAT | O_RDWR, 0600);
+    int state_file_fd = open (tgl_file_callback.get_state_filename (), O_CREAT | O_RDWR, 0600);
     if (state_file_fd < 0) {
-        vlogprintf (E_ERROR, "Can not write state file '%s': %m\n", tgl_file_config.get_state_filename ());
+        vlogprintf (E_ERROR, "Can not write state file '%s': %m\n", tgl_file_callback.get_state_filename ());
         return -1;
     }
     int x[6];
@@ -109,7 +109,7 @@ void write_dc (struct tgl_dc *DC, void *extra) {
 }
 
 int write_auth_file (struct tgl_state *TLS) {
-    int auth_file_fd = open (tgl_file_config.get_auth_key_filename (), O_CREAT | O_RDWR, 0600);
+    int auth_file_fd = open (tgl_file_callback.get_auth_key_filename (), O_CREAT | O_RDWR, 0600);
     assert (auth_file_fd >= 0);
     int x = DC_SERIALIZED_MAGIC;
     assert (write (auth_file_fd, &x, 4) == 4);
@@ -152,7 +152,7 @@ void write_secret_chat (tgl_peer_t *_P, void *extra) {
 }
 
 int write_secret_chat_file (struct tgl_state *TLS) {
-    int secret_chat_fd = open (tgl_file_config.get_secret_chat_filename (), O_CREAT | O_RDWR, 0600);
+    int secret_chat_fd = open (tgl_file_callback.get_secret_chat_filename (), O_CREAT | O_RDWR, 0600);
     assert (secret_chat_fd >= 0);
     int x = SECRET_CHAT_FILE_MAGIC;
     assert (write (secret_chat_fd, &x, 4) == 4);
@@ -210,7 +210,7 @@ void empty_auth_file (struct tgl_state *TLS) {
 }
 
 int read_auth_file (struct tgl_state *TLS) {
-    int auth_file_fd = open (tgl_file_config.get_auth_key_filename (), O_CREAT | O_RDWR, 0600);
+    int auth_file_fd = open (tgl_file_callback.get_auth_key_filename (), O_CREAT | O_RDWR, 0600);
     if (auth_file_fd < 0) {
         empty_auth_file (TLS);
         return 0;
@@ -290,7 +290,7 @@ void read_secret_chat (struct tgl_state *TLS, int fd, int v) {
 }
 
 int read_secret_chat_file (struct tgl_state *TLS) {
-    int secret_chat_fd = open (tgl_file_config.get_secret_chat_filename (), O_RDWR, 0600);
+    int secret_chat_fd = open (tgl_file_callback.get_secret_chat_filename (), O_RDWR, 0600);
     if (secret_chat_fd < 0) { return -1; }
     //assert (secret_chat_fd >= 0);
     int x;
