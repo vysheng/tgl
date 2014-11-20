@@ -30,10 +30,10 @@
 struct tree_ ## X_NAME { \
   struct tree_ ## X_NAME *left, *right;\
   X_TYPE x;\
-  int y;\
+  long y;\
 };\
 \
-static struct tree_ ## X_NAME *new_tree_node_ ## X_NAME (X_TYPE x, int y) {\
+static struct tree_ ## X_NAME *new_tree_node_ ## X_NAME (X_TYPE x, long y) {\
   struct tree_ ## X_NAME *T = talloc (sizeof (*T));\
   T->x = x;\
   T->y = y;\
@@ -60,8 +60,8 @@ static void tree_split_ ## X_NAME (struct tree_ ## X_NAME *T, X_TYPE x, struct t
   }\
 }\
 \
-static struct tree_ ## X_NAME *tree_insert_ ## X_NAME (struct tree_ ## X_NAME *T, X_TYPE x, int y) __attribute__ ((warn_unused_result,unused));\
-static struct tree_ ## X_NAME *tree_insert_ ## X_NAME (struct tree_ ## X_NAME *T, X_TYPE x, int y) {\
+static struct tree_ ## X_NAME *tree_insert_ ## X_NAME (struct tree_ ## X_NAME *T, X_TYPE x, long y) __attribute__ ((warn_unused_result,unused));\
+static struct tree_ ## X_NAME *tree_insert_ ## X_NAME (struct tree_ ## X_NAME *T, X_TYPE x, long y) {\
   if (!T) {\
     return new_tree_node_ ## X_NAME  (x, y);\
   } else {\
