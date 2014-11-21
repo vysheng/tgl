@@ -86,11 +86,11 @@ struct query *tglq_query_get (struct tgl_state *TLS, long long id) {
 
 static int alarm_query (struct tgl_state *TLS, struct query *q) {
   assert (q);
-  vlogprintf (E_DEBUG - 1, "Alarm query %lld\n", q->msg_id);
+  vlogprintf (E_DEBUG - 2, "Alarm query %lld\n", q->msg_id);
   
   TLS->timer_methods->insert (q->ev, QUERY_TIMEOUT); 
 
-  if (q->session->session_id == q->session_id) {
+  if (q->session->session_id == q->session_id && q->session_id) {
     clear_packet ();
     out_int (CODE_msg_container);
     out_int (1);
@@ -105,6 +105,7 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
     if (tree_lookup_query (TLS->queries_tree, q)) {
       TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     }
+    q->session = q->DC->sessions[0];
     q->msg_id = tglmp_encrypt_send_message (TLS, q->session->c, q->data, q->data_len, (q->flags & QUERY_FORCE_SEND) | 1);
     TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
     q->session_id = q->session->session_id;
@@ -190,9 +191,9 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
   int error_code = fetch_int ();
   int error_len = prefetch_strlen ();
   char *error = fetch_str (error_len);
-  vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", id, error_code, error_len, error);
   struct query *q = tglq_query_get (TLS, id);
   if (!q) {
+    vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", id, error_code, error_len, error);
     vlogprintf (E_WARNING, "No such query\n");
   } else {
     if (!(q->flags & QUERY_ACK_RECEIVED)) {
@@ -200,27 +201,88 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
     }
     TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     int res = 0;
-    if (q->methods && q->methods->on_error && error_code != 500 && error_code != 420) {
-      res = q->methods->on_error (TLS, q, error_code, error_len, error);
-    } else {
-      if (error_code == 420 || error_code == 500) {
-        int wait;
-        if (error_code == 420) {
-          if (strncmp (error, "FLOOD_WAIT_", 11)) {
-            vlogprintf (E_ERROR, "error = '%s'\n", error);
-            wait = 10;
-          } else {
-            wait = atoll (error + 11);
+
+    int error_handled = 0;
+
+    switch (error_code) {
+    case 303:
+      // migrate
+      {
+        int offset = -1;
+        if (error_len >= 15 && !memcmp (error, "PHONE_MIGRATE_", 14)) {
+          offset = 14;
+        }
+        if (error_len >= 17 && !memcmp (error, "NETWORK_MIGRATE_", 16)) {
+          offset = 16;
+        }
+        if (error_len >= 14 && !memcmp (error, "USER_MIGRATE_", 13)) {
+          offset = 13;
+        }
+        if (offset >= 0) {
+          int i = 0; 
+          while (offset < error_len && error[offset] >= '0' && error[offset] <= '9') {
+            i = i * 10 + error[offset] - '0';
+            offset ++;
           }
-        } else {
+          if (i > 0 && i < TGL_MAX_DC_NUM) {
+            bl_do_set_working_dc (TLS, i);
+            q->flags &= ~QUERY_ACK_RECEIVED;
+            q->session_id = 0;
+            q->DC = TLS->DC_working;
+            TLS->timer_methods->insert (q->ev, 0);
+            error_handled = 1;
+            res = 1;
+          } 
+        }
+      }
+      break;
+    case 400:
+      // nothing to handle
+      // bad user input probably
+      break;
+    case 401:
+      // unauthorized
+      // ignore for now
+      break;
+    case 403:
+      // privacy violation
+      break;
+    case 404:
+      // not found
+      break;
+    case 420: 
+      // flood
+    case 500:
+      // internal error
+    default:
+      // anything else. Treated as internal error
+      {
+        int wait;
+        if (strncmp (error, "FLOOD_WAIT_", 11)) {
+          if (error_code == 420) {
+            vlogprintf (E_ERROR, "error = '%s'\n", error);
+          }
           wait = 10;
+        } else {
+          wait = atoll (error + 11);
         }
         q->flags &= ~QUERY_ACK_RECEIVED;
         TLS->timer_methods->insert (q->ev, wait);
         q->session_id = 0;
-        res = 1;
+        error_handled = 1;
+      }
+      break;
+    }
+
+    if (error_handled) {
+      vlogprintf (E_DEBUG - 2, "error for query #%lld: #%d %.*s (HANDLED)\n", id, error_code, error_len, error);
+    } else {
+      vlogprintf (E_WARNING, "error for query #%lld: #%d %.*s\n", id, error_code, error_len, error);
+      if (q->methods && q->methods->on_error) {
+        res = q->methods->on_error (TLS, q, error_code, error_len, error);
       }
     }
+
     if (res <= 0) {
       tfree (q->data, q->data_len * 4);
       TLS->timer_methods->free (q->ev);
@@ -420,28 +482,9 @@ static int send_code_on_answer (struct tgl_state *TLS, struct query *q) {
 }
 
 static int send_code_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, char *error) {
-  int s = strlen ("PHONE_MIGRATE_");
-  int s2 = strlen ("NETWORK_MIGRATE_");
-  int want_dc_num = 0;
-  if (l >= s && !memcmp (error, "PHONE_MIGRATE_", s)) {
-    int i = error[s] - '0';
-    want_dc_num = i;
-  } else if (l >= s2 && !memcmp (error, "NETWORK_MIGRATE_", s2)) {
-    int i = error[s2] - '0';
-    want_dc_num = i;
-  } else {
-    vlogprintf (E_ERROR, "error_code = %d, error = %.*s\n", error_code, l, error);
-    if (q->callback) {
-      ((void (*)(struct tgl_state *, void *, int, int, const char *))(q->callback)) (TLS, q->callback_extra, 0, 0, 0);
-    }
-    return 0;
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, int, const char *))(q->callback)) (TLS, q->callback_extra, 0, 0, NULL);
   }
-  bl_do_set_working_dc (TLS, want_dc_num);
-  //if (q->callback) {
-  //  ((void (*)(void *, int, int, const char *))(q->callback)) (q->callback_extra, 0, 0, 0);
-  //}
-  assert (TLS->DC_working->id == want_dc_num);
-  tgl_do_send_code (TLS, q->extra, q->callback, q->callback_extra);
   tfree_str (q->extra);
   return 0;
 }
