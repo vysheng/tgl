@@ -3880,6 +3880,66 @@ void tgl_do_import_card (struct tgl_state *TLS, int size, int *card, void (*call
 }
 /* }}} */
 
+static int send_typing_on_answer (struct tgl_state *TLS, struct query *q) {
+  fetch_bool ();
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 1);
+  }
+  return 0;
+}
+
+static struct query_methods send_typing_methods = {
+  .on_answer = send_typing_on_answer,
+  .on_error = q_void_on_error,
+  .type = TYPE_TO_PARAM(bool)
+};
+
+void tgl_do_send_typing (struct tgl_state *TLS, tgl_peer_id_t id, enum tgl_typing_status status, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  if (tgl_get_peer_type (id) != TGL_PEER_ENCR_CHAT) {  
+    clear_packet ();
+    out_int (CODE_messages_set_typing);
+    out_peer_id (TLS, id);
+    switch (status) {
+    case tgl_typing_none:
+    case tgl_typing_typing:
+      out_int (CODE_send_message_typing_action);
+      break;
+    case tgl_typing_cancel:
+      out_int (CODE_send_message_cancel_action);
+      break;
+    case tgl_typing_record_video:
+      out_int (CODE_send_message_record_video_action);
+      break;
+    case tgl_typing_upload_video:
+      out_int (CODE_send_message_upload_video_action);
+      break;
+    case tgl_typing_record_audio:
+      out_int (CODE_send_message_record_audio_action);
+      break;
+    case tgl_typing_upload_audio:
+      out_int (CODE_send_message_upload_audio_action);
+      break;
+    case tgl_typing_upload_photo:
+      out_int (CODE_send_message_upload_photo_action);
+      break;
+    case tgl_typing_upload_document:
+      out_int (CODE_send_message_upload_document_action);
+      break;
+    case tgl_typing_geo:
+      out_int (CODE_send_message_geo_location_action);
+      break;
+    case tgl_typing_choose_contact:
+      out_int (CODE_send_message_choose_contact_action);
+      break;
+    }
+    tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_typing_methods, 0, callback, callback_extra);
+  } else {
+    if (callback) {
+      callback (TLS, callback_extra, 0);
+    }
+  }
+}
+
 #ifndef DISABLE_EXTF
 static int ext_query_on_answer (struct tgl_state *TLS, struct query *q) {
   if (q->callback) {
