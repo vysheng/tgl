@@ -106,7 +106,7 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
       TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     }
     q->msg_id = tglmp_encrypt_send_message (TLS, q->session->c, q->data, q->data_len, (q->flags & QUERY_FORCE_SEND) | 1);
-    TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
+    TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, irand48 ());
     q->session_id = q->session->session_id;
     if (!(q->session->dc->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
       q->session_id = 0;
@@ -154,7 +154,7 @@ struct query *tglq_send_query_ex (struct tgl_state *TLS, struct tgl_dc *DC, int 
   if (TLS->queries_tree) {
     vlogprintf (E_DEBUG + 2, "%lld %lld\n", q->msg_id, TLS->queries_tree->x->msg_id);
   }
-  TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
+  TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, irand48 ());
 
   q->ev = TLS->timer_methods->alloc (TLS, alarm_query_gateway, q);
   TLS->timer_methods->insert (q->ev, QUERY_TIMEOUT);
@@ -3232,9 +3232,9 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
 
   BN_bn2bin (r, (void *)(g_a + (256 - BN_num_bytes (r))));
   
-  int t = lrand48 ();
+  int t = irand48 ();
   while (tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t))) {
-    t = lrand48 ();
+    t = irand48 ();
   }
 
   bl_do_encr_chat_init (TLS, t, user_id, (void *)random, (void *)g_a);

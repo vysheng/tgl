@@ -570,7 +570,7 @@ static void status_notify (struct tgl_state *TLS, void *arg) {
 
 void tgl_insert_status_update (struct tgl_state *TLS, struct tgl_user *U) {
   if (!tree_lookup_user (TLS->online_updates, U)) {
-    TLS->online_updates = tree_insert_user (TLS->online_updates, U, lrand48 ());
+    TLS->online_updates = tree_insert_user (TLS->online_updates, U, irand48 ());
   }
   if (!TLS->online_updates_timer) {
     TLS->online_updates_timer = TLS->timer_methods->alloc (TLS, status_notify, 0);
