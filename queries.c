@@ -1038,10 +1038,11 @@ void tgl_do_send_text (struct tgl_state *TLS, tgl_peer_id_t id, char *file_name,
     }
     return;
   }
-  static char buf[(1 << 20) + 1];
-  int x = read (fd, buf, (1 << 20) + 1);
+  static const int max_file_size = (1 << 20) + 1;
+  static char buf[max_file_size];
+  int x = (int)(read (fd, buf, max_file_size));
   assert (x >= 0);
-  if (x == (1 << 20) + 1) {
+  if (x == max_file_size) {
     vlogprintf (E_WARNING, "Too big file '%s'\n", file_name);
     close (fd);
     if (callback) {
@@ -1613,7 +1614,7 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
       out_int ((f->size + f->part_size - 1) / f->part_size);
     }
     static char buf[512 << 10];
-    int x = read (f->fd, buf, f->part_size);
+    ssize_t x = read (f->fd, buf, f->part_size);
     assert (x > 0);
     f->offset += x;
     TLS->cur_uploaded_bytes += x;
