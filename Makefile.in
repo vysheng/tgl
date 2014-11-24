@@ -25,7 +25,7 @@ GENERATE_OBJECTS=${OBJ}/generate.o
 COMMON_OBJECTS=${OBJ}/tools.o
 OBJ_C=${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS} ${TLD_OBJECTS}
 
-DEPENDENCE=$(subst ${OBJ}/,${DEP}/,$(patsubst %.o,%.d,${OBJ_LIST}))
+DEPENDENCE=$(subst ${OBJ}/,${DEP}/,$(patsubst %.o,%.d,${OBJ_C}))
 DEPENDENCE_LIST=${DEPENDENCE}
 
 INCLUDE=-I. -I${srcdir}

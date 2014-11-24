@@ -86,11 +86,11 @@ struct query *tglq_query_get (struct tgl_state *TLS, long long id) {
 
 static int alarm_query (struct tgl_state *TLS, struct query *q) {
   assert (q);
-  vlogprintf (E_DEBUG - 1, "Alarm query %lld\n", q->msg_id);
+  vlogprintf (E_DEBUG - 2, "Alarm query %lld\n", q->msg_id);
   
   TLS->timer_methods->insert (q->ev, QUERY_TIMEOUT); 
 
-  if (q->session->session_id == q->session_id) {
+  if (q->session->session_id == q->session_id && q->session_id) {
     clear_packet ();
     out_int (CODE_msg_container);
     out_int (1);
@@ -105,6 +105,7 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
     if (tree_lookup_query (TLS->queries_tree, q)) {
       TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     }
+    q->session = q->DC->sessions[0];
     q->msg_id = tglmp_encrypt_send_message (TLS, q->session->c, q->data, q->data_len, (q->flags & QUERY_FORCE_SEND) | 1);
     TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, irand48 ());
     q->session_id = q->session->session_id;
@@ -190,9 +191,9 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
   int error_code = fetch_int ();
   int error_len = prefetch_strlen ();
   char *error = fetch_str (error_len);
-  vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", id, error_code, error_len, error);
   struct query *q = tglq_query_get (TLS, id);
   if (!q) {
+    vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", id, error_code, error_len, error);
     vlogprintf (E_WARNING, "No such query\n");
   } else {
     if (!(q->flags & QUERY_ACK_RECEIVED)) {
@@ -200,28 +201,89 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
     }
     TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     int res = 0;
-    if (q->methods && q->methods->on_error && error_code != 500 && error_code != 420) {
-      res = q->methods->on_error (TLS, q, error_code, error_len, error);
-    } else {
-      if (error_code == 420 || error_code == 500) {
-        int wait;
-        if (error_code == 420) {
-          if (strncmp (error, "FLOOD_WAIT_", 11)) {
-            vlogprintf (E_ERROR, "error = '%s'\n", error);
-            wait = 10;
-          } else {
-              long long llwait = atoll (error + 11);
-              wait = llwait < INT8_MAX ? (int)(llwait) : INT8_MAX;
+
+    int error_handled = 0;
+
+    switch (error_code) {
+    case 303:
+      // migrate
+      {
+        int offset = -1;
+        if (error_len >= 15 && !memcmp (error, "PHONE_MIGRATE_", 14)) {
+          offset = 14;
+        }
+        if (error_len >= 17 && !memcmp (error, "NETWORK_MIGRATE_", 16)) {
+          offset = 16;
+        }
+        if (error_len >= 14 && !memcmp (error, "USER_MIGRATE_", 13)) {
+          offset = 13;
+        }
+        if (offset >= 0) {
+          int i = 0; 
+          while (offset < error_len && error[offset] >= '0' && error[offset] <= '9') {
+            i = i * 10 + error[offset] - '0';
+            offset ++;
           }
-        } else {
+          if (i > 0 && i < TGL_MAX_DC_NUM) {
+            bl_do_set_working_dc (TLS, i);
+            q->flags &= ~QUERY_ACK_RECEIVED;
+            q->session_id = 0;
+            q->DC = TLS->DC_working;
+            TLS->timer_methods->insert (q->ev, 0);
+            error_handled = 1;
+            res = 1;
+          } 
+        }
+      }
+      break;
+    case 400:
+      // nothing to handle
+      // bad user input probably
+      break;
+    case 401:
+      // unauthorized
+      // ignore for now
+      break;
+    case 403:
+      // privacy violation
+      break;
+    case 404:
+      // not found
+      break;
+    case 420: 
+      // flood
+    case 500:
+      // internal error
+    default:
+      // anything else. Treated as internal error
+      {
+        int wait;
+        if (strncmp (error, "FLOOD_WAIT_", 11)) {
+          if (error_code == 420) {
+            vlogprintf (E_ERROR, "error = '%s'\n", error);
+          }
           wait = 10;
+        } else {
+          long long llwait = atoll (error + 11);
+          wait = llwait < INT8_MAX ? (int)(llwait) : INT8_MAX;
         }
         q->flags &= ~QUERY_ACK_RECEIVED;
         TLS->timer_methods->insert (q->ev, wait);
         q->session_id = 0;
-        res = 1;
+        error_handled = 1;
+      }
+      break;
+    }
+
+    if (error_handled) {
+      vlogprintf (E_DEBUG - 2, "error for query #%lld: #%d %.*s (HANDLED)\n", id, error_code, error_len, error);
+    } else {
+      vlogprintf (E_WARNING, "error for query #%lld: #%d %.*s\n", id, error_code, error_len, error);
+      if (q->methods && q->methods->on_error) {
+        res = q->methods->on_error (TLS, q, error_code, error_len, error);
       }
     }
+
     if (res <= 0) {
       tfree (q->data, q->data_len * 4);
       TLS->timer_methods->free (q->ev);
@@ -379,8 +441,30 @@ static int help_get_config_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int q_void_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  if (q->callback) {
+    ((void (*)(struct tgl_state *,void *, int))(q->callback))(TLS, q->callback_extra, 0);
+  }
+  return 0;
+}
+
+static int q_ptr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  if (q->callback) {
+    ((void (*)(struct tgl_state *,void *, int, void *))(q->callback))(TLS, q->callback_extra, 0, NULL);
+  }
+  return 0;
+}
+
+static int q_list_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  if (q->callback) {
+    ((void (*)(struct tgl_state *,void *, int, int, void *))(q->callback))(TLS, q->callback_extra, 0, 0, NULL);
+  }
+  return 0;
+}
+
 static struct query_methods help_get_config_methods  = {
   .on_answer = help_get_config_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(config)
 };
 
@@ -421,28 +505,9 @@ static int send_code_on_answer (struct tgl_state *TLS, struct query *q) {
 }
 
 static int send_code_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, char *error) {
-  int s = strlen ("PHONE_MIGRATE_");
-  int s2 = strlen ("NETWORK_MIGRATE_");
-  int want_dc_num = 0;
-  if (l >= s && !memcmp (error, "PHONE_MIGRATE_", s)) {
-    int i = error[s] - '0';
-    want_dc_num = i;
-  } else if (l >= s2 && !memcmp (error, "NETWORK_MIGRATE_", s2)) {
-    int i = error[s2] - '0';
-    want_dc_num = i;
-  } else {
-    vlogprintf (E_ERROR, "error_code = %d, error = %.*s\n", error_code, l, error);
-    if (q->callback) {
-      ((void (*)(struct tgl_state *, void *, int, int, const char *))(q->callback)) (TLS, q->callback_extra, 0, 0, 0);
-    }
-    return 0;
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, int, const char *))(q->callback)) (TLS, q->callback_extra, 0, 0, NULL);
   }
-  bl_do_set_working_dc (TLS, want_dc_num);
-  //if (q->callback) {
-  //  ((void (*)(void *, int, int, const char *))(q->callback)) (q->callback_extra, 0, 0, 0);
-  //}
-  assert (TLS->DC_working->id == want_dc_num);
-  tgl_do_send_code (TLS, q->extra, q->callback, q->callback_extra);
   tfree_str (q->extra);
   return 0;
 }
@@ -481,6 +546,7 @@ static int phone_call_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods phone_call_methods  = {
   .on_answer = phone_call_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(bool)
 };
 
@@ -576,40 +642,12 @@ static int get_contacts_on_answer (struct tgl_state *TLS, struct query *q) {
     ((void (*)(struct tgl_state *TLS, void *, int, int, struct tgl_user **))q->callback) (TLS, q->callback_extra, 1, n, list);  
   }
   tfree (list, sizeof (void *) * n); 
-/*  for (i = 0; i < n; i++) {
-    struct tgl_user *U = tglf_fetch_alloc_user (TLS);
-    print_start ();
-    push_color (COLOR_YELLOW);
-    printf ("User #%d: ", tgl_get_peer_id (U->id));
-    print_user_name (U->id, (tgl_peer_t *)U);
-    push_color (COLOR_GREEN);
-    printf (" (");
-    printf ("%s", U->print_name);
-    if (U->phone) {
-      printf (" ");
-      printf ("%s", U->phone);
-    }
-    printf (") ");
-    pop_color ();
-    if (U->status.online > 0) {
-      printf ("online\n");
-    } else {
-      if (U->status.online < 0) {
-        printf ("offline. Was online ");
-        print_date_full (U->status.when);
-      } else {
-        printf ("offline permanent");
-      }
-      printf ("\n");
-    }
-    pop_color ();
-    print_end ();
-  }*/
   return 0;
 }
 
 static struct query_methods get_contacts_methods = {
   .on_answer = get_contacts_on_answer,
+  .on_error = q_list_on_error,
   .type = TYPE_TO_PARAM(contacts_contacts)
 };
 
@@ -751,20 +789,20 @@ static int msg_send_encr_on_answer (struct tgl_state *TLS, struct query *q) {
 }
 
 static int msg_send_encr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
-    struct tgl_message *M = q->extra;
-    tgl_peer_t *P = tgl_peer_get (TLS, M->to_id);
-    if (error_code == 400) {
-        if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
-            bl_do_encr_chat_delete(TLS, &P->encr_chat);
-        }
+  struct tgl_message *M = q->extra;
+  tgl_peer_t *P = tgl_peer_get (TLS, M->to_id);
+  if (P && P->encr_chat.state != sc_deleted &&  error_code == 400) {
+    if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
+      bl_do_encr_chat_delete(TLS, &P->encr_chat);
     }
-    if (q->callback) {
-        ((void (*)(struct tgl_state *TLS, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 0, M);
-    }
-    if (M) {
-        bl_do_delete_msg (TLS, M);
-    }
-    return 0;
+  }
+  if (q->callback) {
+    ((void (*)(struct tgl_state *TLS, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 0, M);
+  }
+  if (M) {
+    bl_do_delete_msg (TLS, M);
+  }
+  return 0;
 }
 
 static int msg_send_on_answer (struct tgl_state *TLS, struct query *q) {
@@ -779,8 +817,6 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q) {
   }
   int date = fetch_int ();
   int pts = fetch_int ();
-  //tglu_fetch_seq ();
-  //bl_do_
   int seq = fetch_int ();
   if (seq == TLS->seq + 1 && !(TLS->locks & TGL_LOCK_DIFF)) {
     bl_do_set_date (TLS, date);
@@ -795,45 +831,6 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q) {
   if (x == CODE_messages_sent_message_link) {
     assert (skip_type_any (TYPE_TO_PARAM_1 (vector, TYPE_TO_PARAM (contacts_link))) >= 0);
   }
-  /*if (x == CODE_messages_sent_message_link) {
-    assert (fetch_int () == CODE_vector);
-    int n = fetch_int ();
-    int i;
-    unsigned a, b;
-    for (i = 0; i < n; i++) {
-      assert (fetch_int () == (int)CODE_contacts_link);
-      a = fetch_int ();
-      assert (a == CODE_contacts_my_link_empty || a == CODE_contacts_my_link_requested || a == CODE_contacts_my_link_contact);
-      if (a == CODE_contacts_my_link_requested) {
-        fetch_bool ();
-      }
-      b = fetch_int ();
-      assert (b == CODE_contacts_foreign_link_unknown || b == CODE_contacts_foreign_link_requested || b == CODE_contacts_foreign_link_mutual);
-      if (b == CODE_contacts_foreign_link_requested) {
-        fetch_bool ();
-      }
-      struct tgl_user *U = tglf_fetch_alloc_user (TLS);
-  
-      U->flags &= ~(FLAG_USER_IN_CONTACT | FLAG_USER_OUT_CONTACT);
-      if (a == CODE_contacts_my_link_contact) {
-        U->flags |= FLAG_USER_IN_CONTACT; 
-      }
-      U->flags &= ~(FLAG_USER_IN_CONTACT | FLAG_USER_OUT_CONTACT);
-      if (b == CODE_contacts_foreign_link_mutual) {
-        U->flags |= FLAG_USER_IN_CONTACT | FLAG_USER_OUT_CONTACT; 
-      }
-      if (b == CODE_contacts_foreign_link_requested) {
-        U->flags |= FLAG_USER_OUT_CONTACT;
-      }
-      print_start ();
-      push_color (COLOR_YELLOW);
-      printf ("Link with user ");
-      print_user_name (U->id, (void *)U);
-      printf (" changed\n");
-      pop_color ();
-      print_end ();
-    }
-  }*/
   if (M->flags & FLAG_PENDING) {
     bl_do_set_message_sent (TLS, M);
   }
@@ -1091,6 +1088,15 @@ static int mark_read_on_receive (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int mark_read_on_error (struct tgl_state *TLS, struct query *q, int error_code, int len, char *error) {
+  int *t = q->extra;
+  tfree (t, 12);
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 0);
+  }
+  return 0;
+}
+
 static int mark_read_encr_on_receive (struct tgl_state *TLS, struct query *q) {
   fetch_bool ();
   if (q->callback) {
@@ -1099,13 +1105,25 @@ static int mark_read_encr_on_receive (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int mark_read_encr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  tgl_peer_t *P = q->extra;
+  if (P && P->encr_chat.state != sc_deleted &&  error_code == 400) {
+    if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
+      bl_do_encr_chat_delete(TLS, &P->encr_chat);
+    }
+  }
+  return 0;
+}
+
 static struct query_methods mark_read_methods = {
   .on_answer = mark_read_on_receive,
+  .on_error = mark_read_on_error,
   .type = TYPE_TO_PARAM(messages_affected_history)
 };
 
 static struct query_methods mark_read_encr_methods = {
   .on_answer = mark_read_encr_on_receive,
+  .on_error = mark_read_encr_on_error,
   .type = TYPE_TO_PARAM(bool)
 };
 
@@ -1130,7 +1148,7 @@ void tgl_do_messages_mark_read_encr (struct tgl_state *TLS, tgl_peer_id_t id, lo
   out_int (tgl_get_peer_id (id));
   out_long (access_hash);
   out_int (last_time);
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &mark_read_encr_methods, 0, callback, callback_extra);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &mark_read_encr_methods, tgl_peer_get (TLS, id), callback, callback_extra);
 }
 
 void tgl_do_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -1227,8 +1245,22 @@ static int get_history_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int get_history_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  void **T = q->extra;
+  struct tgl_message **ML = T[0];
+  int list_size = (long)T[2];
+  tfree (T, sizeof (void *) * 7);
+  tfree (ML, sizeof (void *) * list_size);
+
+  if (q->callback) {
+    ((void (*)(struct tgl_state *TLS, void *, int, int, struct tgl_message **))q->callback) (TLS, q->callback_extra, 0, 0, NULL);
+  }
+  return 0;
+}
+
 static struct query_methods get_history_methods = {
   .on_answer = get_history_on_answer,
+  .on_error = get_history_on_error,
   .type = TYPE_TO_PARAM(messages_messages)
 };
 
@@ -1378,29 +1410,6 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q) {
   for (i = 0; i < n; i++) {
     tglf_fetch_alloc_user (TLS);
   }
-  /*print_start ();
-  push_color (COLOR_YELLOW);
-  for (i = dl_size - 1; i >= 0; i--) {
-    tgl_peer_t *UC;
-    switch (tgl_get_peer_type (plist[i])) {
-    case TGL_PEER_USER:
-      UC = tgl_peer_get (TLS, plist[i]);
-      printf ("User ");
-      print_user_name (plist[i], UC);
-      printf (": %d unread\n", dlist[2 * i + 1]);
-      break;
-    case TGL_PEER_CHAT:
-      UC = tgl_peer_get (TLS, plist[i]);
-      printf ("Chat ");
-      print_chat_name (plist[i], UC);
-      printf (": %d unread\n", dlist[2 * i + 1]);
-      break;
-    }
-  }
-  pop_color ();
-  print_end ();
-
-  dialog_list_got = 1;*/
 
   if (q->callback) {
     ((void (*)(struct tgl_state *TLS, void *, int, int, tgl_peer_id_t *, int *, int *))q->callback) (TLS, q->callback_extra, 1, dl_size, PL, LM, UC);
@@ -1412,8 +1421,16 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int get_dialogs_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  if (q->callback) {
+    ((void (*)(struct tgl_state *TLS, void *, int, int, tgl_peer_id_t *, int *, int *))q->callback) (TLS, q->callback_extra, 0, 0, NULL, NULL, NULL);
+  }
+  return 0;
+}
+
 static struct query_methods get_dialogs_methods = {
   .on_answer = get_dialogs_on_answer,
+  .on_error = get_dialogs_on_error,
   .type = TYPE_TO_PARAM(messages_dialogs)
 };
 
@@ -1545,23 +1562,37 @@ static int set_photo_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int send_file_part_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  struct send_file *f = q->extra;   
+  tfree_str (f->file_name);
+  tfree (f, sizeof (*f));
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 0);
+  }
+  return 0;
+}
+
 static struct query_methods send_file_part_methods = {
   .on_answer = send_file_part_on_answer,
+  .on_error = send_file_part_on_error,
   .type = TYPE_TO_PARAM(bool)
 };
 
 static struct query_methods send_file_methods = {
   .on_answer = send_file_on_answer,
+  .on_error = msg_send_on_error,
   .type = TYPE_TO_PARAM(messages_stated_message)
 };
 
 static struct query_methods set_photo_methods = {
   .on_answer = set_photo_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(photos_photo)
 };
 
 static struct query_methods send_encr_file_methods = {
   .on_answer = send_encr_file_on_answer,
+  .on_error = msg_send_encr_on_error,
   .type = TYPE_TO_PARAM(messages_sent_encrypted_message)
 };
 
@@ -1941,6 +1972,7 @@ int set_profile_name_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods set_profile_name_methods = {
   .on_answer = set_profile_name_on_answer,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(user)
 };
 
@@ -1990,6 +2022,7 @@ int contact_search_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods contact_search_methods = {
   .on_answer = contact_search_on_answer,
+  .on_error = q_list_on_error,
   .type = TYPE_TO_PARAM(contacts_found)
 };
 
@@ -2040,6 +2073,7 @@ static int fwd_msg_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods fwd_msg_methods = {
   .on_answer = fwd_msg_on_answer,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(messages_stated_message)
 };
 
@@ -2255,6 +2289,7 @@ static int rename_chat_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods rename_chat_methods = {
   .on_answer = rename_chat_on_answer,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(messages_stated_message)
 };
 
@@ -2269,29 +2304,6 @@ void tgl_do_rename_chat (struct tgl_state *TLS, tgl_peer_id_t id, char *name, vo
 /* }}} */
 
 /* {{{ Chat info */
-/*void print_chat_info (struct tgl_chat *C) {
-  tgl_peer_t *U = (void *)C;
-  print_start ();
-  push_color (COLOR_YELLOW);
-  printf ("Chat ");
-  print_chat_name (U->id, U);
-  printf (" members:\n");
-  int i;
-  for (i = 0; i < C->user_list_size; i++) {
-    printf ("\t\t");
-    print_user_name (TGL_MK_USER (C->user_list[i].user_id), tgl_peer_get (TLS, TGL_MK_USER (C->user_list[i].user_id)));
-    printf (" invited by ");
-    print_user_name (TGL_MK_USER (C->user_list[i].inviter_id), tgl_peer_get (TLS, TGL_MK_USER (C->user_list[i].inviter_id)));
-    printf (" at ");
-    print_date_full (C->user_list[i].date);
-    if (C->user_list[i].user_id == C->admin_id) {
-      printf (" admin");
-    }
-    printf ("\n");
-  }
-  pop_color ();
-  print_end ();
-}*/
 
 static int chat_info_on_answer (struct tgl_state *TLS, struct query *q) {
   struct tgl_chat *C = tglf_fetch_alloc_chat_full (TLS);
@@ -2304,6 +2316,7 @@ static int chat_info_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods chat_info_methods = {
   .on_answer = chat_info_on_answer,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(messages_chat_full)
 };
 
@@ -2363,6 +2376,7 @@ static int user_info_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods user_info_methods = {
   .on_answer = user_info_on_answer,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(user_full)
 };
 
@@ -2395,37 +2409,6 @@ void tgl_do_get_user_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_
   }
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &user_info_methods, 0, callback, callback_extra);
 }
-/* }}} */
-
-/* {{{ Get user info silently */
-/*int user_list_info_silent_on_answer (struct query *q) {
-  assert (fetch_int () == CODE_vector);
-  int n = fetch_int ();
-  int i;
-  for (i = 0; i < n; i++) {
-    tglf_fetch_alloc_user (TLS);
-  }
-  return 0;
-}
-
-struct query_methods user_list_info_silent_methods = {
-  .on_answer = user_list_info_silent_on_answer,
-  .type = TYPE_TO_PARAM_1(vector, TYPE_TO_PARAM(user))
-};
-
-void tgl_do_get_user_list_info_silent (int num, int *list) {
-  clear_packet ();
-  out_int (CODE_users_get_users);
-  out_int (CODE_vector);
-  out_int (num);
-  int i;
-  for (i = 0; i < num; i++) {
-    out_int (CODE_input_user_contact);
-    out_int (list[i]);
-    //out_long (0);
-  }
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &user_list_info_silent_methods, 0);
-}*/
 /* }}} */
 
 /* {{{ Load photo/video */
@@ -2524,8 +2507,27 @@ static int download_on_answer (struct tgl_state *TLS, struct query *q) {
   }
 }
 
+static int download_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  struct download *D = q->extra;
+  if (D->fd >= 0) {
+    close (D->fd);
+  }
+  
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, char *))q->callback) (TLS, q->callback_extra, 0, NULL);
+  }
+
+  if (D->iv) {
+    tfree_secure (D->iv, 32);
+  }
+  tfree_str (D->name);
+  tfree (D, sizeof (*D));
+  return 0;
+}
+
 static struct query_methods download_methods = {
   .on_answer = download_on_answer,
+  .on_error = download_on_error,
   .type = TYPE_TO_PARAM(upload_file)
 };
 
@@ -2790,6 +2792,7 @@ static int add_contact_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods add_contact_methods = {
   .on_answer = add_contact_on_answer,
+  .on_error = q_list_on_error,
   .type = TYPE_TO_PARAM(contacts_imported_contacts)
 };
 
@@ -2822,6 +2825,7 @@ static int del_contact_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods del_contact_methods = {
   .on_answer = del_contact_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(contacts_link)
 };
 
@@ -2921,8 +2925,23 @@ static int msg_search_on_answer (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+static int msg_search_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  void **T = q->extra;
+  struct tgl_message **ML = T[0];
+  int list_size = (long)T[2];
+  char *s = T[9];
+  tfree (T, sizeof (void *) * 10);
+  tfree_str (s);
+  tfree (ML, sizeof (void *) * list_size);
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, int, struct tgl_message **))q->callback) (TLS, q->callback_extra, 0, 0, NULL);
+  }
+  return 0;
+}
+
 static struct query_methods msg_search_methods = {
   .on_answer = msg_search_on_answer,
+  .on_error = msg_search_on_error,
   .type = TYPE_TO_PARAM(messages_messages)
 };
 
@@ -2985,18 +3004,6 @@ static int contacts_search_on_answer (struct tgl_state *TLS, struct query *q) {
   for (i = 0; i < n; i++) {
     UL[i] = tglf_fetch_alloc_user (TLS);
   }
-  /*print_start ();
-  push_color (COLOR_YELLOW);
-  for (i = 0; i < n; i++) {
-    struct tgl_user *U = tglf_fetch_alloc_user (TLS);
-    printf ("User ");
-    push_color  (COLOR_RED);
-    printf ("%s %s", U->first_name, U->last_name); 
-    pop_color ();
-    printf (". Phone %s\n", U->phone);
-  }
-  pop_color ();
-  print_end ();*/
   if (q->callback) {
     ((void (*)(struct tgl_state *, void *, int, int, struct tgl_user **))q->callback) (TLS, q->callback_extra, 1, n, UL);
   }
@@ -3006,6 +3013,7 @@ static int contacts_search_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods contacts_search_methods = {
   .on_answer = contacts_search_on_answer,
+  .on_error = q_list_on_error,
   .type = TYPE_TO_PARAM(contacts_found)
 };
 
@@ -3022,24 +3030,6 @@ void tgl_do_contacts_search (struct tgl_state *TLS, int limit, const char *s, vo
 static int send_encr_accept_on_answer (struct tgl_state *TLS, struct query *q) {
   struct tgl_secret_chat *E = tglf_fetch_alloc_encrypted_chat (TLS);
 
-  /*if (E->state == sc_ok) {
-    print_start ();
-    push_color (COLOR_YELLOW);
-    printf ("Encrypted connection with ");
-    print_encr_chat_name (E->id, (void *)E);
-    printf (" established\n");
-    pop_color ();
-    print_end ();
-  } else {
-    print_start ();
-    push_color (COLOR_YELLOW);
-    printf ("Encrypted connection with ");
-    print_encr_chat_name (E->id, (void *)E);
-    printf (" failed\n");
-    pop_color ();
-    print_end ();
-  }*/
-
   if (E->state == sc_ok) {
     tgl_do_send_encr_chat_layer (TLS, E);
   }
@@ -3051,25 +3041,6 @@ static int send_encr_accept_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static int send_encr_request_on_answer (struct tgl_state *TLS, struct query *q) {
   struct tgl_secret_chat *E = tglf_fetch_alloc_encrypted_chat (TLS);
-  /*if (E->state == sc_deleted) {
-    print_start ();
-    push_color (COLOR_YELLOW);
-    printf ("Encrypted connection with ");
-    print_encr_chat_name (E->id, (void *)E);
-    printf (" can not be established\n");
-    pop_color ();
-    print_end ();
-  } else {
-    print_start ();
-    push_color (COLOR_YELLOW);
-    printf ("Establishing connection with ");
-    print_encr_chat_name (E->id, (void *)E);
-    printf ("\n");
-    pop_color ();
-    print_end ();
-
-    assert (E->state == sc_waiting);
-  }*/
   
   if (q->callback) {
     ((void (*)(struct tgl_state *, void *, int, struct tgl_secret_chat *))q->callback) (TLS, q->callback_extra, E->state != sc_deleted, E);
@@ -3077,13 +3048,28 @@ static int send_encr_request_on_answer (struct tgl_state *TLS, struct query *q) 
   return 0;
 }
 
+static int encr_accept_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  tgl_peer_t *P = q->extra;
+  if (P && P->encr_chat.state != sc_deleted &&  error_code == 400) {
+    if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
+      bl_do_encr_chat_delete(TLS, &P->encr_chat);
+    }
+  }
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, struct tgl_secret_chat *))q->callback) (TLS, q->callback_extra, 0, NULL);
+  }
+  return 0;
+}
+
 static struct query_methods send_encr_accept_methods  = {
   .on_answer = send_encr_accept_on_answer,
+  .on_error = encr_accept_on_error,
   .type = TYPE_TO_PARAM(encrypted_chat)
 };
 
 static struct query_methods send_encr_request_methods  = {
   .on_answer = send_encr_request_on_answer,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(encrypted_chat)
 };
 
@@ -3300,6 +3286,7 @@ static int get_dh_config_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods get_dh_config_methods  = {
   .on_answer = get_dh_config_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(messages_dh_config)
 };
 
@@ -3465,16 +3452,19 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods lookup_state_methods = {
   .on_answer = lookup_state_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(updates_state)
 };
 
 static struct query_methods get_state_methods = {
   .on_answer = get_state_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(updates_state)
 };
 
 static struct query_methods get_difference_methods = {
   .on_answer = get_difference_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(updates_difference)
 };
 
@@ -3562,53 +3552,11 @@ void tgl_do_visualize_key (struct tgl_state *TLS, tgl_peer_id_t id, unsigned cha
 }
 /* }}} */
 
-/* {{{ Get suggested */
-/*int get_suggested_on_answer (struct query *q) {
-  assert (fetch_int () == CODE_contacts_suggested);
-  assert (fetch_int () == CODE_vector);
-  int n = fetch_int ();
-  logprintf ("n = %d\n", n);
-  assert (n <= 200);
-  int l[400];
-  int i;
-  for (i = 0; i < n; i++) {
-    assert (fetch_int () == CODE_contact_suggested);
-    l[2 * i] = fetch_int ();
-    l[2 * i + 1] = fetch_int ();
-  }
-  assert (fetch_int () == CODE_vector);
-  int m = fetch_int ();
-  assert (n == m);
-  print_start ();
-  push_color (COLOR_YELLOW);
-  for (i = 0; i < m; i++) {
-    tgl_peer_t *U = (void *)tglf_fetch_alloc_user (TLS);
-    assert (tgl_get_peer_id (U->id) == l[2 * i]);
-    print_user_name (U->id, U);
-    printf (" phone %s: %d mutual friends\n", U->user.phone, l[2 * i + 1]);
-  }
-  pop_color ();
-  print_end ();
-  return 0;
-}
-
-struct query_methods get_suggested_methods = {
-  .on_answer = get_suggested_on_answer,
-  .type = TYPE_TO_PARAM(contacts_suggested)
-};
-
-void tgl_do_get_suggested (void) {
-  clear_packet ();
-  out_int (CODE_contacts_get_suggested);
-  out_int (100);
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_suggested_methods, 0);
-}*/
-/* }}} */
-
 /* {{{ Add user to chat */
 
 static struct query_methods add_user_to_chat_methods = {
   .on_answer = fwd_msg_on_answer,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(messages_stated_message)
 };
 
@@ -3668,6 +3616,7 @@ void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_peer_id_t id, void (*
 /* {{{ Create group chat */
 static struct query_methods create_group_chat_methods = {
   .on_answer = fwd_msg_on_answer,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(messages_stated_message)
 };
 
@@ -3742,6 +3691,7 @@ static int delete_msg_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods delete_msg_methods = {
   .on_answer = delete_msg_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM_1(vector, TYPE_TO_PARAM (bare_int))
 };
 
@@ -3771,6 +3721,7 @@ static int restore_msg_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods restore_msg_methods = {
   .on_answer = restore_msg_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM_1(vector, TYPE_TO_PARAM (bare_int))
 };
 
@@ -3802,6 +3753,7 @@ static int export_card_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods export_card_methods = {
   .on_answer = export_card_on_answer,
+  .on_error = q_list_on_error,
   .type = TYPE_TO_PARAM_1(vector, TYPE_TO_PARAM (bare_int))
 };
 
@@ -3825,6 +3777,7 @@ static int import_card_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods import_card_methods = {
   .on_answer = import_card_on_answer,
+  .on_error = q_ptr_on_error, 
   .type = TYPE_TO_PARAM (user)
 };
 
@@ -3838,6 +3791,66 @@ void tgl_do_import_card (struct tgl_state *TLS, int size, int *card, void (*call
 }
 /* }}} */
 
+static int send_typing_on_answer (struct tgl_state *TLS, struct query *q) {
+  fetch_bool ();
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 1);
+  }
+  return 0;
+}
+
+static struct query_methods send_typing_methods = {
+  .on_answer = send_typing_on_answer,
+  .on_error = q_void_on_error,
+  .type = TYPE_TO_PARAM(bool)
+};
+
+void tgl_do_send_typing (struct tgl_state *TLS, tgl_peer_id_t id, enum tgl_typing_status status, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  if (tgl_get_peer_type (id) != TGL_PEER_ENCR_CHAT) {  
+    clear_packet ();
+    out_int (CODE_messages_set_typing);
+    out_peer_id (TLS, id);
+    switch (status) {
+    case tgl_typing_none:
+    case tgl_typing_typing:
+      out_int (CODE_send_message_typing_action);
+      break;
+    case tgl_typing_cancel:
+      out_int (CODE_send_message_cancel_action);
+      break;
+    case tgl_typing_record_video:
+      out_int (CODE_send_message_record_video_action);
+      break;
+    case tgl_typing_upload_video:
+      out_int (CODE_send_message_upload_video_action);
+      break;
+    case tgl_typing_record_audio:
+      out_int (CODE_send_message_record_audio_action);
+      break;
+    case tgl_typing_upload_audio:
+      out_int (CODE_send_message_upload_audio_action);
+      break;
+    case tgl_typing_upload_photo:
+      out_int (CODE_send_message_upload_photo_action);
+      break;
+    case tgl_typing_upload_document:
+      out_int (CODE_send_message_upload_document_action);
+      break;
+    case tgl_typing_geo:
+      out_int (CODE_send_message_geo_location_action);
+      break;
+    case tgl_typing_choose_contact:
+      out_int (CODE_send_message_choose_contact_action);
+      break;
+    }
+    tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_typing_methods, 0, callback, callback_extra);
+  } else {
+    if (callback) {
+      callback (TLS, callback_extra, 0);
+    }
+  }
+}
+
 #ifndef DISABLE_EXTF
 static int ext_query_on_answer (struct tgl_state *TLS, struct query *q) {
   if (q->callback) {
@@ -3850,6 +3863,7 @@ static int ext_query_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods ext_query_methods = {
   .on_answer = ext_query_on_answer,
+  .on_error = q_list_on_error
 };
 
 void tgl_do_send_extf (struct tgl_state *TLS, char *data, int data_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *buf), void *callback_extra) {
@@ -3914,6 +3928,7 @@ static int update_status_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods update_status_methods = {
   .on_answer = update_status_on_answer,
+  .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(bool)
 };
 
