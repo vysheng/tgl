@@ -61,6 +61,7 @@ struct tgl_session {
   struct tgl_dc *dc;
   long long session_id;
   int seq_no;
+  int received_messages;
   struct connection *c;
   struct tree_long *ack_tree;
   struct tgl_timer *ev;
