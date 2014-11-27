@@ -1071,6 +1071,7 @@ static void fail_connection (struct tgl_state *TLS, struct connection *c) {
 static void fail_session (struct tgl_state *TLS, struct tgl_session *S) {
   struct tgl_dc *DC = S->dc;
   tgls_free_session (TLS, S);
+  DC->sessions[0] = NULL;
   tglmp_dc_create_session (TLS, DC);
 }
 

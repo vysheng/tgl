@@ -606,7 +606,7 @@ static void tgln_free (struct connection *c) {
   if (c->read_ev) { event_free (c->read_ev); }
   if (c->write_ev) { event_free (c->write_ev); }
 
-  if (c->fd >= 0) { close (c->fd); }
+  if (c->fd >= 0) { Connections[c->fd] = 0; close (c->fd); }
   tfree (c, sizeof (*c));
 }
 
