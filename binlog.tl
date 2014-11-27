@@ -80,6 +80,7 @@ binlog.messageSetUnreadLong id:long = binlog.Update;
 binlog.setMessageSent id:long = binlog.Update;
 binlog.setMsgId old_id:long new_id:int = binlog.Update;
 binlog.deleteMsg id:long = binlog.Update;
+binlog.messageSetOutbound id:long = binlog.Update;
 
 binlog.msgSeqUpdate id:long = binlog.Update;
 binlog.msgUpdate id:long = binlog.Update;

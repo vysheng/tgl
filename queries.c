@@ -1493,6 +1493,7 @@ static int send_file_on_answer (struct tgl_state *TLS, struct query *q) {
   int pts = fetch_int ();
   //tglu_fetch_seq ();
   
+  bl_do_msg_set_outbound (TLS, M->id);
   int seq = fetch_int ();
   if (seq == TLS->seq + 1 && !(TLS->locks & TGL_LOCK_DIFF)) {
     bl_do_set_pts (TLS, pts);
@@ -2033,6 +2034,7 @@ static int fwd_msg_on_answer (struct tgl_state *TLS, struct query *q) {
   //tglu_fetch_pts ();
   int pts = fetch_int ();
   
+  bl_do_msg_set_outbound (TLS, M->id);
   int seq = fetch_int ();
   if (seq == TLS->seq + 1 && !(TLS->locks & TGL_LOCK_DIFF)) {
     bl_do_set_pts (TLS, pts);
@@ -3770,6 +3772,7 @@ void tgl_do_import_card (struct tgl_state *TLS, int size, int *card, void (*call
 }
 /* }}} */
 
+/* {{{ Send typing */
 static int send_typing_on_answer (struct tgl_state *TLS, struct query *q) {
   fetch_bool ();
   if (q->callback) {
@@ -3829,7 +3832,9 @@ void tgl_do_send_typing (struct tgl_state *TLS, tgl_peer_id_t id, enum tgl_typin
     }
   }
 }
+/* }}} */
 
+/* {{{ Extd query */
 #ifndef DISABLE_EXTF
 static int ext_query_on_answer (struct tgl_state *TLS, struct query *q) {
   if (q->callback) {
@@ -3861,6 +3866,7 @@ void tgl_do_send_extf (struct tgl_state *TLS, char *data, int data_len, void (*c
   }
 }
 #endif
+/* }}} */
 
 static void set_flag_4 (struct tgl_state *TLS, void *_D, int success) {
   struct tgl_dc *D = _D;

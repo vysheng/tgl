@@ -97,10 +97,12 @@ void bl_do_send_message_action_encr (struct tgl_state *TLS, long long msg_id, in
 void bl_do_set_unread (struct tgl_state *TLS, struct tgl_message *M, int unread);
 void bl_do_set_message_sent (struct tgl_state *TLS, struct tgl_message *M);
 void bl_do_set_msg_id (struct tgl_state *TLS, struct tgl_message *M, int id);
+void bl_do_msg_set_outbound (struct tgl_state *TLS, long long id);
 void bl_do_delete_msg (struct tgl_state *TLS, struct tgl_message *M);
 
 void bl_do_msg_seq_update (struct tgl_state *TLS, long long id);
 void bl_do_msg_update (struct tgl_state *TLS, long long id);
+void bl_do_msg_set_oubound (struct tgl_state *TLS, long long id);
 
 void bl_do_reset_authorization (struct tgl_state *TLS);
 
