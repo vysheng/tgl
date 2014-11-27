@@ -2315,7 +2315,7 @@ void bl_do_set_msg_id (struct tgl_state *TLS, struct tgl_message *M, int id) {
 void bl_do_msg_set_outbound (struct tgl_state *TLS, long long id) {
   clear_packet ();
   out_int (CODE_binlog_message_set_outbound);
-  out_int (id);
+  out_long (id);
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 
