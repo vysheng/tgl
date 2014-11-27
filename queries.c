@@ -296,10 +296,6 @@ static int packed_buffer[MAX_PACKED_SIZE / 4];
 
 void tglq_query_result (struct tgl_state *TLS, long long id) {
   vlogprintf (E_DEBUG, "result for query #%lld. Size %ld bytes\n", id, (long)4 * (in_end - in_ptr));
-  /*if (verbosity  >= 4) {
-    logprintf ( "result: ");
-    hexdump_in ();
-  }*/
   int op = prefetch_int ();
   int *end = 0;
   int *eend = 0;
@@ -311,19 +307,11 @@ void tglq_query_result (struct tgl_state *TLS, long long id) {
     vlogprintf (E_DEBUG, "inflated %d bytes\n", total_out);
     end = in_ptr;
     eend = in_end;
-    //assert (total_out % 4 == 0);
     in_ptr = packed_buffer;
     in_end = in_ptr + total_out / 4;
-    /*if (verbosity >= 4) {
-      logprintf ( "Unzipped data: ");
-      hexdump_in ();
-    }*/
   }
   struct query *q = tglq_query_get (TLS, id);
   if (!q) {
-    //if (verbosity) {
-    //  logprintf ( "No such query\n");
-    //}
     vlogprintf (E_WARNING, "No such query\n");
     in_ptr = in_end;
   } else {
@@ -357,14 +345,6 @@ void tglq_query_result (struct tgl_state *TLS, long long id) {
   }
   TLS->active_queries --;
 } 
-
-
-//int max_chat_size;
-//int max_bcast_size;
-//int want_dc_num;
-//int new_dc_num;
-//extern struct tgl_dc *DC_list[];
-//extern struct tgl_dc *TLS->DC_working;
 
 static void out_random (int n) {
   assert (n <= 32);
@@ -1783,15 +1763,15 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
       }
       if (f->media_type == CODE_input_media_uploaded_video) {
         out_int (0);
-        out_string ("video");
+        out_string (tg_mime_by_filename (f->file_name));
       }
       if (f->media_type == CODE_input_media_uploaded_document) {
         out_string (f->file_name);
-        out_string ("text");
+        out_string (tg_mime_by_filename (f->file_name));
       }
       if (f->media_type == CODE_input_media_uploaded_audio) {
         out_int (60);
-        out_string ("audio");
+        out_string (tg_mime_by_filename (f->file_name));
       }
       if (f->media_type == CODE_input_media_uploaded_video || f->media_type == CODE_input_media_uploaded_photo) {
         out_int (100);

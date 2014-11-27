@@ -814,7 +814,7 @@ static int fetch_comb_binlog_send_message_text (struct tgl_state *TLS, void *ext
     assert (!(M->flags & FLAG_CREATED));
   }
   
-  M->flags |= FLAG_CREATED;
+  M->flags |= FLAG_CREATED | FLAG_SESSION_OUTBOUND;
   M->from_id = TGL_MK_USER (fetch_int ());
   int t = fetch_int ();
   if (t == TGL_PEER_ENCR_CHAT) {
