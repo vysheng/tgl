@@ -1082,7 +1082,7 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
   if (len < MINSZ || (len & 15) != (UNENCSZ & 15)) {
     vlogprintf (E_WARNING, "Incorrect packet from server. Closing connection\n");
     fail_connection (TLS, c);
-    return 0;
+    return -1;
   }
   assert (len >= MINSZ && (len & 15) == (UNENCSZ & 15));
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
@@ -1107,7 +1107,7 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
   if (!(!(enc->msg_len & 3) && enc->msg_len > 0 && enc->msg_len <= len - MINSZ && len - MINSZ - enc->msg_len <= 12)) {
     vlogprintf (E_WARNING, "Incorrect packet from server. Closing connection\n");
     fail_connection (TLS, c);
-    return 0;
+    return -1;
   }
   assert (!(enc->msg_len & 3) && enc->msg_len > 0 && enc->msg_len <= len - MINSZ && len - MINSZ - enc->msg_len <= 12);
 
@@ -1122,7 +1122,7 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
   if (memcmp (&enc->msg_key, sha1_buffer + 4, 16)) {
     vlogprintf (E_WARNING, "Incorrect packet from server. Closing connection\n");
     fail_connection (TLS, c);
-    return 0;
+    return -1;
   }
   assert (!memcmp (&enc->msg_key, sha1_buffer + 4, 16));
 
@@ -1140,7 +1140,7 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
   if (this_server_time < st - 300 || this_server_time > st + 30) {
     vlogprintf (E_WARNING, "bad msg time: salt = %lld, session_id = %lld, msg_id = %lld, seq_no = %d, st = %lf, now = %lf\n", enc->server_salt, enc->session_id, enc->msg_id, enc->seq_no, st, get_utime (CLOCK_REALTIME));
     fail_session (TLS, S);
-    return 0;
+    return -1;
   }
   S->received_messages ++;
 
