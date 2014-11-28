@@ -3868,6 +3868,86 @@ void tgl_do_send_extf (struct tgl_state *TLS, char *data, int data_len, void (*c
 #endif
 /* }}} */
 
+static int send_broadcast_on_answer (struct tgl_state *TLS, struct query *q) {
+  unsigned op = fetch_int ();
+  assert (op == CODE_messages_stated_messages || op == CODE_messages_stated_messages_links);
+  assert (fetch_int () == CODE_vector);
+  int num = fetch_int ();
+  struct tgl_message **ML = talloc (sizeof (void *) * num);
+  int i;
+  for (i = 0; i < num; i++) {
+    ML[i] = tglf_fetch_alloc_message (TLS);
+    bl_do_msg_set_outbound (TLS, ML[i]->id);    
+  }
+  int n;
+  assert (fetch_int () == CODE_vector);
+  n = fetch_int ();
+  for (i = 0; i < n; i++) {
+    tglf_fetch_alloc_chat (TLS);
+  }
+  assert (fetch_int () == CODE_vector);
+  n = fetch_int ();
+  for (i = 0; i < n; i++) {
+    tglf_fetch_alloc_user (TLS);
+  }
+  if (op == CODE_messages_stated_messages_links) {
+    assert (skip_type_any (TYPE_TO_PARAM_1 (vector, TYPE_TO_PARAM (contacts_link))) >= 0);
+  }
+  int pts = fetch_int ();
+  int seq = fetch_int ();
+  
+  if (seq == TLS->seq + 1 && !(TLS->locks & TGL_LOCK_DIFF)) {
+    bl_do_set_pts (TLS, pts);
+    bl_do_set_seq (TLS, seq);
+    int i;
+    for (i = 0; i < num; i++) {
+      bl_do_msg_update (TLS, ML[i]->id);
+    }
+  } else {
+    if (seq > TLS->seq + 1) {
+      vlogprintf (E_NOTICE, "Hole in seq\n");
+      tgl_do_get_difference (TLS, 0, 0, 0);
+    }
+  }
+
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, int, struct tgl_message **))q->callback)(TLS, q->callback_extra, 1, num, ML);
+  }
+  tfree (ML, num * sizeof (void *));
+
+  return 0;
+}
+
+static struct query_methods send_broadcast_methods = {
+  .on_answer = send_broadcast_on_answer,
+  .on_error = q_list_on_error,
+  .type = TYPE_TO_PARAM(messages_stated_messages)
+};
+
+void tgl_do_send_broadcast (struct tgl_state *TLS, int num, tgl_peer_id_t id[], const char *text, int text_len, void (*callback)(struct tgl_state *TLS, void *extra, int success, int num, struct tgl_message *ML[]), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_messages_send_broadcast);
+  out_int (CODE_vector);
+  out_int (num);
+  int i;
+  for (i = 0; i < num; i++) {
+    assert (tgl_get_peer_type (id[i]) == TGL_PEER_USER);
+   
+    struct tgl_user *U = (void *)tgl_peer_get (TLS, id[i]);
+    if (U && U->access_hash) {
+      out_int (CODE_input_user_foreign);
+      out_int (tgl_get_peer_id (id[i]));
+      out_long (U->access_hash);
+    } else {
+      out_int (CODE_input_user_contact);
+      out_int (tgl_get_peer_id (id[i]));
+    }
+  }
+  out_cstring (text, text_len);
+  out_int (CODE_input_media_empty);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_broadcast_methods, 0, callback, callback_extra);
+}
+
 static void set_flag_4 (struct tgl_state *TLS, void *_D, int success) {
   struct tgl_dc *D = _D;
   assert (success);
