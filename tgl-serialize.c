@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <openssl/sha.h>
 
 #include "tgl-serialize.h"
 #include "tgl-binlog.h"
@@ -146,6 +147,7 @@ void write_secret_chat (tgl_peer_t *_P, void *extra) {
     assert (write (fd, &P->state, 4) == 4);
     assert (write (fd, &P->key_fingerprint, 8) == 8);
     assert (write (fd, &P->key, 256) == 256);
+    assert (write (fd, &P->first_key_sha, 20) == 20);
     assert (write (fd, &P->in_seq_no, 4) == 4);
     assert (write (fd, &P->last_in_seq_no, 4) == 4);
     assert (write (fd, &P->out_seq_no, 4) == 4);
@@ -156,7 +158,7 @@ int write_secret_chat_file (struct tgl_state *TLS) {
     assert (secret_chat_fd >= 0);
     int x = SECRET_CHAT_FILE_MAGIC;
     assert (write (secret_chat_fd, &x, 4) == 4);
-    x = 1;
+    x = 2;
     assert (write (secret_chat_fd, &x, 4) == 4); // version
     assert (write (secret_chat_fd, &x, 4) == 4); // num
     
@@ -254,6 +256,7 @@ void read_secret_chat (struct tgl_state *TLS, int fd, int v) {
     long long access_hash, key_fingerprint;
     static char s[1000];
     static unsigned char key[256];
+    static unsigned char sha[20];
     assert (read (fd, &id, 4) == 4);
     //assert (read (fd, &flags, 4) == 4);
     assert (read (fd, &l, 4) == 4);
@@ -268,6 +271,9 @@ void read_secret_chat (struct tgl_state *TLS, int fd, int v) {
     assert (read (fd, &state, 4) == 4);
     assert (read (fd, &key_fingerprint, 8) == 8);
     assert (read (fd, &key, 256) == 256);
+    if (v >= 2) {
+        assert (read (fd, sha, 20) == 20);
+    }
     int in_seq_no = 0, out_seq_no = 0, last_in_seq_no = 0;
     if (v >= 1) {
         assert (read (fd, &in_seq_no, 4) == 4);
@@ -284,6 +290,12 @@ void read_secret_chat (struct tgl_state *TLS, int fd, int v) {
     bl_do_encr_chat_set_access_hash (TLS, P, access_hash);
     bl_do_encr_chat_set_state (TLS, P, state);
     bl_do_encr_chat_set_key (TLS, P, key, key_fingerprint);
+    if (v >= 2) {
+        bl_do_encr_chat_set_sha (TLS, P, sha);
+    } else {
+        SHA1 ((void *)key, 256, sha);
+        bl_do_encr_chat_set_sha (TLS, P, sha);
+    }
     if (v >= 1) {
         bl_do_encr_chat_set_seq (TLS, P, in_seq_no, last_in_seq_no, out_seq_no);
     }
@@ -298,7 +310,7 @@ int read_secret_chat_file (struct tgl_state *TLS) {
     if (x != SECRET_CHAT_FILE_MAGIC) { close (secret_chat_fd); return -1; }
     int v = 0;
     assert (read (secret_chat_fd, &v, 4) == 4);
-    assert (v == 0 || v == 1); // version
+    assert (v == 0 || v == 1 || v == 2); // version
     assert (read (secret_chat_fd, &x, 4) == 4);
     assert (x >= 0);
     while (x --> 0) {
