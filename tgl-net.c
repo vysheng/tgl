@@ -481,7 +481,9 @@ static void try_rpc_read (struct connection *c) {
     len *= 4;
     int op;
     assert (tgln_read_in_lookup (c, &op, 4) == 4);
-    c->methods->execute (TLS, c, op, len);
+    if (c->methods->execute (TLS, c, op, len) < 0) {
+      return;
+    }
   }
 }
 
@@ -606,7 +608,7 @@ static void tgln_free (struct connection *c) {
   if (c->read_ev) { event_free (c->read_ev); }
   if (c->write_ev) { event_free (c->write_ev); }
 
-  if (c->fd >= 0) { close (c->fd); }
+  if (c->fd >= 0) { Connections[c->fd] = 0; close (c->fd); }
   tfree (c, sizeof (*c));
 }
 

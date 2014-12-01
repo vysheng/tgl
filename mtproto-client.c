@@ -878,8 +878,6 @@ int tglmp_encrypt_inner_temp (struct tgl_state *TLS, struct connection *c, int *
   return l + UNENCSZ;
 }
 
-static int good_messages;
-
 static void rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long long msg_id);
 
 //int unread_messages;
@@ -1061,10 +1059,31 @@ static void rpc_execute_answer (struct tgl_state *TLS, struct connection *c, lon
   in_ptr = in_end; // Will not fail due to assertion in_ptr == in_end
 }
 
+static struct mtproto_methods mtproto_methods;
+void tgls_free_session (struct tgl_state *TLS, struct tgl_session *S);
+static void fail_connection (struct tgl_state *TLS, struct connection *c) {
+  struct tgl_session *S = TLS->net_methods->get_session (c);
+  struct tgl_dc *DC = TLS->net_methods->get_dc (c);
+  TLS->net_methods->free (c);
+  S->c = TLS->net_methods->create_connection (TLS, DC->ip, DC->port, S, DC, &mtproto_methods);
+}
+
+static void fail_session (struct tgl_state *TLS, struct tgl_session *S) {
+  struct tgl_dc *DC = S->dc;
+  tgls_free_session (TLS, S);
+  DC->sessions[0] = NULL;
+  tglmp_dc_create_session (TLS, DC);
+}
+
 static int process_rpc_message (struct tgl_state *TLS, struct connection *c, struct encrypted_message *enc, int len) {
   const int MINSZ = offsetof (struct encrypted_message, message);
   const int UNENCSZ = offsetof (struct encrypted_message, server_salt);
   vlogprintf (E_DEBUG, "process_rpc_message(), len=%d\n", len);  
+  if (len < MINSZ || (len & 15) != (UNENCSZ & 15)) {
+    vlogprintf (E_WARNING, "Incorrect packet from server. Closing connection\n");
+    fail_connection (TLS, c);
+    return -1;
+  }
   assert (len >= MINSZ && (len & 15) == (UNENCSZ & 15));
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
   if (enc->auth_key_id != DC->temp_auth_key_id && enc->auth_key_id != DC->auth_key_id) {
@@ -1081,31 +1100,53 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
     assert (DC->auth_key_id);
     tgl_init_aes_auth (DC->auth_key + 8, enc->msg_key, AES_DECRYPT);
   }
+  
   int l = tgl_pad_aes_decrypt ((char *)&enc->server_salt, len - UNENCSZ, (char *)&enc->server_salt, len - UNENCSZ);
   assert (l == len - UNENCSZ);
-  //assert (enc->auth_key_id2 == enc->auth_key_id);
-  assert (!(enc->msg_len & 3) && enc->msg_len > 0 && enc->msg_len <= len - MINSZ && len - MINSZ - enc->msg_len <= 12);
-  static unsigned char sha1_buffer[20];
-  sha1 ((void *)&enc->server_salt, enc->msg_len + (MINSZ - UNENCSZ), sha1_buffer);
-  assert (!memcmp (&enc->msg_key, sha1_buffer + 4, 16));
-  //assert (enc->server_salt == server_salt); //in fact server salt can change
-  if (DC->server_salt != enc->server_salt) {
-    DC->server_salt = enc->server_salt;
-    //write_auth_file ();
-  }
- 
   
-  int this_server_time = enc->msg_id >> 32LL;
-  if (!DC->server_time_delta) {
-    DC->server_time_delta = this_server_time - get_utime (CLOCK_REALTIME);
-    DC->server_time_udelta = this_server_time - get_utime (CLOCK_MONOTONIC);
+  if (!(!(enc->msg_len & 3) && enc->msg_len > 0 && enc->msg_len <= len - MINSZ && len - MINSZ - enc->msg_len <= 12)) {
+    vlogprintf (E_WARNING, "Incorrect packet from server. Closing connection\n");
+    fail_connection (TLS, c);
+    return -1;
   }
-  double st = get_server_time (DC);
-  if (this_server_time < st - 300 || this_server_time > st + 30) {
-    vlogprintf (E_WARNING, "salt = %lld, session_id = %lld, msg_id = %lld, seq_no = %d, st = %lf, now = %lf\n", enc->server_salt, enc->session_id, enc->msg_id, enc->seq_no, st, get_utime (CLOCK_REALTIME));
+  assert (!(enc->msg_len & 3) && enc->msg_len > 0 && enc->msg_len <= len - MINSZ && len - MINSZ - enc->msg_len <= 12);
+
+  struct tgl_session *S = TLS->net_methods->get_session (c);
+  if (!S || S->session_id != enc->session_id) {
+    vlogprintf (E_WARNING, "Message to bad session. Drop.\n");
     return 0;
   }
 
+  static unsigned char sha1_buffer[20];
+  sha1 ((void *)&enc->server_salt, enc->msg_len + (MINSZ - UNENCSZ), sha1_buffer);
+  if (memcmp (&enc->msg_key, sha1_buffer + 4, 16)) {
+    vlogprintf (E_WARNING, "Incorrect packet from server. Closing connection\n");
+    fail_connection (TLS, c);
+    return -1;
+  }
+  assert (!memcmp (&enc->msg_key, sha1_buffer + 4, 16));
+
+  int this_server_time = enc->msg_id >> 32LL;
+  if (!S->received_messages) {
+    DC->server_time_delta = this_server_time - get_utime (CLOCK_REALTIME);
+    if (DC->server_time_udelta) {
+      vlogprintf (E_WARNING, "adjusting CLOCK_MONOTONIC delta to %lf\n", 
+          DC->server_time_udelta - this_server_time - get_utime (CLOCK_MONOTONIC));
+    }
+    DC->server_time_udelta = this_server_time - get_utime (CLOCK_MONOTONIC);
+  }
+
+  double st = get_server_time (DC);
+  if (this_server_time < st - 300 || this_server_time > st + 30) {
+    vlogprintf (E_WARNING, "bad msg time: salt = %lld, session_id = %lld, msg_id = %lld, seq_no = %d, st = %lf, now = %lf\n", enc->server_salt, enc->session_id, enc->msg_id, enc->seq_no, st, get_utime (CLOCK_REALTIME));
+    fail_session (TLS, S);
+    return -1;
+  }
+  S->received_messages ++;
+
+  if (DC->server_salt != enc->server_salt) {
+    DC->server_salt = enc->server_salt;
+  }
 
   assert (this_server_time >= st - 300 && this_server_time <= st + 30);
   //assert (enc->msg_id > server_last_msg_id && (enc->msg_id & 3) == 1);
@@ -1117,26 +1158,10 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
 
   assert (l >= (MINSZ - UNENCSZ) + 8);
   //assert (enc->message[0] == CODE_rpc_result && *(long long *)(enc->message + 1) == client_last_msg_id);
-  ++good_messages;
   
   in_ptr = enc->message;
   in_end = in_ptr + (enc->msg_len / 4);
-  
-  /*{
-    assert (len <= 10000);
-    static char s[1 << 20];
-    int p = 0;
-    int i;
-    //static int buf[10000];
-    //assert (TLS->net_methods->read_in_lookup (c, buf, len) == len);
-    
-    for (i = 0; i < in_end - in_ptr; i++) {
-      p += sprintf (s + p, "%08x ", *(int *)(in_ptr + i));
-    }
-    vlogprintf (E_DEBUG, "%s\n", s);
-  }*/
  
-  struct tgl_session *S = TLS->net_methods->get_session (c);
   if (enc->msg_id & 1) {
     tgln_insert_msg_id (TLS, S, enc->msg_id);
   }
@@ -1150,24 +1175,6 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
 static int rpc_execute (struct tgl_state *TLS, struct connection *c, int op, int len) {
   struct tgl_dc *D = TLS->net_methods->get_dc (c);
   vlogprintf (E_DEBUG, "outbound rpc connection from dc #%d (%s:%d) : received rpc answer %d with %d content bytes\n", D->id, D->ip, D->port, op, len);
-  
-  /*{
-    assert (len <= 10000);
-    static char s[1 << 20];
-    int p = 0;
-    int i;
-    static int buf[10000];
-    assert (TLS->net_methods->read_in_lookup (c, buf, len) == len);
-    
-    for (i = 0; i < len / 4; i++) {
-      p += sprintf (s + p, "%08x ", *(int *)(buf + i));
-    }
-    vlogprintf (E_DEBUG, "%s\n", s);
-  }*/
-  /*  if (op < 0) {
-    assert (TLS->net_methods->read_in (c, Response, Response_len) == Response_len);
-    return 0;
-  }*/
 
   if (len >= MAX_RESPONSE_SIZE/* - 12*/ || len < 0/*12*/) {
     vlogprintf (E_WARNING, "answer too long (%d bytes), skipping\n", len);

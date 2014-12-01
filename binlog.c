@@ -814,7 +814,7 @@ static int fetch_comb_binlog_send_message_text (struct tgl_state *TLS, void *ext
     assert (!(M->flags & FLAG_CREATED));
   }
   
-  M->flags |= FLAG_CREATED;
+  M->flags |= FLAG_CREATED | FLAG_SESSION_OUTBOUND;
   M->from_id = TGL_MK_USER (fetch_int ());
   int t = fetch_int ();
   if (t == TGL_PEER_ENCR_CHAT) {
@@ -1207,6 +1207,13 @@ static int fetch_comb_binlog_set_msg_id (struct tgl_state *TLS, void *extra) {
   return 0;
 }
 
+static int fetch_comb_binlog_message_set_outbound (struct tgl_state *TLS, void *extra) {
+  struct tgl_message *M = tgl_message_get (TLS, fetch_long ());
+  assert (M);
+  M->flags |= FLAG_SESSION_OUTBOUND;
+  return 0;
+}
+
 static int fetch_comb_binlog_delete_msg (struct tgl_state *TLS, void *extra) {
   struct tgl_message *M = tgl_message_get (TLS, fetch_long ());
   assert (M);
@@ -1424,6 +1431,7 @@ static void replay_log_event (struct tgl_state *TLS) {
   FETCH_COMBINATOR_FUNCTION (binlog_message_set_unread_long)
   FETCH_COMBINATOR_FUNCTION (binlog_set_message_sent)
   FETCH_COMBINATOR_FUNCTION (binlog_set_msg_id)
+  FETCH_COMBINATOR_FUNCTION (binlog_message_set_outbound)
   FETCH_COMBINATOR_FUNCTION (binlog_delete_msg)
   FETCH_COMBINATOR_FUNCTION (binlog_msg_seq_update)
   FETCH_COMBINATOR_FUNCTION (binlog_msg_update)
@@ -2301,6 +2309,13 @@ void bl_do_set_msg_id (struct tgl_state *TLS, struct tgl_message *M, int id) {
   out_int (CODE_binlog_set_msg_id);
   out_long (M->id);
   out_int (id);
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
+void bl_do_msg_set_outbound (struct tgl_state *TLS, long long id) {
+  clear_packet ();
+  out_int (CODE_binlog_message_set_outbound);
+  out_long (id);
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 

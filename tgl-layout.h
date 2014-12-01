@@ -25,6 +25,7 @@
 #define FLAG_FORBIDDEN 4
 #define FLAG_HAS_PHOTO 8
 #define FLAG_CREATED 16
+#define FLAG_SESSION_OUTBOUND 32
 
 #define FLAG_USER_SELF 128
 #define FLAG_USER_FOREIGN 256
@@ -60,6 +61,7 @@ struct tgl_session {
   struct tgl_dc *dc;
   long long session_id;
   int seq_no;
+  int received_messages;
   struct connection *c;
   struct tree_long *ack_tree;
   struct tgl_timer *ev;
