@@ -187,7 +187,8 @@ static int rpc_send_packet (struct tgl_state *TLS, struct connection *c) {
   int len = (packet_ptr - packet_buffer) * 4;
   //c->out_packet_num ++;
   TLS->net_methods->incr_out_packet_num (c);
-  long long next_msg_id = (long long) ((1LL << 32) * get_utime (CLOCK_REALTIME)) & -4;
+  struct tgl_dc *DC = TLS->net_methods->get_dc (c);
+  long long next_msg_id = (long long) ((1LL << 32) * (DC->server_time_delta + get_utime (CLOCK_REALTIME))) & -4;
   if (next_msg_id <= unenc_msg_header.out_msg_id) {
     unenc_msg_header.out_msg_id += 4;
   } else {
