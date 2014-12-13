@@ -190,11 +190,14 @@ static int rpc_send_packet (struct tgl_state *TLS, struct connection *c) {
   TLS->net_methods->incr_out_packet_num (c);
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
   long long next_msg_id = (long long) ((1LL << 32) * get_server_time (DC)) & -4;
+  struct tgl_session *S = TLS->net_methods->get_session (c);
+  unenc_msg_header.out_msg_id = S->last_msg_id;
   if (next_msg_id <= unenc_msg_header.out_msg_id) {
     unenc_msg_header.out_msg_id += 4;
   } else {
     unenc_msg_header.out_msg_id = next_msg_id;
   }
+  S->last_msg_id = unenc_msg_header.out_msg_id;
   unenc_msg_header.msg_len = len;
 
   int total_len = len + 20;
@@ -240,7 +243,6 @@ static int send_req_pq_packet (struct tgl_state *TLS, struct connection *c) {
   assert (D->state == st_init);
 
   tglt_secure_random (D->nonce, 16);
-  unenc_msg_header.out_msg_id = 0;
   clear_packet ();
   out_int (CODE_req_pq);
   out_ints ((int *)D->nonce, 4);
@@ -255,7 +257,6 @@ static int send_req_pq_temp_packet (struct tgl_state *TLS, struct connection *c)
   assert (D->state == st_authorized);
 
   tglt_secure_random (D->nonce, 16);
-  unenc_msg_header.out_msg_id = 0;
   clear_packet ();
   out_int (CODE_req_pq);
   out_ints ((int *)D->nonce, 4);
