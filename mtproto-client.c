@@ -1005,6 +1005,7 @@ static void work_bad_msg_notification (struct tgl_state *TLS, struct connection 
   int s = fetch_int ();
   int e = fetch_int ();
   vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %lld, seq = %d, error = %d\n", m1, s, e);
+  tglq_regen_query (TLS, m1);
 }
 
 static void rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long long msg_id) {

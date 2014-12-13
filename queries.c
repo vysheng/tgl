@@ -116,6 +116,22 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
   return 0;
 }
 
+void tglq_regen_query (struct tgl_state *TLS, long long id) {
+  struct query *q = tglq_query_get (TLS, id);
+  if (!q) { return; }
+  q->flags &= ~QUERY_ACK_RECEIVED;
+  if (tree_lookup_query (TLS->queries_tree, q)) {
+    TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
+  }
+  q->session = q->DC->sessions[0];
+  q->msg_id = tglmp_encrypt_send_message (TLS, q->session->c, q->data, q->data_len, (q->flags & QUERY_FORCE_SEND) | 1);
+  TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
+  q->session_id = q->session->session_id;
+  if (!(q->session->dc->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
+    q->session_id = 0;
+  }
+}
+
 void tglq_query_restart (struct tgl_state *TLS, long long id) {
   struct query *q = tglq_query_get (TLS, id);
   if (q) {

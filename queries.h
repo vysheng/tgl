@@ -73,6 +73,8 @@ void tgl_do_confirm_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, 
 void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, long long exchange_id, unsigned char g_a[]);
 void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char g_a[]);
 void tgl_do_abort_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E);
+
+void tglq_regen_query (struct tgl_state *TLS, long long id);
 // For binlog
 
 //int get_dh_config_on_answer (struct query *q);
