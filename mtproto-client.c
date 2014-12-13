@@ -183,12 +183,13 @@ static int encrypt_packet_buffer_aes_unauth (const char server_nonce[16], const 
 }
 
 
+static double get_server_time (struct tgl_dc *DC);
 static int rpc_send_packet (struct tgl_state *TLS, struct connection *c) {
   int len = (packet_ptr - packet_buffer) * 4;
   //c->out_packet_num ++;
   TLS->net_methods->incr_out_packet_num (c);
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
-  long long next_msg_id = (long long) ((1LL << 32) * (DC->server_time_delta + get_utime (CLOCK_REALTIME))) & -4;
+  long long next_msg_id = (long long) ((1LL << 32) * get_server_time (DC)) & -4;
   if (next_msg_id <= unenc_msg_header.out_msg_id) {
     unenc_msg_header.out_msg_id += 4;
   } else {
@@ -593,7 +594,7 @@ static int process_dh_answer (struct tgl_state *TLS, struct connection *c, char 
   assert (!memcmp (decrypt_buffer, sha1_buffer, 20));
   assert ((char *) in_end - (char *) in_ptr < 16);
 
-  D->server_time_delta = server_time - time (0);
+  D->server_time_delta = server_time - get_utime (CLOCK_REALTIME);
   D->server_time_udelta = server_time - get_utime (CLOCK_MONOTONIC);
   //logprintf ( "server time is %d, delta = %d\n", server_time, server_time_delta);
 
