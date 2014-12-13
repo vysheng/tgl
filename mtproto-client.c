@@ -661,7 +661,7 @@ static void create_temp_auth_key (struct tgl_state *TLS, struct connection *c) {
 }
 
 int tglmp_encrypt_inner_temp (struct tgl_state *TLS, struct connection *c, int *msg, int msg_ints, int useful, void *data, long long msg_id);
-static long long generate_next_msg_id (struct tgl_state *TLS, struct tgl_dc *DC);
+static long long generate_next_msg_id (struct tgl_state *TLS, struct tgl_dc *DC, struct tgl_session *S);
 static long long msg_id_override;
 static void mpc_on_get_config (struct tgl_state *TLS, void *extra, int success);
 static int process_auth_complete (struct tgl_state *TLS, struct connection *c, char *packet, int len, int temp_key) {
@@ -710,7 +710,7 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
   if (temp_key) {
     //D->flags |= 2;
     
-    long long msg_id = generate_next_msg_id (TLS, D);
+    long long msg_id = generate_next_msg_id (TLS, D, TLS->net_methods->get_session (c));
     clear_packet ();
     out_int (CODE_bind_auth_key_inner);
     long long rand;
@@ -759,7 +759,7 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
 
 static struct encrypted_message enc_msg;
 
-static long long client_last_msg_id, server_last_msg_id;
+//static long long client_last_msg_id, server_last_msg_id;
 
 static double get_server_time (struct tgl_dc *DC) {
   if (!DC->server_time_udelta) {
@@ -768,12 +768,12 @@ static double get_server_time (struct tgl_dc *DC) {
   return get_utime (CLOCK_MONOTONIC) + DC->server_time_udelta;
 }
 
-static long long generate_next_msg_id (struct tgl_state *TLS, struct tgl_dc *DC) {
+static long long generate_next_msg_id (struct tgl_state *TLS, struct tgl_dc *DC, struct tgl_session *S) {
   long long next_id = (long long) (get_server_time (DC) * (1LL << 32)) & -4;
-  if (next_id <= client_last_msg_id) {
-    next_id = client_last_msg_id += 4;
+  if (next_id <= S->last_msg_id) {
+    next_id = S->last_msg_id  += 4;
   } else {
-    client_last_msg_id = next_id;
+    S->last_msg_id = next_id;
   }
   return next_id;
 }
@@ -792,7 +792,7 @@ static void init_enc_msg (struct tgl_state *TLS, struct tgl_session *S, int usef
   }
   enc_msg.session_id = S->session_id;
   //enc_msg.auth_key_id2 = auth_key_id;
-  enc_msg.msg_id = msg_id_override ? msg_id_override : generate_next_msg_id (TLS, DC);
+  enc_msg.msg_id = msg_id_override ? msg_id_override : generate_next_msg_id (TLS, DC, S);
   //enc_msg.msg_id -= 0x10000000LL * (lrand48 () & 15);
   //kprintf ("message id %016llx\n", enc_msg.msg_id);
   enc_msg.seq_no = S->seq_no;
@@ -828,11 +828,11 @@ static int aes_encrypt_message (struct tgl_state *TLS, char *key, struct encrypt
 
 long long tglmp_encrypt_send_message (struct tgl_state *TLS, struct connection *c, int *msg, int msg_ints, int flags) {
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
-  if (!(DC->flags & 4) && !(flags & 2)) {
-    return generate_next_msg_id (TLS, DC);
-  }
   struct tgl_session *S = TLS->net_methods->get_session (c);
   assert (S);
+  if (!(DC->flags & 4) && !(flags & 2)) {
+    return generate_next_msg_id (TLS, DC, S);
+  }
 
   const int UNENCSZ = offsetof (struct encrypted_message, server_salt);
   if (msg_ints <= 0 || msg_ints > MAX_MESSAGE_INTS - 4) {
@@ -856,7 +856,7 @@ long long tglmp_encrypt_send_message (struct tgl_state *TLS, struct connection *
   rpc_send_message (TLS, c, &enc_msg, l + UNENCSZ);
 
   
-  return client_last_msg_id;
+  return S->last_msg_id;
 }
 
 int tglmp_encrypt_inner_temp (struct tgl_state *TLS, struct connection *c, int *msg, int msg_ints, int useful, void *data, long long msg_id) {
@@ -1157,7 +1157,7 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
   assert (this_server_time >= st - 300 && this_server_time <= st + 30);
   //assert (enc->msg_id > server_last_msg_id && (enc->msg_id & 3) == 1);
   vlogprintf (E_DEBUG, "received mesage id %016llx\n", enc->msg_id);
-  server_last_msg_id = enc->msg_id;
+  //server_last_msg_id = enc->msg_id;
 
   //*(long long *)(longpoll_query + 3) = *(long long *)((char *)(&enc->msg_id) + 0x3c);
   //*(long long *)(longpoll_query + 5) = *(long long *)((char *)(&enc->msg_id) + 0x3c);
