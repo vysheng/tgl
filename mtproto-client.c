@@ -880,7 +880,7 @@ int tglmp_encrypt_inner_temp (struct tgl_state *TLS, struct connection *c, int *
   return l + UNENCSZ;
 }
 
-static void rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long long msg_id);
+static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long long msg_id);
 
 //int unread_messages;
 //int pts;
@@ -888,7 +888,7 @@ static void rpc_execute_answer (struct tgl_state *TLS, struct connection *c, lon
 //int last_date;
 //int seq;
 
-static void work_container (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_container (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   vlogprintf (E_DEBUG, "work_container: msg_id = %lld\n", msg_id);
   assert (fetch_int () == CODE_msg_container);
   int n = fetch_int ();
@@ -903,13 +903,15 @@ static void work_container (struct tgl_state *TLS, struct connection *c, long lo
     int bytes = fetch_int ();
     int *t = in_end;
     in_end = in_ptr + (bytes / 4);
-    rpc_execute_answer (TLS, c, id);
+    int r = rpc_execute_answer (TLS, c, id);
+    if (r < 0) { return -1; }
     assert (in_ptr == in_end);
     in_end = t;
   }
+  return 0;
 }
 
-static void work_new_session_created (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_new_session_created (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   vlogprintf (E_DEBUG, "work_new_session_created: msg_id = %lld\n", msg_id);
   assert (fetch_int () == (int)CODE_new_session_created);
   fetch_long (); // first message id
@@ -919,9 +921,10 @@ static void work_new_session_created (struct tgl_state *TLS, struct connection *
   if (TLS->started && !(TLS->locks & TGL_LOCK_DIFF)) {
     tgl_do_get_difference (TLS, 0, 0, 0);
   }
+  return 0;
 }
 
-static void work_msgs_ack (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_msgs_ack (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   vlogprintf (E_DEBUG, "work_msgs_ack: msg_id = %lld\n", msg_id);
   assert (fetch_int () == CODE_msgs_ack);
   assert (fetch_int () == CODE_vector);
@@ -932,9 +935,10 @@ static void work_msgs_ack (struct tgl_state *TLS, struct connection *c, long lon
     vlogprintf (E_DEBUG + 1, "ack for %lld\n", id);
     tglq_query_ack (TLS, id);
   }
+  return 0;
 }
 
-static void work_rpc_result (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_rpc_result (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   vlogprintf (E_DEBUG, "work_rpc_result: msg_id = %lld\n", msg_id);
   assert (fetch_int () == (int)CODE_rpc_result);
   long long id = fetch_long ();
@@ -944,10 +948,11 @@ static void work_rpc_result (struct tgl_state *TLS, struct connection *c, long l
   } else {
     tglq_query_result (TLS, id);
   }
+  return 0;
 }
 
 #define MAX_PACKED_SIZE (1 << 24)
-static void work_packed (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_packed (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   assert (fetch_int () == CODE_gzip_packed);
   static int in_gzip;
   static int buf[MAX_PACKED_SIZE >> 2];
@@ -963,13 +968,14 @@ static void work_packed (struct tgl_state *TLS, struct connection *c, long long 
   //assert (total_out % 4 == 0);
   in_ptr = buf;
   in_end = in_ptr + total_out / 4;
-  rpc_execute_answer (TLS, c, msg_id);
+  int r = rpc_execute_answer (TLS, c, msg_id);
   in_ptr = end;
   in_end = eend;
   in_gzip = 0;
+  return r;
 }
 
-static void work_bad_server_salt (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_bad_server_salt (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   assert (fetch_int () == (int)CODE_bad_server_salt);
   long long id = fetch_long ();
   tglq_query_restart (TLS, id);
@@ -977,89 +983,85 @@ static void work_bad_server_salt (struct tgl_state *TLS, struct connection *c, l
   fetch_int (); // error_code
   long long new_server_salt = fetch_long ();
   TLS->net_methods->get_dc (c)->server_salt = new_server_salt;
+  return 0;
 }
 
-static void work_pong (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_pong (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   assert (fetch_int () == CODE_pong);
   fetch_long (); // msg_id
   fetch_long (); // ping_id
+  return 0;
 }
 
-static void work_detailed_info (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_detailed_info (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   assert (fetch_int () == CODE_msg_detailed_info);
   fetch_long (); // msg_id
   fetch_long (); // answer_msg_id
   fetch_int (); // bytes
   fetch_int (); // status
+  return 0;
 }
 
-static void work_new_detailed_info (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_new_detailed_info (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   assert (fetch_int () == (int)CODE_msg_new_detailed_info);
   fetch_long (); // answer_msg_id
   fetch_int (); // bytes
   fetch_int (); // status
+  return 0;
 }
 
-static void work_bad_msg_notification (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int work_bad_msg_notification (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   assert (fetch_int () == (int)CODE_bad_msg_notification);
   long long m1 = fetch_long ();
   int s = fetch_int ();
   int e = fetch_int ();
   vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %lld, seq = %d, error = %d\n", m1, s, e);
   tglq_regen_query (TLS, m1);
+  return -1;
 }
 
-static void rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long long msg_id) {
+static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   int op = prefetch_int ();
   switch (op) {
   case CODE_msg_container:
-    work_container (TLS, c, msg_id);
-    return;
+    return work_container (TLS, c, msg_id);
   case CODE_new_session_created:
-    work_new_session_created (TLS, c, msg_id);
-    return;
+    return work_new_session_created (TLS, c, msg_id);
   case CODE_msgs_ack:
-    work_msgs_ack (TLS, c, msg_id);
-    return;
+    return work_msgs_ack (TLS, c, msg_id);
   case CODE_rpc_result:
-    work_rpc_result (TLS, c, msg_id);
-    return;
+    return work_rpc_result (TLS, c, msg_id);
   case CODE_update_short:
     tglu_work_update_short (TLS, c, msg_id);
-    return;
+    return 0;
   case CODE_updates:
     tglu_work_updates (TLS, c, msg_id);
-    return;
+    return 0;
   case CODE_update_short_message:
     tglu_work_update_short_message (TLS, c, msg_id);
-    return;
+    return 0;
   case CODE_update_short_chat_message:
     tglu_work_update_short_chat_message (TLS, c, msg_id);
-    return;
+    return 0;
   case CODE_gzip_packed:
-    work_packed (TLS, c, msg_id);
-    return;
+    return work_packed (TLS, c, msg_id);
   case CODE_bad_server_salt:
-    work_bad_server_salt (TLS, c, msg_id);
-    return;
+    return work_bad_server_salt (TLS, c, msg_id);
   case CODE_pong:
-    work_pong (TLS, c, msg_id);
-    return;
+    return work_pong (TLS, c, msg_id);
   case CODE_msg_detailed_info:
-    work_detailed_info (TLS, c, msg_id);
-    return;
+    return work_detailed_info (TLS, c, msg_id);
   case CODE_msg_new_detailed_info:
-    work_new_detailed_info (TLS, c, msg_id);
-    return;
+    return work_new_detailed_info (TLS, c, msg_id);
   case CODE_updates_too_long:
     tglu_work_updates_to_long (TLS, c, msg_id);
-    return;
+    return 0;
   case CODE_bad_msg_notification:
-    work_bad_msg_notification (TLS, c, msg_id);
-    return;
+    return work_bad_msg_notification (TLS, c, msg_id);
   }
   vlogprintf (E_WARNING, "Unknown message: %08x\n", op);
   in_ptr = in_end; // Will not fail due to assertion in_ptr == in_end
+  return 0;
 }
 
 static struct mtproto_methods mtproto_methods;
@@ -1134,7 +1136,7 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
     DC->server_time_delta = this_server_time - get_utime (CLOCK_REALTIME);
     if (DC->server_time_udelta) {
       vlogprintf (E_WARNING, "adjusting CLOCK_MONOTONIC delta to %lf\n", 
-          DC->server_time_udelta - this_server_time - get_utime (CLOCK_MONOTONIC));
+          DC->server_time_udelta - this_server_time + get_utime (CLOCK_MONOTONIC));
     }
     DC->server_time_udelta = this_server_time - get_utime (CLOCK_MONOTONIC);
   }
@@ -1169,7 +1171,11 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
     tgln_insert_msg_id (TLS, S, enc->msg_id);
   }
   assert (S->session_id == enc->session_id);
-  rpc_execute_answer (TLS, c, enc->msg_id);
+
+  if (rpc_execute_answer (TLS, c, enc->msg_id) < 0) {
+    fail_session (TLS, S);
+    return -1;
+  }
   assert (in_ptr == in_end);
   return 0;
 }
@@ -1219,7 +1225,7 @@ static int rpc_execute (struct tgl_state *TLS, struct connection *c, int op, int
     if (op < 0 && op >= -999) {
       vlogprintf (E_WARNING, "Server error %d\n", op);
     } else {
-      process_rpc_message (TLS, c, (void *)(Response/* + 8*/), Response_len/* - 12*/);
+      return process_rpc_message (TLS, c, (void *)(Response/* + 8*/), Response_len/* - 12*/);
     }
     return 0;
   default:
