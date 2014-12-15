@@ -591,12 +591,21 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
     vlogprintf (E_ERROR, "nonce mismatch\n");
     return -1;
   }
+  if (op != CODE_dh_gen_ok) {
+    vlogprintf (E_ERROR, "something bad. Retry regen\n");
+    return -1;
+  }
   
   fetch_ints (tmp, 4);
   
   static unsigned char th[44], sha1_buffer[20];
   memcpy (th, DC->new_nonce, 32);
   th[32] = 1;
+  if (!temp_key) {
+    sha1 ((unsigned char *)DC->auth_key, 256, sha1_buffer);
+  } else {
+    sha1 ((unsigned char *)DC->temp_auth_key, 256, sha1_buffer);
+  }
   memcpy (th + 33, sha1_buffer, 8);
   sha1 (th, 41, sha1_buffer);
   if (memcmp (tmp, sha1_buffer + 4, 16)) {
