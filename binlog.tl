@@ -88,3 +88,4 @@ binlog.msgUpdate id:long = binlog.Update;
 binlog.resetAuthorization = binlog.Update;
 
 //binlog.addDc id:int ip:string port:int auth_key_id:long auth_key:64*[int] = binlog.Update;
+---functions---

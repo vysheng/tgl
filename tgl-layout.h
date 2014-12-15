@@ -72,6 +72,7 @@ struct tgl_dc {
   int id;
   int port;
   int flags;
+  int rsa_key_idx;
   enum tgl_dc_state state;
   char *ip;
   //char *user;

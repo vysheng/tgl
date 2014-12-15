@@ -47,8 +47,8 @@ struct connection;
 
 long long tglmp_encrypt_send_message (struct tgl_state *TLS, struct connection *c, int *msg, int msg_ints, int flags);
 void tglmp_dc_create_session (struct tgl_state *TLS, struct tgl_dc *DC);
-int tglmp_check_g (struct tgl_state *TLS, unsigned char p[256], BIGNUM *g);
-int tglmp_check_DH_params (struct tgl_state *TLS, BIGNUM *p, int g);
+//int tglmp_check_g (struct tgl_state *TLS, unsigned char p[256], BIGNUM *g);
+//int tglmp_check_DH_params (struct tgl_state *TLS, BIGNUM *p, int g);
 struct tgl_dc *tglmp_alloc_dc (struct tgl_state *TLS, int id, char *ip, int port);
 void tglmp_regenerate_temp_auth_key (struct tgl_state *TLS, struct tgl_dc *D);
 

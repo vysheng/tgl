@@ -141,6 +141,7 @@ struct tgl_state {
   int our_id; // ID of logged in user
   int encr_root;
   unsigned char *encr_prime;
+  void *encr_prime_bn;
   int encr_param_version;
   int pts;
   int qts;
@@ -176,7 +177,10 @@ struct tgl_state {
   void *ev_base;
 
   char *rsa_key_list[TGL_MAX_RSA_KEYS_NUM];
+  void *rsa_key_loaded[TGL_MAX_RSA_KEYS_NUM];
+  long long rsa_key_fingerprint[TGL_MAX_RSA_KEYS_NUM];
   int rsa_key_num;
+
   struct bignum_ctx *BN_ctx;
 
   struct tgl_allocator allocator;
@@ -200,8 +204,6 @@ struct tgl_state {
   int binlog_fd;
 
   struct tgl_timer_methods *timer_methods;
-
-  void *pubKey;
 
   struct tree_query *queries_tree;
 

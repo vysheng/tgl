@@ -53,6 +53,7 @@
 #include "auto.h"
 #include "tgl.h"
 #include "tg-mime-types.h"
+#include "mtproto-utils.h"
 
 #define sha1 SHA1
 
@@ -3101,13 +3102,12 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
   ensure_ptr (b);
   BIGNUM *g_a = BN_bin2bn (E->g_key, 256, 0);
   ensure_ptr (g_a);
-  assert (tglmp_check_g (TLS, TLS->encr_prime, g_a) >= 0);
+  assert (tglmp_check_g_a (TLS, TLS->encr_prime_bn, g_a) >= 0);
   //if (!ctx) {
   //  ctx = BN_CTX_new ();
   //  ensure_ptr (ctx);
   //}
-  BIGNUM *p = BN_bin2bn (TLS->encr_prime, 256, 0); 
-  ensure_ptr (p);
+  BIGNUM *p = TLS->encr_prime_bn;
   BIGNUM *r = BN_new ();
   ensure_ptr (r);
   ensure (BN_mod_exp (r, g_a, b, p, TLS->BN_ctx));
@@ -3139,7 +3139,6 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
   out_long (E->key_fingerprint);
   BN_clear_free (b);
   BN_clear_free (g_a);
-  BN_clear_free (p);
   BN_clear_free (r);
 
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_encr_accept_methods, E, callback, callback_extra);
@@ -3149,8 +3148,9 @@ void tgl_do_create_keys_end (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   assert (TLS->encr_prime);
   BIGNUM *g_b = BN_bin2bn (U->g_key, 256, 0);
   ensure_ptr (g_b);
-  assert (tglmp_check_g (TLS, TLS->encr_prime, g_b) >= 0);
-  BIGNUM *p = BN_bin2bn (TLS->encr_prime, 256, 0); 
+  assert (tglmp_check_g_a (TLS, TLS->encr_prime_bn, g_b) >= 0);
+  
+  BIGNUM *p = TLS->encr_prime_bn; 
   ensure_ptr (p);
   BIGNUM *r = BN_new ();
   ensure_ptr (r);
@@ -3179,7 +3179,6 @@ void tgl_do_create_keys_end (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   memcpy (U->first_key_sha, sha_buffer, 20);
   tfree_secure (t, 256);
   
-  BN_clear_free (p);
   BN_clear_free (g_b);
   BN_clear_free (r);
   BN_clear_free (a);
@@ -3983,7 +3982,7 @@ static int send_bind_temp_on_answer (struct tgl_state *TLS, struct query *q) {
 
 static struct query_methods send_bind_temp_methods = {
   .on_answer = send_bind_temp_on_answer,
-  .on_error = fail_on_error,
+  //.on_error = fail_on_error,
   .type = TYPE_TO_PARAM (bool)
 };
 
@@ -4080,12 +4079,12 @@ void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, l
   BIGNUM *g_a = BN_bin2bn (ga, 256, 0);
   ensure_ptr (g_a);
 
-  assert (tglmp_check_g (TLS, TLS->encr_prime, g_a) >= 0);
+  assert (tglmp_check_g_a (TLS, TLS->encr_prime_bn, g_a) >= 0);
   //if (!ctx) {
   //  ctx = BN_CTX_new ();
   //  ensure_ptr (ctx);
   //}
-  BIGNUM *p = BN_bin2bn (TLS->encr_prime, 256, 0); 
+  BIGNUM *p = TLS->encr_prime_bn; 
   ensure_ptr (p);
   BIGNUM *r = BN_new ();
   ensure_ptr (r);
@@ -4118,7 +4117,6 @@ void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, l
 
   BN_clear_free (b);
   BN_clear_free (g_a);
-  BN_clear_free (p);
   BN_clear_free (r);
   
   struct tgl_message *M = tgl_message_get (TLS, t);
@@ -4149,9 +4147,9 @@ void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, u
   
   BIGNUM *g_b = BN_bin2bn (gb, 256, 0);  
   ensure_ptr (g_b);
-  assert (tglmp_check_g (TLS, TLS->encr_prime, g_b) >= 0);
+  assert (tglmp_check_g_a (TLS, TLS->encr_prime_bn, g_b) >= 0);
 
-  BIGNUM *p = BN_bin2bn (TLS->encr_prime, 256, 0); 
+  BIGNUM *p = TLS->encr_prime_bn;
   ensure_ptr (p);
   BIGNUM *r = BN_new ();
   ensure_ptr (r);
@@ -4164,7 +4162,6 @@ void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, u
   
   BN_bn2bin (r, s + (256 - BN_num_bytes (r)));
   
-  BN_clear_free (p);
   BN_clear_free (g_b);
   BN_clear_free (r);
   BN_clear_free (a);
