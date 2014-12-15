@@ -9,6 +9,7 @@ boolFalse#bc799737 = Bool;
 boolTrue#997275b5 = Bool;
 
 int128 long long = Int128;
+int256 long long long long = Int256;
 
 vector#1cb5c415 {t:Type} # [ t ] = Vector t;
 
