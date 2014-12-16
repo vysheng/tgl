@@ -99,8 +99,7 @@ static int rpc_close (struct tgl_state *TLS, struct connection *c);
 static double get_utime (int clock_id) {
   struct timespec T;
   tgl_my_clock_gettime (clock_id, &T);
-  double res = T.tv_sec + (double) T.tv_nsec * 1e-9;
-  return res;
+  return T.tv_sec + (double) T.tv_nsec * 1e-9;
 }
 
 
@@ -187,9 +186,6 @@ static int rpc_send_packet (struct tgl_state *TLS, struct connection *c) {
   return 1;
 }
 
-// 
-// Used in authorized part of protocol
-// 
 static int rpc_send_message (struct tgl_state *TLS, struct connection *c, void *data, int len) {
   assert (len > 0 && !(len & 0xfc000003));
   
@@ -665,6 +661,7 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
   
   return 1;
 }
+/* }}} */
 
 /*
  *
@@ -673,8 +670,6 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
  */
 
 static struct encrypted_message enc_msg;
-
-//static long long client_last_msg_id, server_last_msg_id;
 
 static double get_server_time (struct tgl_dc *DC) {
   if (!DC->server_time_udelta) {
@@ -696,20 +691,15 @@ static long long generate_next_msg_id (struct tgl_state *TLS, struct tgl_dc *DC,
 static void init_enc_msg (struct tgl_state *TLS, struct tgl_session *S, int useful) {
   struct tgl_dc *DC = S->dc;
   assert (DC->state == st_authorized);
-  //assert (DC->flags & 2);
   assert (DC->temp_auth_key_id);
   vlogprintf (E_DEBUG, "temp_auth_key_id = 0x%016llx, auth_key_id = 0x%016llx\n", DC->temp_auth_key_id, DC->auth_key_id);
   enc_msg.auth_key_id = DC->temp_auth_key_id;
-//  assert (DC->server_salt);
   enc_msg.server_salt = DC->server_salt;
   if (!S->session_id) {
     tglt_secure_random (&S->session_id, 8);
   }
   enc_msg.session_id = S->session_id;
-  //enc_msg.auth_key_id2 = auth_key_id;
   enc_msg.msg_id = msg_id_override ? msg_id_override : generate_next_msg_id (TLS, DC, S);
-  //enc_msg.msg_id -= 0x10000000LL * (lrand48 () & 15);
-  //kprintf ("message id %016llx\n", enc_msg.msg_id);
   enc_msg.seq_no = S->seq_no;
   if (useful) {
     enc_msg.seq_no |= 1;
@@ -730,14 +720,13 @@ static int aes_encrypt_message (struct tgl_state *TLS, char *key, struct encrypt
   unsigned char sha1_buffer[20];
   const int MINSZ = offsetof (struct encrypted_message, message);
   const int UNENCSZ = offsetof (struct encrypted_message, server_salt);
+  
   int enc_len = (MINSZ - UNENCSZ) + enc->msg_len;
   assert (enc->msg_len >= 0 && enc->msg_len <= MAX_MESSAGE_INTS * 4 - 16 && !(enc->msg_len & 3));
   sha1 ((unsigned char *) &enc->server_salt, enc_len, sha1_buffer);
-  //printf ("enc_len is %d\n", enc_len);
   vlogprintf (E_DEBUG, "sending message with sha1 %08x\n", *(int *)sha1_buffer);
   memcpy (enc->msg_key, sha1_buffer + 4, 16);
   tgl_init_aes_auth (key, enc->msg_key, AES_ENCRYPT);
-  //hexdump ((char *)enc, (char *)enc + enc_len + 24);
   return tgl_pad_aes_encrypt ((char *) &enc->server_salt, enc_len, (char *) &enc->server_salt, MAX_MESSAGE_INTS * 4 + (MINSZ - UNENCSZ));
 }
 
@@ -763,9 +752,7 @@ long long tglmp_encrypt_send_message (struct tgl_state *TLS, struct connection *
   }
   init_enc_msg (TLS, S, flags & 1);
 
-  //hexdump ((char *)msg, (char *)msg + (msg_ints * 4));
   int l = aes_encrypt_message (TLS, DC->temp_auth_key, &enc_msg);
-  //hexdump ((char *)&enc_msg, (char *)&enc_msg + l  + 24);
   assert (l > 0);
   vlogprintf (E_DEBUG, "Sending message to DC%d: %s:%d with key_id=%lld\n", DC->id, DC->ip, DC->port, enc_msg.auth_key_id);
   rpc_send_message (TLS, c, &enc_msg, l + UNENCSZ);
@@ -798,12 +785,6 @@ int tglmp_encrypt_inner_temp (struct tgl_state *TLS, struct connection *c, int *
 
 static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long long msg_id);
 
-//int unread_messages;
-//int pts;
-//int qts;
-//int last_date;
-//int seq;
-
 static int work_container (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   vlogprintf (E_DEBUG, "work_container: msg_id = %lld\n", msg_id);
   assert (fetch_int () == CODE_msg_container);
@@ -831,7 +812,6 @@ static int work_new_session_created (struct tgl_state *TLS, struct connection *c
   vlogprintf (E_DEBUG, "work_new_session_created: msg_id = %lld\n", msg_id);
   assert (fetch_int () == (int)CODE_new_session_created);
   fetch_long (); // first message id
-  //DC->session_id = fetch_long ();
   fetch_long (); // unique_id
   TLS->net_methods->get_dc (c)->server_salt = fetch_long ();
   if (TLS->started && !(TLS->locks & TGL_LOCK_DIFF)) {
@@ -932,7 +912,20 @@ static int work_bad_msg_notification (struct tgl_state *TLS, struct connection *
   int s = fetch_int ();
   int e = fetch_int ();
   vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %lld, seq = %d, error = %d\n", m1, s, e);
-  tglq_regen_query (TLS, m1);
+  switch (e) {
+  // Too low msg id
+  case 16:
+    tglq_regen_query (TLS, m1);
+    break;
+  // Too high msg id
+  case 17:
+    tglq_regen_query (TLS, m1);
+    break;
+  default:
+    vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %lld, seq = %d, error = %d\n", m1, s, e);
+    break;
+  }
+    
   return -1;
 }
 
