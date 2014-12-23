@@ -17,7 +17,7 @@ LIB=libs
 EXE=bin
 DIR_LIST=${DEP} ${AUTO} ${EXE} ${OBJ} ${LIB} ${DEP}/auto ${OBJ}/auto
 
-LIB_LIST=${LIB}/libtgl.a
+LIB_LIST=${LIB}/libtgl.a ${LIB}/libtgl.so
 
 TGL_OBJECTS=${OBJ}/mtproto-common.o ${OBJ}/mtproto-client.o ${OBJ}/queries.o ${OBJ}/structures.o ${OBJ}/binlog.o ${OBJ}/auto/auto.o ${OBJ}/tgl.o ${OBJ}/updates.o ${OBJ}/tg-mime-types.o @EXTRA_OBJECTS@
 TLD_OBJECTS=${OBJ}/dump-tl-file.o
@@ -54,6 +54,9 @@ ${OBJ_C}: ${OBJ}/%.o: ${srcdir}/%.c | create_dirs
 
 ${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS}
 	ar ruv $@ ${TGL_OBJECTS} ${COMMON_OBJECTS}
+
+${LIB}/libtgl.so: ${TGL_OBJECTS} ${COMMON_OBJECTS}
+	${CC} -shared -o $@ ${TGL_OBJECTS} ${COMMON_OBJECTS}
 
 ${EXE}/generate: ${GENERATE_OBJECTS} ${COMMON_OBJECTS}
 	${CC} ${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS} -o $@
