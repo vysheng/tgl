@@ -72,13 +72,14 @@ auto/scheme.tlo: auto/scheme.tl tgl-tl-parser
 	${srcdir}/tgl-tl-parser -e $@ auto/scheme.tl
 
 auto/scheme.tl: ${srcdir}/scheme.tl ${srcdir}/encrypted_scheme.tl \
-		${srcdir}/binlog.tl ${srcdir}/append.tl
-		cat $^ > $@
+	${srcdir}/binlog.tl ${srcdir}/append.tl
+	mkdir -p auto
+	cat $^ > $@
 
 auto/scheme2.tl: auto/scheme.tl tgl-tl-parser
 	${srcdir}/tgl-tl-parser -E auto/scheme.tl 2> $@  || ( cat 	$@ && rm $@ && false )
 
-auto/auto.c: auto/scheme.tlo tgl-generate
+auto/auto.c: auto/scheme.tlo tgl-generate auto/auto-header.h auto/constants.h
 	${srcdir}/tgl-generate auto/scheme.tlo > $@
 
 auto/auto-header.h: auto/scheme.tlo tgl-generate
