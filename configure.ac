@@ -15,6 +15,8 @@ AM_INIT_AUTOMAKE([
     subdir-objects
 ])
 
+AC_PROG_MAKE_SET
+
 
 m4_include([m4_ax_check_openssl.m4])
 m4_include([m4_ax_check_zlib.m4])
