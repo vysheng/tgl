@@ -22,6 +22,10 @@ AM_CFLAGS = ${my_CFLAGS} \
 	-Wno-unused-parameter \
 	-fPIC
 
+AM_LDFLAGS = \
+	-Wl,--gc-sections \
+	-Wl,--as-needed
+
 
 LIBTGL_CURRENT=1
 LIBTGL_REVISION=0
