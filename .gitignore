@@ -10,6 +10,7 @@
 .idea/
 .libs/
 Makefile
+Makefile.in
 aclocal.m4
 auto/
 autom4te.cache
@@ -22,6 +23,7 @@ config.h.in
 config.log
 config.status
 configure.scan
+configure
 dep/
 libs/
 libtool
