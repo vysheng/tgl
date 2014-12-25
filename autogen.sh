@@ -2,13 +2,8 @@
 
 autoreconf --install
 
-libdir() {
-        echo $(cd $1/$(gcc -print-multi-os-directory); pwd)
-}
-
 args="--prefix=/usr \
---sysconfdir=/etc \
---libdir=$(libdir /usr/lib)"
+      --sysconfdir=/etc"
 
 echo
 echo "----------------------------------------------------------------"
