@@ -22,9 +22,6 @@ AM_CFLAGS = ${my_CFLAGS} \
 	-Wno-unused-parameter \
 	-fPIC
 
-AM_LDFLAGS = \
-	-Wl,--gc-sections
-
 
 LIBTGL_CURRENT=1
 LIBTGL_REVISION=0
@@ -50,7 +47,7 @@ libtgl_la_SOURCES =\
 	updates.c \
 	tools.c
 
-libtgl_la_LDFLAGS = $(AM_LDFLAGS) \
+libtgl_la_LDFLAGS = \
 	-version-info $(LIBTGL_CURRENT):$(LIBTGL_REVISION):$(LIBTGL_AGE) \
 	$(OPENSSL_LIBS) $(OPENSSL_LDFLAGS)
 
