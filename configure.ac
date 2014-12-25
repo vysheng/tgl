@@ -1,11 +1,27 @@
 AC_PREREQ([2.68])
-AC_INIT([telegram-cli], [1.0])
+AC_INIT([tgl], [0.1])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
+AM_INIT_AUTOMAKE([
+    check-news
+    foreign
+    1.11
+    -Wall
+    -Wno-portability
+    silent-rules
+    tar-pax
+    no-dist-gzip
+    dist-xz
+    subdir-objects
+])
+
 
 m4_include([m4_ax_check_openssl.m4])
 m4_include([m4_ax_check_zlib.m4])
 m4_include([m4-ax_gcc_builtin.m4])
+
+AC_CONFIG_MACRO_DIR([m4])
+LT_INIT
 
 # Checks for programs.
 AC_PROG_CC

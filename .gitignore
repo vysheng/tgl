@@ -10,3 +10,8 @@ objs/
 dep/
 auto/
 libs/
+.libs/
+.deps/
+*.o
+*.lo
+*.pyc
