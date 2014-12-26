@@ -20,7 +20,10 @@ AM_CFLAGS = ${my_CFLAGS} \
 	-fno-omit-frame-pointer \
 	-ggdb \
 	-Wno-unused-parameter \
-	-fPIC
+	-fPIC \
+	-ffunction-sections \
+	-fdata-sections
+
 
 AM_LDFLAGS = \
 	-Wl,--gc-sections \
