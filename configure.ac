@@ -24,9 +24,11 @@ m4_include([m4-ax_gcc_builtin.m4])
 
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
-
+AM_CONDITIONAL([TARGET_LINUX],[test "${host_os}" = "linux-gnu" ||
+                 test "${host_os}" = "linux"])
 # Checks for programs.
 AC_PROG_CC
+
 
 # BSD locations for headers and libraries from packages, Linux locations for self-compiled stuff.
 CPPFLAGS="$CPPFLAGS -I/usr/local/include"

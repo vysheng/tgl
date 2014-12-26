@@ -24,10 +24,11 @@ AM_CFLAGS = ${my_CFLAGS} \
 	-ffunction-sections \
 	-fdata-sections
 
-
+if TARGET_LINUX
 AM_LDFLAGS = \
 	-Wl,--gc-sections \
 	-Wl,--as-needed
+endif
 
 
 LIBTGL_CURRENT=1
