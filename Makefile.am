@@ -78,12 +78,14 @@ tgl_tl_parser_SOURCES = tl-parser/tl-parser.c \
 					tl-parser/crc32.c
 tgl_tl_parser_CFLAGS = -iquote
 
+auto:
+	mkdir -p auto
+
 auto/scheme.tlo: auto/scheme.tl tgl-tl-parser
 	${srcdir}/tgl-tl-parser -e $@ auto/scheme.tl
 
 auto/scheme.tl: ${srcdir}/scheme.tl ${srcdir}/encrypted_scheme.tl \
-	${srcdir}/binlog.tl ${srcdir}/append.tl
-	mkdir -p auto
+	${srcdir}/binlog.tl ${srcdir}/append.tl | auto
 	cat $^ > $@
 
 auto/scheme2.tl: auto/scheme.tl tgl-tl-parser
