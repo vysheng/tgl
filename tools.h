@@ -39,7 +39,7 @@
 #define tsnprintf tgl_snprintf
 
 
-struct tgl_allocator *tgl_allocator;
+extern struct tgl_allocator *tgl_allocator;
 double tglt_get_double_time (void);
 
 int tgl_inflate (void *input, int ilen, void *output, int olen);
