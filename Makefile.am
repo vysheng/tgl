@@ -55,7 +55,7 @@ libtgl_la_SOURCES =\
 	updates.c \
 	tools.c
 
-EXTRA_libtgl_la_SOURCES = tgl-net.c tgl-timer.c
+EXTRA_libtgl_la_SOURCES = tgl-net.c tgl-timers.c
 
 libtgl_la_LIBADD = $(EXTRA_OBJECTS)
 libtgl_la_DEPENDENCIES = $(EXTRA_OBJECTS)
