@@ -544,12 +544,14 @@ static int process_dh_answer (struct tgl_state *TLS, struct connection *c, char 
 /* }}} */
 
 static void create_temp_auth_key (struct tgl_state *TLS, struct connection *c) {
+  assert (TLS->enable_pfs);
   send_req_pq_temp_packet (TLS, c);
 }
 
 int tglmp_encrypt_inner_temp (struct tgl_state *TLS, struct connection *c, int *msg, int msg_ints, int useful, void *data, long long msg_id);
 static long long msg_id_override;
 static void mpc_on_get_config (struct tgl_state *TLS, void *extra, int success);
+static void bind_temp_auth_key (struct tgl_state *TLS, struct connection *c);
 
 /* {{{ RECV AUTH COMPLETE */
 
@@ -613,8 +615,8 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
     bl_do_set_auth_key_id (TLS, DC->id, (unsigned char *)DC->auth_key);
     sha1 ((unsigned char *)DC->auth_key, 256, sha1_buffer);
   } else {
-    DC->temp_auth_key_id = *(long long *)(sha1_buffer + 12);
     sha1 ((unsigned char *)DC->temp_auth_key, 256, sha1_buffer);
+    DC->temp_auth_key_id = *(long long *)(sha1_buffer + 12);
   }
 
   DC->server_salt = *(long long *)DC->server_nonce ^ *(long long *)DC->new_nonce;
@@ -623,28 +625,7 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
   
   vlogprintf (E_DEBUG, "Auth success\n");
   if (temp_key) {
-    long long msg_id = generate_next_msg_id (TLS, DC, TLS->net_methods->get_session (c));
-    clear_packet ();
-    out_int (CODE_bind_auth_key_inner);
-    long long rand;
-    tglt_secure_random (&rand, 8);
-    out_long (rand);
-    out_long (DC->temp_auth_key_id);
-    out_long (DC->auth_key_id);
-
-    struct tgl_session *S = TLS->net_methods->get_session (c);
-    if (!S->session_id) {
-      tglt_secure_random (&S->session_id, 8);
-    }
-    out_long (S->session_id);
-    int expires = time (0) + DC->server_time_delta + TLS->temp_key_expire_time;
-    out_int (expires);
-
-    static int data[1000];
-    int len = tglmp_encrypt_inner_temp (TLS, c, packet_buffer, packet_ptr - packet_buffer, 0, data, msg_id);
-    msg_id_override = msg_id;
-    tgl_do_send_bind_temp_key (TLS, DC, rand, expires, (void *)data, len, msg_id);
-    msg_id_override = 0;
+    bind_temp_auth_key (TLS, c);
   } else {
     DC->flags |= 1;
     if (TLS->enable_pfs) {
@@ -663,6 +644,37 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
 }
 /* }}} */
 
+static void bind_temp_auth_key (struct tgl_state *TLS, struct connection *c) {
+  struct tgl_dc *DC = TLS->net_methods->get_dc (c);
+  if (DC->temp_auth_key_bind_query_id) {
+    tglq_query_delete (TLS, DC->temp_auth_key_bind_query_id);
+  }
+  struct tgl_session *S = TLS->net_methods->get_session (c);
+  long long msg_id = generate_next_msg_id (TLS, DC, S);
+  
+  clear_packet ();
+  out_int (CODE_bind_auth_key_inner);
+  long long rand;
+  tglt_secure_random (&rand, 8);
+  out_long (rand);
+  out_long (DC->temp_auth_key_id);
+  out_long (DC->auth_key_id);
+
+  if (!S->session_id) {
+    tglt_secure_random (&S->session_id, 8);
+  }
+  out_long (S->session_id);
+  int expires = time (0) + DC->server_time_delta + TLS->temp_key_expire_time;
+  out_int (expires);
+
+  static int data[1000];
+  int len = tglmp_encrypt_inner_temp (TLS, c, packet_buffer, packet_ptr - packet_buffer, 0, data, msg_id);
+  msg_id_override = msg_id;
+  DC->temp_auth_key_bind_query_id = msg_id;
+  tgl_do_send_bind_temp_key (TLS, DC, rand, expires, (void *)data, len, msg_id);
+  msg_id_override = 0;
+}
+
 /*
  *
  *                AUTHORIZED (MAIN) PROTOCOL PART
@@ -672,9 +684,9 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
 static struct encrypted_message enc_msg;
 
 static double get_server_time (struct tgl_dc *DC) {
-  if (!DC->server_time_udelta) {
-    DC->server_time_udelta = get_utime (CLOCK_REALTIME) - get_utime (CLOCK_MONOTONIC);
-  }
+  //if (!DC->server_time_udelta) {
+  //  DC->server_time_udelta = get_utime (CLOCK_REALTIME) - get_utime (CLOCK_MONOTONIC);
+  //}
   return get_utime (CLOCK_MONOTONIC) + DC->server_time_udelta;
 }
 
@@ -756,7 +768,6 @@ long long tglmp_encrypt_send_message (struct tgl_state *TLS, struct connection *
   assert (l > 0);
   vlogprintf (E_DEBUG, "Sending message to DC%d: %s:%d with key_id=%lld\n", DC->id, DC->ip, DC->port, enc_msg.auth_key_id);
   rpc_send_message (TLS, c, &enc_msg, l + UNENCSZ);
-
   
   return S->last_msg_id;
 }
@@ -814,7 +825,7 @@ static int work_new_session_created (struct tgl_state *TLS, struct connection *c
   fetch_long (); // first message id
   fetch_long (); // unique_id
   TLS->net_methods->get_dc (c)->server_salt = fetch_long ();
-  if (TLS->started && !(TLS->locks & TGL_LOCK_DIFF)) {
+  if (TLS->started && !(TLS->locks & TGL_LOCK_DIFF) && TLS->DC_working->has_auth) {
     tgl_do_get_difference (TLS, 0, 0, 0);
   }
   return 0;
@@ -840,11 +851,10 @@ static int work_rpc_result (struct tgl_state *TLS, struct connection *c, long lo
   long long id = fetch_long ();
   int op = prefetch_int ();
   if (op == CODE_rpc_error) {
-    tglq_query_error (TLS, id);
+    return tglq_query_error (TLS, id);
   } else {
-    tglq_query_result (TLS, id);
+    return tglq_query_result (TLS, id);
   }
-  return 0;
 }
 
 #define MAX_PACKED_SIZE (1 << 24)
@@ -983,6 +993,7 @@ static void fail_connection (struct tgl_state *TLS, struct connection *c) {
 }
 
 static void fail_session (struct tgl_state *TLS, struct tgl_session *S) {
+  vlogprintf (E_NOTICE, "failing session %lld\n", S->session_id);
   struct tgl_dc *DC = S->dc;
   tgls_free_session (TLS, S);
   DC->sessions[0] = NULL;
@@ -1110,6 +1121,9 @@ static int rpc_execute (struct tgl_state *TLS, struct connection *c, int op, int
 #endif
   int o = DC->state;
   //if (DC->flags & 1) { o = st_authorized;}
+  if (o != st_authorized) {
+    vlogprintf (E_DEBUG, "%s: state = %d\n", __func__, o);
+  }
   switch (o) {
   case st_reqpq_sent:
     process_respq_answer (TLS, c, Response/* + 8*/, Response_len/* - 12*/, 0);
@@ -1157,7 +1171,7 @@ static void mpc_on_get_config (struct tgl_state *TLS, void *extra, int success) 
 }
 
 static int tc_becomes_ready (struct tgl_state *TLS, struct connection *c) {
-  vlogprintf (E_DEBUG, "outbound rpc connection from dc #%d becomed ready\n", TLS->net_methods->get_dc(c)->id);
+  vlogprintf (E_NOTICE, "outbound rpc connection from dc #%d becomed ready\n", TLS->net_methods->get_dc(c)->id);
   //char byte = 0xef;
   //assert (TLS->net_methods->write_out (c, &byte, 1) == 1);
   //TLS->net_methods->flush_out (c);
@@ -1176,8 +1190,13 @@ static int tc_becomes_ready (struct tgl_state *TLS, struct connection *c) {
     break;
   case st_authorized:
     if (!(DC->flags & 2)) {
-      assert (!DC->temp_auth_key_id);
-      create_temp_auth_key (TLS, c);
+      assert (TLS->enable_pfs);
+      if (!DC->temp_auth_key_id) {
+        assert (!DC->temp_auth_key_id);
+        create_temp_auth_key (TLS, c);
+      } else {
+        bind_temp_auth_key (TLS, c);
+      }
     } else if (!(DC->flags & 4)) {
       tgl_do_help_get_config_dc (TLS, DC, mpc_on_get_config, DC);
     }

@@ -84,6 +84,7 @@ struct tgl_dc {
   char server_nonce[256];
   long long auth_key_id;
   long long temp_auth_key_id;
+  long long temp_auth_key_bind_query_id;
 
   long long server_salt;
   struct tgl_timer *ev;

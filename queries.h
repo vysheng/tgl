@@ -55,8 +55,8 @@ struct query {
 
 struct query *tglq_send_query (struct tgl_state *TLS, struct tgl_dc *DC, int len, void *data, struct query_methods *methods, void *extra, void *callback, void *callback_extra);
 void tglq_query_ack (struct tgl_state *TLS, long long id);
-void tglq_query_error (struct tgl_state *TLS, long long id);
-void tglq_query_result (struct tgl_state *TLS, long long id);
+int tglq_query_error (struct tgl_state *TLS, long long id);
+int tglq_query_result (struct tgl_state *TLS, long long id);
 void tglq_query_restart (struct tgl_state *TLS, long long id);
 
 //double next_timer_in (void);
@@ -75,6 +75,7 @@ void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, u
 void tgl_do_abort_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E);
 
 void tglq_regen_query (struct tgl_state *TLS, long long id);
+void tglq_query_delete (struct tgl_state *TLS, long long id);
 // For binlog
 
 //int get_dh_config_on_answer (struct query *q);

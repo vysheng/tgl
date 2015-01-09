@@ -121,14 +121,18 @@ void tglq_regen_query (struct tgl_state *TLS, long long id) {
   struct query *q = tglq_query_get (TLS, id);
   if (!q) { return; }
   q->flags &= ~QUERY_ACK_RECEIVED;
-        
-  q->session_id = 0;
+  
+  if (!(q->session->dc->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
+    q->session_id = 0;
+  }
+  vlogprintf (E_NOTICE, "regen query %lld\n", id);
   TLS->timer_methods->insert (q->ev, 0.001);
 }
 
 void tglq_query_restart (struct tgl_state *TLS, long long id) {
   struct query *q = tglq_query_get (TLS, id);
   if (q) {
+    vlogprintf (E_NOTICE, "restarting query %lld\n", id);
     TLS->timer_methods->remove (q->ev);
     alarm_query (TLS, q);
   }
@@ -196,7 +200,21 @@ void tglq_query_ack (struct tgl_state *TLS, long long id) {
   }
 }
 
-void tglq_query_error (struct tgl_state *TLS, long long id) {
+void tglq_query_delete (struct tgl_state *TLS, long long id) {
+  struct query *q = tglq_query_get (TLS, id);
+  if (!q) {
+    return;
+  }
+  if (!(q->flags & QUERY_ACK_RECEIVED)) {
+    TLS->timer_methods->remove (q->ev);
+  }
+  TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
+  tfree (q->data, q->data_len * 4);
+  TLS->timer_methods->free (q->ev);
+  TLS->active_queries --;
+}
+
+int tglq_query_error (struct tgl_state *TLS, long long id) {
   assert (fetch_int () == CODE_rpc_error);
   int error_code = fetch_int ();
   int error_len = prefetch_strlen ();
@@ -237,7 +255,11 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
           if (i > 0 && i < TGL_MAX_DC_NUM) {
             bl_do_set_working_dc (TLS, i);
             q->flags &= ~QUERY_ACK_RECEIVED;
-            q->session_id = 0;
+            //q->session_id = 0;
+            struct tgl_dc *DC = q->DC;
+            if (!(DC->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
+              q->session_id = 0;
+            }
             q->DC = TLS->DC_working;
             TLS->timer_methods->insert (q->ev, 0);
             error_handled = 1;
@@ -278,7 +300,10 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
         }
         q->flags &= ~QUERY_ACK_RECEIVED;
         TLS->timer_methods->insert (q->ev, wait);
-        q->session_id = 0;
+        struct tgl_dc *DC = q->DC;
+        if (!(DC->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
+          q->session_id = 0;
+        }         
         error_handled = 1;
       }
       break;
@@ -297,14 +322,21 @@ void tglq_query_error (struct tgl_state *TLS, long long id) {
       tfree (q->data, q->data_len * 4);
       TLS->timer_methods->free (q->ev);
     }
+
+    if (res == -11) {
+      TLS->active_queries --;
+      return -1;
+      
+    }
   }
   TLS->active_queries --;
+  return 0;
 }
 
 #define MAX_PACKED_SIZE (1 << 24)
 static int packed_buffer[MAX_PACKED_SIZE / 4];
 
-void tglq_query_result (struct tgl_state *TLS, long long id) {
+int tglq_query_result (struct tgl_state *TLS, long long id) {
   vlogprintf (E_DEBUG, "result for query #%lld. Size %ld bytes\n", id, (long)4 * (in_end - in_ptr));
   int op = prefetch_int ();
   int *end = 0;
@@ -354,6 +386,7 @@ void tglq_query_result (struct tgl_state *TLS, long long id) {
     in_end = eend;
   }
   TLS->active_queries --;
+  return 0;
 } 
 
 static void out_random (int n) {
@@ -561,8 +594,7 @@ static int sign_in_on_answer (struct tgl_state *TLS, struct query *q) {
 
   struct tgl_user *U = tglf_fetch_alloc_user (TLS);
   
-  TLS->DC_working->has_auth = 1;
-
+  //TLS->DC_working->has_auth = 1;
   bl_do_dc_signed (TLS, TLS->DC_working->id);
 
   if (q->callback) {
@@ -2713,13 +2745,16 @@ static struct query_methods import_auth_methods = {
   .type = TYPE_TO_PARAM(auth_authorization)
 };
 
-static int export_auth_on_answer (struct tgl_state *TLS, struct query *q) {
+static int export_auth_on_answer (struct tgl_state *TLS, struct query *q) { 
   assert (fetch_int () == (int)CODE_auth_exported_authorization);
   bl_do_set_our_id (TLS, fetch_int ());
   int l = prefetch_strlen ();
   char *s = talloc (l);
   memcpy (s, fetch_str (l), l);
-  
+ 
+  //struct tgl_dc *DC = q->extra;
+  //vlogprintf (0, "exported auth (to %d)\n", DC->id);
+
   clear_packet ();
   tgl_do_insert_header (TLS);
   out_int (CODE_auth_import_authorization);
@@ -3966,16 +4001,24 @@ static void set_flag_4 (struct tgl_state *TLS, void *_D, int success) {
 
 static int send_bind_temp_on_answer (struct tgl_state *TLS, struct query *q) {
   assert (fetch_int () == (int)CODE_bool_true);
-  struct tgl_dc *D = q->extra;
-  D->flags |= 2;
-  tgl_do_help_get_config_dc (TLS, D, set_flag_4, D);
-  vlogprintf (E_DEBUG, "Bind successful in dc %d\n", D->id);
+  struct tgl_dc *DC = q->extra;
+  DC->flags |= 2;
+  tgl_do_help_get_config_dc (TLS, DC, set_flag_4, DC);
+  vlogprintf (E_DEBUG, "Bind successful in dc %d\n", DC->id);
+  return 0;
+}
+
+static int send_bind_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, char *error) {
+  vlogprintf (E_WARNING, "bind: error %d: %.*s\n", error_code, l, error);
+  if (error_code == 400) {
+    return -11;
+  }
   return 0;
 }
 
 static struct query_methods send_bind_temp_methods = {
   .on_answer = send_bind_temp_on_answer,
-  //.on_error = fail_on_error,
+  .on_error = send_bind_on_error,
   .type = TYPE_TO_PARAM (bool)
 };
 
