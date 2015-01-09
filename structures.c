@@ -609,8 +609,9 @@ void tglf_fetch_photo (struct tgl_state *TLS, struct tgl_photo *P) {
   }
 }
 
-void tglf_fetch_video (struct tgl_state *TLS, struct tgl_video *V) {
+void tglf_fetch_video (struct tgl_state *TLS, struct tgl_document *V) {
   memset (V, 0, sizeof (*V));
+  V->flags = FLAG_DOCUMENT_VIDEO;
   unsigned x = fetch_int ();
   V->id = fetch_long ();
   if (x == CODE_video_empty) { return; }
@@ -627,8 +628,9 @@ void tglf_fetch_video (struct tgl_state *TLS, struct tgl_video *V) {
   V->h = fetch_int ();
 }
 
-void tglf_fetch_audio (struct tgl_state *TLS, struct tgl_audio *V) {
+void tglf_fetch_audio (struct tgl_state *TLS, struct tgl_document *V) {
   memset (V, 0, sizeof (*V));
+  V->flags = FLAG_DOCUMENT_AUDIO;
   unsigned x = fetch_int ();
   V->id = fetch_long ();
   if (x == CODE_audio_empty) { return; }
@@ -641,19 +643,68 @@ void tglf_fetch_audio (struct tgl_state *TLS, struct tgl_audio *V) {
   V->dc_id = fetch_int ();
 }
 
+void tglf_fetch_document_attribute (struct tgl_state *TLS, struct tgl_document *V) {
+  unsigned x = fetch_int ();
+  switch (x) {
+  case CODE_document_attribute_image_size:
+    V->flags |= FLAG_DOCUMENT_IMAGE;
+    V->w = fetch_int ();
+    V->h = fetch_int ();
+    return;
+  case CODE_document_attribute_animated:
+    V->flags |= FLAG_DOCUMENT_ANIMATED;
+    return;
+  case CODE_document_attribute_sticker:
+    V->flags |= FLAG_DOCUMENT_STICKER;
+    return;
+  case CODE_document_attribute_video:
+    V->flags |= FLAG_DOCUMENT_VIDEO;
+    V->duration = fetch_int ();
+    V->w = fetch_int ();
+    V->h = fetch_int ();
+    return;
+  case CODE_document_attribute_audio:
+    V->flags |= FLAG_DOCUMENT_AUDIO;
+    V->duration = fetch_int ();
+    return;
+  case CODE_document_attribute_filename:
+    V->caption = fetch_str_dup ();
+    return;
+  default:
+    vlogprintf (E_ERROR, "x = 0x%08x\n", x);
+    assert (0);
+  }
+}
+
 void tglf_fetch_document (struct tgl_state *TLS, struct tgl_document *V) {
   memset (V, 0, sizeof (*V));
   unsigned x = fetch_int ();
   V->id = fetch_long ();
   if (x == CODE_document_empty) { return; }
-  V->access_hash = fetch_long ();
-  V->user_id = fetch_int ();
-  V->date = fetch_int ();
-  V->caption = fetch_str_dup ();
-  V->mime_type = fetch_str_dup ();
-  V->size = fetch_int ();
-  tglf_fetch_photo_size (TLS, &V->thumb);
-  V->dc_id = fetch_int ();
+  if (x == CODE_document_l19) {
+    V->access_hash = fetch_long ();
+    V->user_id = fetch_int ();
+    V->date = fetch_int ();
+    V->caption = fetch_str_dup ();
+    V->mime_type = fetch_str_dup ();
+    V->size = fetch_int ();
+    tglf_fetch_photo_size (TLS, &V->thumb);
+    V->dc_id = fetch_int ();
+  } else {
+    V->access_hash = fetch_long ();
+    V->date = fetch_int ();
+    V->mime_type = fetch_str_dup ();
+    V->size = fetch_int ();
+    tglf_fetch_photo_size (TLS, &V->thumb);
+    V->dc_id = fetch_int ();
+
+    assert (fetch_int () == CODE_vector);
+    int num = fetch_int ();
+    int i;
+    for (i = 0; i < num; i++) {
+      tglf_fetch_document_attribute (TLS, V);
+    }
+  }
 }
 
 void tglf_fetch_message_action (struct tgl_state *TLS, struct tgl_message_action *M) {
@@ -812,12 +863,12 @@ void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *
     tglf_fetch_photo (TLS, &M->photo);
     break;
   case CODE_message_media_video:
-    M->type = tgl_message_media_video;
-    tglf_fetch_video (TLS, &M->video);
+    M->type = tgl_message_media_document;
+    tglf_fetch_video (TLS, &M->document);
     break;
   case CODE_message_media_audio:
-    M->type = tgl_message_media_audio;
-    tglf_fetch_audio (TLS, &M->audio);
+    M->type = tgl_message_media_document;
+    tglf_fetch_audio (TLS, &M->document);
     break;
   case CODE_message_media_document:
     M->type = tgl_message_media_document;
@@ -888,89 +939,93 @@ void tglf_fetch_message_media_encrypted (struct tgl_state *TLS, struct tgl_messa
   case CODE_decrypted_message_media_video:
   case CODE_decrypted_message_media_video_l12:
     //M->type = CODE_decrypted_message_media_video;
-    M->type = tgl_message_media_video_encr;
+    M->type = tgl_message_media_document_encr;
+    M->encr_document.flags = FLAG_DOCUMENT_VIDEO;
+
     l = prefetch_strlen ();
     fetch_str (l); // thumb
     fetch_int (); // thumb_w
     fetch_int (); // thumb_h
-    M->encr_video.duration = fetch_int ();
+    M->encr_document.duration = fetch_int ();
     if (x == CODE_decrypted_message_media_video) {
-      M->encr_video.mime_type = fetch_str_dup ();
+      M->encr_document.mime_type = fetch_str_dup ();
     }
-    M->encr_video.w = fetch_int ();
-    M->encr_video.h = fetch_int ();
-    M->encr_video.size = fetch_int ();
+    M->encr_document.w = fetch_int ();
+    M->encr_document.h = fetch_int ();
+    M->encr_document.size = fetch_int ();
     
     l = prefetch_strlen  ();
     assert (l > 0);
-    M->encr_video.key = talloc0 (32);
+    M->encr_document.key = talloc0 (32);
     if (l <= 32) {
-      memcpy (M->encr_video.key + (32 - l), fetch_str (l), l);
+      memcpy (M->encr_document.key + (32 - l), fetch_str (l), l);
     } else {
-      memcpy (M->encr_video.key, fetch_str (l) + (l - 32), 32);
+      memcpy (M->encr_document.key, fetch_str (l) + (l - 32), 32);
     }
-    M->encr_video.iv = talloc (32);
+    M->encr_document.iv = talloc (32);
     l = prefetch_strlen  ();
     assert (l > 0);
-    memset (M->encr_video.iv, 0, 32);
+    memset (M->encr_document.iv, 0, 32);
     if (l <= 32) {
-      memcpy (M->encr_video.iv + (32 - l), fetch_str (l), l);
+      memcpy (M->encr_document.iv + (32 - l), fetch_str (l), l);
     } else {
-      memcpy (M->encr_video.iv, fetch_str (l) + (l - 32), 32);
+      memcpy (M->encr_document.iv, fetch_str (l) + (l - 32), 32);
     }
     break;
   case CODE_decrypted_message_media_audio:
   case CODE_decrypted_message_media_audio_l12:
-    //M->type = CODE_decrypted_message_media_audio;
-    M->type = tgl_message_media_audio_encr;
-    M->encr_audio.duration = fetch_int ();
+    M->type = tgl_message_media_document_encr;
+    M->encr_document.flags = FLAG_DOCUMENT_AUDIO;
+    
+    M->encr_document.duration = fetch_int ();
     if (x == CODE_decrypted_message_media_audio) {
-      M->encr_audio.mime_type = fetch_str_dup ();
+      M->encr_document.mime_type = fetch_str_dup ();
     }
-    M->encr_audio.size = fetch_int ();
+    M->encr_document.size = fetch_int ();
     
     l = prefetch_strlen  ();
     assert (l > 0);
-    M->encr_video.key = talloc0 (32);
+    M->encr_document.key = talloc0 (32);
     if (l <= 32) {
-      memcpy (M->encr_video.key + (32 - l), fetch_str (l), l);
+      memcpy (M->encr_document.key + (32 - l), fetch_str (l), l);
     } else {
-      memcpy (M->encr_video.key, fetch_str (l) + (l - 32), 32);
+      memcpy (M->encr_document.key, fetch_str (l) + (l - 32), 32);
     }
-    M->encr_video.iv = talloc0 (32);
+    M->encr_document.iv = talloc0 (32);
     l = prefetch_strlen  ();
     assert (l > 0);
     if (l <= 32) {
-      memcpy (M->encr_video.iv + (32 - l), fetch_str (l), l);
+      memcpy (M->encr_document.iv + (32 - l), fetch_str (l), l);
     } else {
-      memcpy (M->encr_video.iv, fetch_str (l) + (l - 32), 32);
+      memcpy (M->encr_document.iv, fetch_str (l) + (l - 32), 32);
     }
     break;
   case CODE_decrypted_message_media_document:
     M->type = tgl_message_media_document_encr;
+    M->encr_document.flags = 0;
     l = prefetch_strlen ();
     fetch_str (l); // thumb
     fetch_int (); // thumb_w
     fetch_int (); // thumb_h
-    M->encr_document.file_name = fetch_str_dup ();
+    M->encr_document.caption = fetch_str_dup ();
     M->encr_document.mime_type = fetch_str_dup ();
-    M->encr_video.size = fetch_int ();
+    M->encr_document.size = fetch_int ();
     
     l = prefetch_strlen  ();
     assert (l > 0);
-    M->encr_video.key = talloc0 (32);
+    M->encr_document.key = talloc0 (32);
     if (l <= 32) {
-      memcpy (M->encr_video.key + (32 - l), fetch_str (l), l);
+      memcpy (M->encr_document.key + (32 - l), fetch_str (l), l);
     } else {
-      memcpy (M->encr_video.key, fetch_str (l) + (l - 32), 32);
+      memcpy (M->encr_document.key, fetch_str (l) + (l - 32), 32);
     }
-    M->encr_video.iv = talloc0 (32);
+    M->encr_document.iv = talloc0 (32);
     l = prefetch_strlen  ();
     assert (l > 0);
     if (l <= 32) {
-      memcpy (M->encr_video.iv + (32 - l), fetch_str (l), l);
+      memcpy (M->encr_document.iv + (32 - l), fetch_str (l), l);
     } else {
-      memcpy (M->encr_video.iv, fetch_str (l) + (l - 32), 32);
+      memcpy (M->encr_document.iv, fetch_str (l) + (l - 32), 32);
     }
     break;
 /*  case CODE_decrypted_message_media_file:
@@ -1413,9 +1468,9 @@ void tglf_fetch_encrypted_message_file (struct tgl_state *TLS, struct tgl_messag
   unsigned x = fetch_int ();
   assert (x == CODE_encrypted_file || x == CODE_encrypted_file_empty);
   if (x == CODE_encrypted_file_empty) {
-    assert (M->type != tgl_message_media_photo_encr && M->type != tgl_message_media_video_encr);
+    assert (M->type != tgl_message_media_photo_encr && M->type != tgl_message_media_document_encr);
   } else {
-    assert (M->type == tgl_message_media_document_encr || M->type == tgl_message_media_photo_encr || M->type == tgl_message_media_video_encr || M->type == tgl_message_media_audio_encr);
+    assert (M->type == tgl_message_media_document_encr || M->type == tgl_message_media_photo_encr);
 
     M->encr_photo.id = fetch_long();
     M->encr_photo.access_hash = fetch_long();
@@ -1709,17 +1764,17 @@ void tgls_free_photo (struct tgl_state *TLS, struct tgl_photo *P) {
     tfree (P->sizes, sizeof (struct tgl_photo_size) * P->sizes_num);
   }
 }
-
+/*
 void tgls_free_video (struct tgl_state *TLS, struct tgl_video *V) {
   tfree_str (V->mime_type);
   if (!V->access_hash) { return; }
   tfree_str (V->caption);
   tgls_free_photo_size (TLS, &V->thumb);
-}
+}*/
 
-void tgls_free_audio (struct tgl_state *TLS, struct tgl_audio *A) {
-  tfree_str (A->mime_type);
-}
+//void tgls_free_audio (struct tgl_state *TLS, struct tgl_audio *A) {
+//  tfree_str (A->mime_type);
+//}
 
 void tgls_free_document (struct tgl_state *TLS, struct tgl_document *D) {
   if (!D->access_hash) { return; }
@@ -1733,15 +1788,15 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
   case tgl_message_media_none:
   case tgl_message_media_geo:
     return;
-  case tgl_message_media_audio:
-    tgls_free_audio (TLS, &M->audio);
-    return;
+  //case tgl_message_media_audio:
+  //  tgls_free_audio (TLS, &M->audio);
+  //  return;
   case tgl_message_media_photo:
     tgls_free_photo (TLS, &M->photo);
     return;
-  case tgl_message_media_video:
-    tgls_free_video (TLS, &M->video);
-    return;
+  //case tgl_message_media_video:
+  //  tgls_free_video (TLS, &M->video);
+  //  return;
   case tgl_message_media_contact:
     tfree_str (M->phone);
     tfree_str (M->first_name);
@@ -1754,8 +1809,8 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
     tfree (M->data, M->data_size);
     return;
   case tgl_message_media_photo_encr:
-  case tgl_message_media_video_encr:
-  case tgl_message_media_audio_encr:
+  //case tgl_message_media_video_encr:
+  //case tgl_message_media_audio_encr:
   case tgl_message_media_document_encr:
     tfree_secure (M->encr_photo.key, 32);
     tfree_secure (M->encr_photo.iv, 32);

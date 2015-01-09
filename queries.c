@@ -1468,7 +1468,7 @@ void tgl_do_get_dialog_list (struct tgl_state *TLS, void (*callback)(struct tgl_
 
 int allow_send_linux_version = 1;
 
-/* {{{ Send photo/video file */
+/* {{{ Send document file */
 struct send_file {
   int fd;
   long long size;
@@ -1478,13 +1478,16 @@ struct send_file {
   long long id;
   long long thumb_id;
   tgl_peer_id_t to_id;
-  unsigned media_type;
+  int flags;
   char *file_name;
   int encr;
   int avatar;
   unsigned char *iv;
   unsigned char *init_iv;
   unsigned char *key;
+  int w;
+  int h;
+  int duration;
 };
 
 static void out_peer_id (struct tgl_state *TLS, tgl_peer_id_t id) {
@@ -1618,6 +1621,236 @@ static struct query_methods send_encr_file_methods = {
   .type = TYPE_TO_PARAM(messages_sent_encrypted_message)
 };
 
+static void send_avatar_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
+  if (f->avatar > 0) {
+    out_int (CODE_messages_edit_chat_photo);
+    out_int (f->avatar);
+    out_int (CODE_input_chat_uploaded_photo);
+    if (f->size < (16 << 20)) {
+      out_int (CODE_input_file);
+    } else {
+      out_int (CODE_input_file_big);
+    }
+    out_long (f->id);
+    out_int (f->part_num);
+    out_string ("");
+    if (f->size < (16 << 20)) {
+      out_string ("");
+    }
+    out_int (CODE_input_photo_crop_auto);
+    tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_file_methods, 0, callback, callback_extra);
+  } else {
+    out_int (CODE_photos_upload_profile_photo);
+    if (f->size < (16 << 20)) {
+      out_int (CODE_input_file);
+    } else {
+      out_int (CODE_input_file_big);
+    }
+    out_long (f->id);
+    out_int (f->part_num);
+    char *s = f->file_name + strlen (f->file_name);
+    while (s >= f->file_name && *s != '/') { s --;}
+    out_string (s + 1);
+    if (f->size < (16 << 20)) {
+      out_string ("");
+    }
+    out_string ("profile photo");
+    out_int (CODE_input_geo_point_empty);
+    out_int (CODE_input_photo_crop_auto);
+    tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &set_photo_methods, 0, callback, callback_extra);
+  }
+}
+
+
+static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
+  out_int (CODE_messages_send_media);
+  out_peer_id (TLS, f->to_id);
+  if (f->flags == -1) {
+    out_int (CODE_input_media_uploaded_photo);
+  } else {
+    if (f->thumb_id > 0) {
+      out_int (CODE_input_media_uploaded_thumb_document);
+    } else {
+      out_int (CODE_input_media_uploaded_document);
+    }
+  }
+
+  if (f->size < (16 << 20)) {
+    out_int (CODE_input_file);
+  } else {
+    out_int (CODE_input_file_big);
+  }
+
+  out_long (f->id);
+  out_int (f->part_num);
+  char *s = f->file_name + strlen (f->file_name);
+  while (s >= f->file_name && *s != '/') { s --;}
+  out_string (s + 1);
+  if (f->size < (16 << 20)) {
+    out_string ("");
+  }
+
+  out_string (tg_mime_by_filename (f->file_name));
+
+  if (f->flags != -1) {
+    out_int (CODE_vector);
+    if (f->flags & FLAG_DOCUMENT_IMAGE) {
+      if (f->flags & FLAG_DOCUMENT_ANIMATED) {
+        out_int (2);
+        out_int (CODE_document_attribute_image_size);
+        out_int (f->w);
+        out_int (f->h);
+        out_int (CODE_document_attribute_animated);
+      } else {
+        out_int (2);
+        out_int (CODE_document_attribute_image_size);
+        out_int (f->w);
+        out_int (f->h);
+      }
+    } else if (f->flags & FLAG_DOCUMENT_AUDIO) {
+      out_int (1);
+      out_int (CODE_document_attribute_audio);
+      out_int (f->duration);
+    } else if (f->flags & FLAG_DOCUMENT_VIDEO) {
+      out_int (1);
+      out_int (CODE_document_attribute_video);
+      out_int (f->duration);
+      out_int (f->w);
+      out_int (f->h);
+    } else if (f->flags & FLAG_DOCUMENT_STICKER) {
+      out_int (1);
+      out_int (CODE_document_attribute_sticker);
+    } else {
+      out_int (0);
+    }
+
+    if (f->thumb_id > 0) {
+      out_int (CODE_input_file);
+      out_long (f->thumb_id);
+      out_int (1);
+      out_string ("thumb.jpg");
+      out_string ("");
+    }
+  }
+  long long r;
+  tglt_secure_random (&r, 8);
+  out_long (r);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_file_methods, 0, callback, callback_extra);
+  tfree_str (f->file_name);
+  tfree (f, sizeof (*f));
+}
+
+static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
+  out_int (CODE_messages_send_encrypted_file);
+  out_int (CODE_input_encrypted_chat);
+  out_int (tgl_get_peer_id (f->to_id));
+  tgl_peer_t *P = tgl_peer_get (TLS, f->to_id);
+  assert (P);
+  out_long (P->encr_chat.access_hash);
+  long long r;
+  tglt_secure_random (&r, 8);
+  out_long (r);
+  encr_start ();
+  if (P->encr_chat.layer <= 16) {
+    out_int (CODE_decrypted_message_l16);
+  } else {
+    out_int (CODE_decrypted_message_layer);
+    out_random (15 + 4 * (lrand48 () % 3));
+    out_int (TGL_ENCRYPTED_LAYER);
+    out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != TLS->our_id));
+    out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == TLS->our_id));
+    out_int (CODE_decrypted_message);
+  }
+  out_long (r);
+  if (P->encr_chat.layer < 17) {
+    out_random (15 + 4 * (lrand48 () % 3));
+  } else {
+    out_int (0);
+  }
+  out_string ("");
+  int *save_ptr = packet_ptr;
+  if (f->flags == -1) {
+    out_int (CODE_decrypted_message_media_photo);
+  } else if ((f->flags & FLAG_DOCUMENT_VIDEO)) {
+    out_int (CODE_decrypted_message_media_video);
+  } else if ((f->flags & FLAG_DOCUMENT_AUDIO)) {
+    out_int (CODE_decrypted_message_media_audio);
+  } else {
+    out_int (CODE_decrypted_message_media_document);
+  }
+  if (!(f->flags & FLAG_DOCUMENT_AUDIO)) {
+    out_cstring ("", 0);
+    out_int (90);
+    out_int (90);
+  }
+  
+  if (f->flags == -1) {
+    out_int (f->w);
+    out_int (f->h);
+  } else if (f->flags & FLAG_DOCUMENT_VIDEO) {
+    out_int (f->duration);
+    out_string (tg_mime_by_filename (f->file_name));
+    out_int (f->w);
+    out_int (f->h);
+  } else if (f->flags & FLAG_DOCUMENT_AUDIO) {
+    out_int (f->duration);
+    out_string (tg_mime_by_filename (f->file_name));
+  } else {
+    // document
+  }
+  
+  out_int (f->size);
+  out_cstring ((void *)f->key, 32);
+  out_cstring ((void *)f->init_iv, 32);
+
+  bl_do_create_message_media_encr_pending (TLS, r, TLS->our_id, tgl_get_peer_type (f->to_id), tgl_get_peer_id (f->to_id), time (0), 0, 0, save_ptr, packet_ptr - save_ptr);
+
+  encr_finish (&P->encr_chat);
+  if (f->size < (16 << 20)) {
+    out_int (CODE_input_encrypted_file_uploaded);
+  } else {
+    out_int (CODE_input_encrypted_file_big_uploaded);
+  }
+  out_long (f->id);
+  out_int (f->part_num);
+  if (f->size < (16 << 20)) {
+    out_string ("");
+  }
+
+  unsigned char md5[16];
+  unsigned char str[64];
+  memcpy (str, f->key, 32);
+  memcpy (str + 32, f->init_iv, 32);
+  MD5 (str, 64, md5);
+  out_int ((*(int *)md5) ^ (*(int *)(md5 + 4)));
+
+  tfree_secure (f->iv, 32);
+  struct tgl_message *M = tgl_message_get (TLS, r);
+  assert (M);
+      
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_encr_file_methods, M, callback, callback_extra);
+  
+  tfree_str (f->file_name);
+  tfree (f, sizeof (*f));
+}
+
+static void send_file_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
+  TLS->cur_uploaded_bytes -= f->size;
+  TLS->cur_uploading_bytes -= f->size;
+  clear_packet ();
+    
+  if (f->avatar) {
+    send_avatar_end (TLS, f, callback, callback_extra);
+    return;
+  }
+  if (!f->encr) {
+    send_file_unencrypted_end (TLS, f, callback, callback_extra);
+    return;
+  }
+  send_file_encrypted_end (TLS, f, callback, callback_extra);
+  return;
+}
+
 static void send_part (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
   if (f->fd >= 0) {
     if (!f->part_num) {
@@ -1663,224 +1896,22 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
     //update_prompt ();
     tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_file_part_methods, f, callback, callback_extra);
   } else {
-    TLS->cur_uploaded_bytes -= f->size;
-    TLS->cur_uploading_bytes -= f->size;
-    //update_prompt ();
-    clear_packet ();
-    assert (f->media_type == CODE_input_media_uploaded_photo || f->media_type == CODE_input_media_uploaded_video || f->media_type == CODE_input_media_uploaded_thumb_video || f->media_type == CODE_input_media_uploaded_audio || f->media_type == CODE_input_media_uploaded_document || f->media_type == CODE_input_media_uploaded_thumb_document);
-    if (f->avatar) {
-      assert (!f->encr);
-      if (f->avatar > 0) {
-        out_int (CODE_messages_edit_chat_photo);
-        out_int (f->avatar);
-        out_int (CODE_input_chat_uploaded_photo);
-        if (f->size < (16 << 20)) {
-          out_int (CODE_input_file);
-        } else {
-          out_int (CODE_input_file_big);
-        }
-        out_long (f->id);
-        out_int (f->part_num);
-        /*char *s = f->file_name + strlen (f->file_name);
-        while (s >= f->file_name && *s != '/') { s --;}
-        out_string (s + 1);*/
-        out_string ("");
-        if (f->size < (16 << 20)) {
-          out_string ("");
-        }
-        out_int (CODE_input_photo_crop_auto);
-        tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_file_methods, 0, callback, callback_extra);
-      } else {
-        out_int (CODE_photos_upload_profile_photo);
-        if (f->size < (16 << 20)) {
-          out_int (CODE_input_file);
-        } else {
-          out_int (CODE_input_file_big);
-        }
-        out_long (f->id);
-        out_int (f->part_num);
-        char *s = f->file_name + strlen (f->file_name);
-        while (s >= f->file_name && *s != '/') { s --;}
-        out_string (s + 1);
-        if (f->size < (16 << 20)) {
-          out_string ("");
-        }
-        out_string ("profile photo");
-        out_int (CODE_input_geo_point_empty);
-        out_int (CODE_input_photo_crop_auto);
-        tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &set_photo_methods, 0, callback, callback_extra);
-      }
-    } else if (!f->encr) {
-      out_int (CODE_messages_send_media);
-      out_peer_id (TLS, f->to_id);
-      out_int (f->media_type);
-      if (f->size < (16 << 20)) {
-        out_int (CODE_input_file);
-      } else {
-        out_int (CODE_input_file_big);
-      }
-      out_long (f->id);
-      out_int (f->part_num);
-      char *s = f->file_name + strlen (f->file_name);
-      while (s >= f->file_name && *s != '/') { s --;}
-      out_string (s + 1);
-      if (f->size < (16 << 20)) {
-        out_string ("");
-      }
-      if (f->media_type == CODE_input_media_uploaded_thumb_video || f->media_type == CODE_input_media_uploaded_thumb_document) {
-        out_int (CODE_input_file);
-        out_long (f->thumb_id);
-        out_int (1);
-        out_string ("thumb.jpg");
-        out_string ("");
-      }
-      if (f->media_type == CODE_input_media_uploaded_video || f->media_type == CODE_input_media_uploaded_thumb_video) {
-        out_int (100);
-        out_int (100);
-        out_int (100);
-        out_string (tg_mime_by_filename (f->file_name));
-      }
-      if (f->media_type == CODE_input_media_uploaded_document || f->media_type == CODE_input_media_uploaded_thumb_document) {
-        out_string (s + 1);
-        out_string (tg_mime_by_filename (f->file_name));
-      }
-      if (f->media_type == CODE_input_media_uploaded_audio) {
-        out_int (60);
-        out_string (tg_mime_by_filename (f->file_name));
-      }
-
-      long long r;
-      tglt_secure_random (&r, 8);
-      out_long (r);
-      tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_file_methods, 0, callback, callback_extra);
-    } else {
-      //struct tgl_message *M = talloc0 (sizeof (*M));
-
-      out_int (CODE_messages_send_encrypted_file);
-      out_int (CODE_input_encrypted_chat);
-      out_int (tgl_get_peer_id (f->to_id));
-      tgl_peer_t *P = tgl_peer_get (TLS, f->to_id);
-      assert (P);
-      out_long (P->encr_chat.access_hash);
-      long long r;
-      tglt_secure_random (&r, 8);
-      out_long (r);
-      encr_start ();
-      if (P->encr_chat.layer <= 16) {
-        out_int (CODE_decrypted_message_l16);
-      } else {
-        out_int (CODE_decrypted_message_layer);
-        out_random (15 + 4 * (lrand48 () % 3));
-        out_int (TGL_ENCRYPTED_LAYER);
-        out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != TLS->our_id));
-        out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == TLS->our_id));
-        out_int (CODE_decrypted_message);
-      }
-      out_long (r);
-      if (P->encr_chat.layer < 17) {
-        out_random (15 + 4 * (lrand48 () % 3));
-      } else {
-        out_int (0);
-      }
-      out_string ("");
-      int *save_ptr = packet_ptr;
-      if (f->media_type == CODE_input_media_uploaded_photo) {
-        out_int (CODE_decrypted_message_media_photo);
-        //M->media.type = CODE_decrypted_message_media_photo;
-      } else if (f->media_type == CODE_input_media_uploaded_video) {
-        out_int (CODE_decrypted_message_media_video);
-        //M->media.type = CODE_decrypted_message_media_video;
-      } else if (f->media_type == CODE_input_media_uploaded_audio) {
-        out_int (CODE_decrypted_message_media_audio);
-        //M->media.type = CODE_decrypted_message_media_audio;
-      } else if (f->media_type == CODE_input_media_uploaded_document) {
-        out_int (CODE_decrypted_message_media_document);
-        //M->media.type = CODE_decrypted_message_media_document;;
-      } else {
-        assert (0);
-      }
-      if (f->media_type != CODE_input_media_uploaded_audio) {
-        out_cstring ((void *)thumb_file, thumb_file_size);
-        out_int (90);
-        out_int (90);
-      }
-      if (f->media_type == CODE_input_media_uploaded_video) {
-        out_int (0);
-        out_string (tg_mime_by_filename (f->file_name));
-      }
-      if (f->media_type == CODE_input_media_uploaded_document) {
-        out_string (f->file_name);
-        out_string (tg_mime_by_filename (f->file_name));
-      }
-      if (f->media_type == CODE_input_media_uploaded_audio) {
-        out_int (60);
-        out_string (tg_mime_by_filename (f->file_name));
-      }
-      if (f->media_type == CODE_input_media_uploaded_video || f->media_type == CODE_input_media_uploaded_photo) {
-        out_int (100);
-        out_int (100);
-      }
-      out_int (f->size);
-      out_cstring ((void *)f->key, 32);
-      out_cstring ((void *)f->init_iv, 32);
-
-      bl_do_create_message_media_encr_pending (TLS, r, TLS->our_id, tgl_get_peer_type (f->to_id), tgl_get_peer_id (f->to_id), time (0), 0, 0, save_ptr, packet_ptr - save_ptr);
-
-      encr_finish (&P->encr_chat);
-      if (f->size < (16 << 20)) {
-        out_int (CODE_input_encrypted_file_uploaded);
-      } else {
-        out_int (CODE_input_encrypted_file_big_uploaded);
-      }
-      out_long (f->id);
-      out_int (f->part_num);
-      if (f->size < (16 << 20)) {
-        out_string ("");
-      }
- 
-      unsigned char md5[16];
-      unsigned char str[64];
-      memcpy (str, f->key, 32);
-      memcpy (str + 32, f->init_iv, 32);
-      MD5 (str, 64, md5);
-      out_int ((*(int *)md5) ^ (*(int *)(md5 + 4)));
-
-      tfree_secure (f->iv, 32);
-      struct tgl_message *M = tgl_message_get (TLS, r);
-      assert (M);
-      
-      //M->media.encr_photo.key = f->key;
-      //M->media.encr_photo.iv = f->init_iv;
-      //M->media.encr_photo.key_fingerprint = (*(int *)md5) ^ (*(int *)(md5 + 4)); 
-      //M->media.encr_photo.size = f->size;
-  
-      //M->flags = FLAG_ENCRYPTED;
-      //M->from_id = TGL_MK_USER (TLS->our_id);
-      //M->to_id = f->to_id;
-      //M->unread = 1;
-      //M->message = tstrdup ("");
-      //M->out = 1;
-      //M->id = r;
-      //M->date = time (0);
-      
-      tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_encr_file_methods, M, callback, callback_extra);
-    }
-    tfree_str (f->file_name);
-    tfree (f, sizeof (*f));
+    send_file_end (TLS, f, callback, callback_extra);
   }
 }
 
-/*void send_file_thumb (struct send_file *f, void *callback, void *callback_extra) {
+static void send_file_thumb (struct tgl_state *TLS, struct send_file *f, const void *thumb_data, int thumb_len, void *callback, void *callback_extra) {
   clear_packet ();
   f->thumb_id = lrand48 () * (1ll << 32) + lrand48 ();
   out_int (CODE_upload_save_file_part);
   out_long (f->thumb_id);
   out_int (0);
-  out_cstring ((void *)thumb_file, thumb_file_size);
+  out_cstring ((void *)thumb_data, thumb_len);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_file_part_methods, f, callback, callback_extra);
-}*/
+}
 
-void _tgl_do_send_photo (struct tgl_state *TLS, enum tgl_message_media_type type, tgl_peer_id_t to_id, char *file_name, int avatar, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+
+static void _tgl_do_send_photo (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, int avatar, int w, int h, int duration, const void *thumb_data, int thumb_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   int fd = open (file_name, O_RDONLY);
   if (fd < 0) {
     vlogprintf (E_WARNING, "No such file '%s'\n", file_name);
@@ -1911,6 +1942,7 @@ void _tgl_do_send_photo (struct tgl_state *TLS, enum tgl_message_media_type type
   while (f->part_size < tmp) {
     f->part_size *= 2;
   }
+  f->flags = flags;
 
   if (f->part_size > (512 << 10)) {
     close (fd);
@@ -1924,29 +1956,12 @@ void _tgl_do_send_photo (struct tgl_state *TLS, enum tgl_message_media_type type
   
   tglt_secure_random (&f->id, 8);
   f->to_id = to_id;
-  switch (type) {
-  case tgl_message_media_photo:
-    f->media_type = CODE_input_media_uploaded_photo;
-    break;
-  case tgl_message_media_video:
-    f->media_type = CODE_input_media_uploaded_video;
-    break;
-  case tgl_message_media_audio:
-    f->media_type = CODE_input_media_uploaded_audio;
-    break;
-  case tgl_message_media_document:
-    f->media_type = CODE_input_media_uploaded_document;
-    break;
-  default:
-    close (fd);
-    vlogprintf (E_WARNING, "Unknown type %d.\n", type);
-    tfree (f, sizeof (*f));
-    if (callback) {
-      callback (TLS, callback_extra, 0, 0);
-    }
-    return;
-  }
+  f->flags = flags;
   f->file_name = tstrdup (file_name);
+  f->w = w;
+  f->h = h;
+  f->duration = duration;
+
   if (tgl_get_peer_type (f->to_id) == TGL_PEER_ENCR_CHAT) {
     f->encr = 1;
     f->iv = talloc (32);
@@ -1956,29 +1971,41 @@ void _tgl_do_send_photo (struct tgl_state *TLS, enum tgl_message_media_type type
     f->key = talloc (32);
     tglt_secure_random (f->key, 32);
   }
-  /*if (f->media_type == CODE_input_media_uploaded_video && !f->encr) {
-    f->media_type = CODE_input_media_uploaded_thumb_video;
-    send_file_thumb (f);
-  } else if (f->media_type == CODE_input_media_uploaded_document && !f->encr) {
-    f->media_type = CODE_input_media_uploaded_thumb_document;
-    send_file_thumb (f);
+ 
+  if (!f->encr && f->flags != -1 && thumb_len > 0) {
+    send_file_thumb (TLS, f, thumb_data, thumb_len, callback, callback_extra);
   } else {
-    send_part (f);
-  }*/
-  send_part (TLS, f, callback, callback_extra);
+    send_part (TLS, f, callback, callback_extra);
+  }
 }
 
-void tgl_do_send_photo (struct tgl_state *TLS, enum tgl_message_media_type type, tgl_peer_id_t to_id, char *file_name, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
-  _tgl_do_send_photo (TLS, type, to_id, file_name, 0, callback, callback_extra);
+void tgl_do_send_document_ex (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, int w, int h, int duration, const void *thumb, int thumb_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  _tgl_do_send_photo (TLS, flags, to_id, file_name, 0, w, h, duration, thumb, thumb_len, callback, callback_extra);
+}
+
+void tgl_do_send_document (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  if (flags == -2) {
+    char *mime_type = tg_mime_by_filename (file_name);
+    if (!memcmp (mime_type, "image/", 6)) {
+      flags = -1;
+    } else if (!memcmp (mime_type, "video/", 6)) {
+      flags = FLAG_DOCUMENT_VIDEO;
+    } else if (!memcmp (mime_type, "audio/", 6)) {
+      flags = FLAG_DOCUMENT_AUDIO;
+    } else {
+      flags = 0;
+    }
+  }
+  _tgl_do_send_photo (TLS, flags, to_id, file_name, 0, 100, 100, 100, 0, 0, callback, callback_extra);
 }
 
 void tgl_do_set_chat_photo (struct tgl_state *TLS, tgl_peer_id_t chat_id, char *file_name, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   assert (tgl_get_peer_type (chat_id) == TGL_PEER_CHAT);
-  _tgl_do_send_photo (TLS, tgl_message_media_photo, chat_id, file_name, tgl_get_peer_id (chat_id), callback, callback_extra);
+  _tgl_do_send_photo (TLS, -1, chat_id, file_name, tgl_get_peer_id (chat_id), 0, 0, 0, 0, 0, callback, callback_extra);
 }
 
 void tgl_do_set_profile_photo (struct tgl_state *TLS, char *file_name, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
-  _tgl_do_send_photo (TLS, tgl_message_media_photo, TGL_MK_USER(TLS->our_id), file_name, -1, (void *)callback, callback_extra);
+  _tgl_do_send_photo (TLS, -1, TGL_MK_USER(TLS->our_id), file_name, -1, 0, 0, 0, 0, 0, (void *)callback, callback_extra);
 }
 /* }}} */
 
@@ -2164,8 +2191,8 @@ void tgl_do_forward_media (struct tgl_state *TLS, tgl_peer_id_t id, int n, void 
     }
     return;
   }
-  if (M->media.type != tgl_message_media_photo && M->media.type != tgl_message_media_video && M->media.type != tgl_message_media_audio && M->media.type != tgl_message_media_document) {
-    vlogprintf (E_WARNING, "Can only forward photo/audio/video/document\n");
+  if (M->media.type != tgl_message_media_photo && M->media.type != tgl_message_media_document) {
+    vlogprintf (E_WARNING, "Can only forward photo/document\n");
     if (callback) {
       callback (TLS, callback_extra, 0, 0);
     }
@@ -2180,18 +2207,6 @@ void tgl_do_forward_media (struct tgl_state *TLS, tgl_peer_id_t id, int n, void 
     out_int (CODE_input_photo);
     out_long (M->media.photo.id);
     out_long (M->media.photo.access_hash);
-    break;
-  case tgl_message_media_video:
-    out_int (CODE_input_media_video);
-    out_int (CODE_input_video);
-    out_long (M->media.video.id);
-    out_long (M->media.video.access_hash);
-    break;
-  case tgl_message_media_audio:
-    out_int (CODE_input_media_audio);
-    out_int (CODE_input_audio);
-    out_long (M->media.audio.id);
-    out_long (M->media.audio.access_hash);
     break;
   case tgl_message_media_document:
     out_int (CODE_input_media_document);
@@ -2650,40 +2665,8 @@ void tgl_do_load_photo (struct tgl_state *TLS, struct tgl_photo *photo, void (*c
   tgl_do_load_photo_size (TLS, &photo->sizes[maxi], callback, callback_extra);
 }
 
-void tgl_do_load_video_thumb (struct tgl_state *TLS, struct tgl_video *video, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra) {
-  tgl_do_load_photo_size (TLS, &video->thumb, callback, callback_extra);
-}
-
 void tgl_do_load_document_thumb (struct tgl_state *TLS, struct tgl_document *video, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra) {
   tgl_do_load_photo_size (TLS, &video->thumb, callback, callback_extra);
-}
-
-void tgl_do_load_video (struct tgl_state *TLS, struct tgl_video *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra) {
-  assert (V);
-  struct download *D = talloc0 (sizeof (*D));
-  D->offset = 0;
-  D->size = V->size;
-  D->id = V->id;
-  D->access_hash = V->access_hash;
-  D->dc = V->dc_id;
-  D->name = 0;
-  D->fd = -1;
-  D->type = CODE_input_video_file_location;
-  load_next_part (TLS, D, callback, callback_extra);
-}
-
-void tgl_do_load_audio (struct tgl_state *TLS, struct tgl_audio *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra) {
-  assert (V);
-  struct download *D = talloc0 (sizeof (*D));
-  D->offset = 0;
-  D->size = V->size;
-  D->id = V->id;
-  D->access_hash = V->access_hash;
-  D->dc = V->dc_id;
-  D->name = 0;
-  D->fd = -1;
-  D->type = CODE_input_audio_file_location;
-  load_next_part (TLS, D, callback, callback_extra);
 }
 
 void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra) {
@@ -2700,7 +2683,7 @@ void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (
   load_next_part (TLS, D, callback, callback_extra);
 }
 
-void tgl_do_load_encr_video (struct tgl_state *TLS, struct tgl_encr_video *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra) {
+void tgl_do_load_encr_document (struct tgl_state *TLS, struct tgl_encr_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra) {
   assert (V);
   struct download *D = talloc0 (sizeof (*D));
   D->offset = 0;
@@ -3910,6 +3893,37 @@ void tgl_do_send_extf (struct tgl_state *TLS, char *data, int data_len, void (*c
 }
 #endif
 /* }}} */
+
+static void tgl_do_set_password (struct tgl_state *TLS, char *current_password, char *new_password, char *current_salt, char *new_salt, char *hint, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  static char s[512];
+  static unsigned char shab[32];
+
+  if (current_password) {
+    assert (strlen (current_salt) <= 128);
+    assert (strlen (current_password) <= 128);
+  }
+  assert (strlen (new_salt) <= 128);
+  assert (strlen (new_password) <= 128);
+
+  store_int (CODE_account_set_password);
+
+  if (current_password) {
+    int l = strlen (current_salt);
+    strcpy (s, current_salt);
+    int r = strlen (current_password);
+    strcpy (s + l, current_password);
+  
+    strcpy (s + l + r, current_salt);
+
+    SHA256 (s, 2 * l + r, shab);
+    store_cstring (shab, 32);
+  } else {
+    store_string ("");
+  }
+
+  
+}
 
 static int send_broadcast_on_answer (struct tgl_state *TLS, struct query *q) {
   unsigned op = fetch_int ();

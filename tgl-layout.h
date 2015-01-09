@@ -38,6 +38,13 @@
 #define FLAG_ENCRYPTED 4096
 #define FLAG_PENDING 8192
 
+
+#define FLAG_DOCUMENT_IMAGE 1
+#define FLAG_DOCUMENT_STICKER 2
+#define FLAG_DOCUMENT_ANIMATED 4
+#define FLAG_DOCUMENT_AUDIO 8
+#define FLAG_DOCUMENT_VIDEO 16
+
 #pragma pack(push,4)
 
 typedef struct { int type; int id; } tgl_peer_id_t;
@@ -97,15 +104,15 @@ struct tgl_dc {
 enum tgl_message_media_type {
   tgl_message_media_none,
   tgl_message_media_photo,
-  tgl_message_media_video,
-  tgl_message_media_audio,
+  //tgl_message_media_video,
+  //tgl_message_media_audio,
   tgl_message_media_document,
   tgl_message_media_geo,
   tgl_message_media_contact,
   tgl_message_media_unsupported,
   tgl_message_media_photo_encr,
-  tgl_message_media_video_encr,
-  tgl_message_media_audio_encr,
+  //tgl_message_media_video_encr,
+  //tgl_message_media_audio_encr,
   tgl_message_media_document_encr,
 };
 
@@ -186,6 +193,7 @@ struct tgl_encr_photo {
   int dc_id;
   int size;
   int key_fingerprint;
+  int flags;
 
   unsigned char *key;
   unsigned char *iv;
@@ -193,7 +201,7 @@ struct tgl_encr_photo {
   int h;
 };
 
-struct tgl_encr_video {
+/*struct tgl_encr_video {
   long long id;
   long long access_hash;
   int dc_id;
@@ -219,7 +227,7 @@ struct tgl_encr_audio {
   unsigned char *iv;
   int duration;
   char *mime_type;
-};
+};*/
 
 struct tgl_encr_document {
   long long id;
@@ -227,18 +235,22 @@ struct tgl_encr_document {
   int dc_id;
   int size;
   int key_fingerprint;
+  int flags;
   
   unsigned char *key;
   unsigned char *iv;
-  char *file_name;
+  int w;
+  int h;
+  char *caption;
   char *mime_type;
+  int duration;
 };
 
-struct tgl_encr_file {
-  char *filename;
-  unsigned char *key;
-  unsigned char *iv;
-};
+//struct tgl_encr_file {
+//  char *filename;
+//  unsigned char *key;
+//  unsigned char *iv;
+//};
 
 
 struct tgl_user_status {
@@ -355,7 +367,7 @@ typedef union tgl_peer {
   struct tgl_chat chat;
   struct tgl_secret_chat encr_chat;
 } tgl_peer_t;
-
+/*
 struct tgl_video {
   long long id;
   long long access_hash;
@@ -380,7 +392,7 @@ struct tgl_audio {
   int dc_id;
   int duration;
   char *mime_type;
-};
+};*/
 
 struct tgl_document {
   long long id;
@@ -392,6 +404,11 @@ struct tgl_document {
   struct tgl_photo_size thumb;
   char *caption;
   char *mime_type;
+
+  int w;
+  int h;
+  int flags;
+  int duration;
 };
 
 struct tgl_message_action {
@@ -427,9 +444,11 @@ struct tgl_message_media {
   enum tgl_message_media_type type;
   union {
     struct tgl_photo photo;
-    struct tgl_video video;
-    struct tgl_audio audio;
+    //struct tgl_video video;
+    //struct tgl_audio audio;
     struct tgl_document document;
+    struct tgl_encr_document encr_document;
+
     struct tgl_geo geo;
     struct {
       char *phone;
@@ -438,10 +457,10 @@ struct tgl_message_media {
       int user_id;
     };
     struct tgl_encr_photo encr_photo;
-    struct tgl_encr_video encr_video;
-    struct tgl_encr_audio encr_audio;
-    struct tgl_encr_document encr_document;
-    struct tgl_encr_file encr_file;
+    //struct tgl_encr_video encr_video;
+    //struct tgl_encr_audio encr_audio;
+    //struct tgl_encr_document encr_document;
+    //struct tgl_encr_file encr_file;
     struct {
       void *data;
       int data_size;

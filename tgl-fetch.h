@@ -46,8 +46,8 @@ void tglf_fetch_photo (struct tgl_state *TLS, struct tgl_photo *P);
 void tglf_fetch_chat (struct tgl_state *TLS, struct tgl_chat *C);
 void tglf_fetch_chat_full (struct tgl_state *TLS, struct tgl_chat *C);
 
-void tglf_fetch_audio (struct tgl_state *TLS, struct tgl_audio *V);
-void tglf_fetch_video (struct tgl_state *TLS, struct tgl_video *V);
+void tglf_fetch_audio (struct tgl_state *TLS, struct tgl_document *V);
+void tglf_fetch_video (struct tgl_state *TLS, struct tgl_document *V);
 void tglf_fetch_document (struct tgl_state *TLS, struct tgl_document *V);
 void tglf_fetch_message (struct tgl_state *TLS, struct tgl_message *M);
 void tglf_fetch_geo_message (struct tgl_state *TLS, struct tgl_message *M);
