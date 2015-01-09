@@ -422,7 +422,7 @@ static void try_write (struct connection *c) {
   vlogprintf (E_DEBUG, "try write: fd = %d\n", c->fd);
   int x = 0;
   while (c->out_head) {
-    int r = write (c->fd, c->out_head->rptr, c->out_head->wptr - c->out_head->rptr);
+    ssize_t r = write (c->fd, c->out_head->rptr, c->out_head->wptr - c->out_head->rptr);
     if (r >= 0) {
       x += r;
       c->out_head->rptr += r;
@@ -499,7 +499,7 @@ static void try_read (struct connection *c) {
   #endif
   int x = 0;
   while (1) {
-    int r = read (c->fd, c->in_tail->wptr, c->in_tail->end - c->in_tail->wptr);
+    ssize_t r = read (c->fd, c->in_tail->wptr, c->in_tail->end - c->in_tail->wptr);
     if (r > 0) {
       c->last_receive_time = tglt_get_double_time ();
       stop_ping_timer (c);

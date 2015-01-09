@@ -73,7 +73,7 @@ char *tgls_default_create_print_name (struct tgl_state *TLS, tgl_peer_id_t id, c
     s++;
   }
   s = buf;
-  int fl = strlen (s);
+  int fl = tstrlen (s);
   int cc = 0;
   while (1) {
     tgl_peer_t *P = tgl_peer_get_by_name (TLS, s);
@@ -1240,7 +1240,7 @@ void tglf_tglf_fetch_geo_message (struct tgl_state *TLS, struct tgl_message *M) 
     tglf_fetch_message_action (TLS, &M->action);
   } else {
     M->message = fetch_str_dup ();
-    M->message_len = strlen (M->message);
+    M->message_len = tstrlen (M->message);
     tglf_fetch_message_media (TLS, &M->media);
   }
 }
@@ -1511,7 +1511,7 @@ struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS) {
     TLS->users_allocated ++;
     U = talloc0 (sizeof (*U));
     U->id = TGL_MK_USER (data[1]);
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, irand48 ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
   }
@@ -1527,7 +1527,7 @@ struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS) 
     U = talloc0 (sizeof (*U));
     U->id = TGL_MK_ENCR_CHAT (data[1]);
     TLS->encr_chats_allocated ++;
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, irand48 ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
   }
@@ -1546,7 +1546,7 @@ struct tgl_user *tglf_fetch_alloc_user_full (struct tgl_state *TLS) {
     TLS->users_allocated ++;
     U = talloc0 (sizeof (*U));
     U->id = TGL_MK_USER (data[2]);
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, irand48 ());
     tglf_fetch_user_full (TLS, &U->user);
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
@@ -1584,7 +1584,7 @@ struct tgl_message *tglf_fetch_alloc_geo_message (struct tgl_state *TLS) {
   } else {
     tglm_message_add_use (TLS, M);
     tglm_message_add_peer (TLS, M);
-    TLS->message_tree = tree_insert_message (TLS->message_tree, M, lrand48 ());
+    TLS->message_tree = tree_insert_message (TLS->message_tree, M, irand48 ());
     return M;
   }
 }
@@ -1680,7 +1680,7 @@ struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS) {
     TLS->chats_allocated ++;
     U = talloc0 (sizeof (*U));
     U->id = TGL_MK_CHAT (data[1]);
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, irand48 ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
   }
@@ -1699,7 +1699,7 @@ struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS) {
     TLS->chats_allocated ++;
     U = talloc0 (sizeof (*U));
     U->id = TGL_MK_CHAT (data[2]);
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, irand48 ());
     tglf_fetch_chat_full (TLS, &U->chat);
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
@@ -1710,21 +1710,21 @@ struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS) {
 
 void tglp_insert_encrypted_chat (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->encr_chats_allocated ++;
-  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, irand48 ());
   increase_peer_size (TLS);
   TLS->Peers[TLS->peer_num ++] = P;
 }
 
 void tglp_insert_user (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->users_allocated ++;
-  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, irand48 ());
   increase_peer_size (TLS);
   TLS->Peers[TLS->peer_num ++] = P;
 }
 
 void tglp_insert_chat (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->chats_allocated ++;
-  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, irand48 ());
   increase_peer_size (TLS);
   TLS->Peers[TLS->peer_num ++] = P;
 }
@@ -1958,7 +1958,7 @@ void tglm_message_add_peer (struct tgl_state *TLS, struct tgl_message *M) {
       TLS->encr_chats_allocated ++;
       break;
     }
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, irand48 ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = P;
   }
@@ -2021,12 +2021,12 @@ struct tgl_message *tglm_message_alloc (struct tgl_state *TLS, long long id) {
 void tglm_update_message_id (struct tgl_state *TLS, struct tgl_message *M, long long id) {
   TLS->message_tree = tree_delete_message (TLS->message_tree, M);
   M->id = id;
-  TLS->message_tree = tree_insert_message (TLS->message_tree, M, lrand48 ());
+  TLS->message_tree = tree_insert_message (TLS->message_tree, M, irand48 ());
 }
 
 void tglm_message_insert_tree (struct tgl_state *TLS, struct tgl_message *M) {
   assert (M->id);
-  TLS->message_tree = tree_insert_message (TLS->message_tree, M, lrand48 ());
+  TLS->message_tree = tree_insert_message (TLS->message_tree, M, irand48 ());
 }
 
 void tglm_message_remove_tree (struct tgl_state *TLS, struct tgl_message *M) {
@@ -2040,7 +2040,7 @@ void tglm_message_insert (struct tgl_state *TLS, struct tgl_message *M) {
 }
 
 void tglm_message_insert_unsent (struct tgl_state *TLS, struct tgl_message *M) {
-  TLS->message_unsent_tree = tree_insert_message (TLS->message_unsent_tree, M, lrand48 ());
+  TLS->message_unsent_tree = tree_insert_message (TLS->message_unsent_tree, M, irand48 ());
 }
 
 void tglm_message_remove_unsent (struct tgl_state *TLS, struct tgl_message *M) {
@@ -2066,7 +2066,7 @@ void tglm_send_all_unsent (struct tgl_state *TLS) {
 /* }}} */
 
 void tglp_peer_insert_name (struct tgl_state *TLS, tgl_peer_t *P) {
-  TLS->peer_by_name_tree = tree_insert_peer_by_name (TLS->peer_by_name_tree, P, lrand48 ());
+  TLS->peer_by_name_tree = tree_insert_peer_by_name (TLS->peer_by_name_tree, P, irand48 ());
 }
 
 void tglp_peer_delete_name (struct tgl_state *TLS, tgl_peer_t *P) {

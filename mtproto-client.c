@@ -1279,7 +1279,7 @@ void tgln_insert_msg_id (struct tgl_state *TLS, struct tgl_session *S, long long
     TLS->timer_methods->insert (S->ev, ACK_TIMEOUT); 
   }
   if (!tree_lookup_long (S->ack_tree, id)) {
-    S->ack_tree = tree_insert_long (S->ack_tree, id, lrand48 ());
+    S->ack_tree = tree_insert_long (S->ack_tree, id, irand48 ());
   }
 }
 

@@ -25,6 +25,8 @@
 #include <assert.h>
 #include "tools.h"
 
+static inline int irand48() { return (int)(lrand48 ()); }
+
 #pragma pack(push,4)
 #define DEFINE_TREE(X_NAME, X_TYPE, X_CMP, X_UNSET) \
 struct tree_ ## X_NAME { \

@@ -33,6 +33,7 @@
 #include <zlib.h>
 #include <time.h>
 #include <sys/time.h>
+#include <limits.h>
 
 //#include "interface.h"
 #include "tools.h"
@@ -91,7 +92,8 @@ int tgl_asprintf (char **res, const char *format, ...) {
   return r;
 }
 
-void tgl_free_debug (void *ptr, int size __attribute__ ((unused))) {
+void tgl_free_debug (void *ptr, size_t isize __attribute__ ((unused))) {
+  int size = (int)isize;
   total_allocated_bytes -= size;
   ptr -= RES_PRE;
   if (size != (int)((*(int *)ptr) ^ 0xbedabeda)) {
@@ -113,11 +115,11 @@ void tgl_free_debug (void *ptr, int size __attribute__ ((unused))) {
   }
   blocks[--used_blocks] = 0;
   memset (ptr, 0, size + RES_PRE + RES_AFTER);
-  *(int *)ptr = size + 12;
+  *(intptr_t *)ptr = size + 12;
   free_blocks[free_blocks_cnt ++] = ptr;
 }
 
-void tgl_free_release (void *ptr, int size) {
+void tgl_free_release (void *ptr, size_t size) {
   free (ptr);
 }
 
@@ -136,7 +138,8 @@ void *tgl_realloc_release (void *ptr, size_t old_size __attribute__ ((unused)), 
   return p;
 }
 
-void *tgl_alloc_debug (size_t size) {
+void *tgl_alloc_debug (size_t isize) {
+  int size = (int)isize;
   total_allocated_bytes += size;
   void *p = malloc (size + RES_PRE + RES_AFTER);
   ensure_ptr (p);
@@ -165,8 +168,13 @@ void *tgl_alloc0 (size_t size) {
   return p;
 }
 
+int tgl_strlen (const char *s) {
+    size_t l = strlen (s);
+    return l < INT_MAX ? (int)(l) : INT_MAX;
+}
+
 char *tgl_strdup (const char *s) {
-  int l = strlen (s);
+  int l = tstrlen (s);
   char *p = talloc (l + 1);
   memcpy (p, s, l + 1);
   return p;

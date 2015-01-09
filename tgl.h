@@ -69,7 +69,7 @@ struct tgl_dc;
 struct tgl_allocator {
   void *(*alloc)(size_t size);
   void *(*realloc)(void *ptr, size_t old_size, size_t size);
-  void (*free)(void *ptr, int size);
+  void (*free)(void *ptr, size_t size);
   void (*check)(void);
   void (*exists)(void *ptr, int size);
 };
@@ -152,7 +152,7 @@ struct tgl_state {
   int verbosity;
   int unread_messages;
   int active_queries;
-  int max_msg_id;
+  long long max_msg_id;
   int started;
 
   long long locks; 

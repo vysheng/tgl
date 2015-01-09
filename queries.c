@@ -108,7 +108,7 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
     }
     q->session = q->DC->sessions[0];
     q->msg_id = tglmp_encrypt_send_message (TLS, q->session->c, q->data, q->data_len, (q->flags & QUERY_FORCE_SEND) | 1);
-    TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
+    TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, irand48 ());
     q->session_id = q->session->session_id;
     if (!(q->session->dc->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
       q->session_id = 0;
@@ -169,7 +169,7 @@ struct query *tglq_send_query_ex (struct tgl_state *TLS, struct tgl_dc *DC, int 
   if (TLS->queries_tree) {
     vlogprintf (E_DEBUG + 2, "%lld %lld\n", q->msg_id, TLS->queries_tree->x->msg_id);
   }
-  TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
+  TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, irand48 ());
 
   q->ev = TLS->timer_methods->alloc (TLS, alarm_query_gateway, q);
   TLS->timer_methods->insert (q->ev, QUERY_TIMEOUT);
@@ -296,7 +296,8 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
           }
           wait = 10;
         } else {
-          wait = atoll (error + 11);
+          long long llwait = atoll (error + 11);
+          wait = llwait < INT8_MAX ? (int)(llwait) : INT8_MAX;
         }
         q->flags &= ~QUERY_ACK_RECEIVED;
         TLS->timer_methods->insert (q->ev, wait);
@@ -1059,10 +1060,11 @@ void tgl_do_send_text (struct tgl_state *TLS, tgl_peer_id_t id, char *file_name,
     }
     return;
   }
-  static char buf[(1 << 20) + 1];
-  int x = read (fd, buf, (1 << 20) + 1);
+  static const int max_file_size = (1 << 20) + 1;
+  static char buf[max_file_size];
+  int x = (int)(read (fd, buf, max_file_size));
   assert (x >= 0);
-  if (x == (1 << 20) + 1) {
+  if (x == max_file_size) {
     vlogprintf (E_WARNING, "Too big file '%s'\n", file_name);
     close (fd);
     if (callback) {
@@ -1868,7 +1870,7 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
       out_int ((f->size + f->part_size - 1) / f->part_size);
     }
     static char buf[512 << 10];
-    int x = read (f->fd, buf, f->part_size);
+    ssize_t x = read (f->fd, buf, f->part_size);
     assert (x > 0);
     f->offset += x;
     TLS->cur_uploaded_bytes += x;
@@ -3225,9 +3227,9 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
 
   BN_bn2bin (r, (void *)(g_a + (256 - BN_num_bytes (r))));
   
-  int t = lrand48 ();
+  int t = irand48 ();
   while (tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t))) {
-    t = lrand48 ();
+    t = irand48 ();
   }
 
   bl_do_encr_chat_init (TLS, t, user_id, (void *)random, (void *)g_a);

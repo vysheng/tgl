@@ -118,7 +118,7 @@ struct encrypted_message {
 //BN_CTX *BN_ctx;
 
 void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int password_length);
-int tgl_serialize_bignum (BIGNUM *b, char *buffer, int maxlen);
+int tgl_serialize_bignum (BIGNUM *b, char *buffer, size_t maxlen);
 long long tgl_do_compute_rsa_key_fingerprint (RSA *key);
 
 #define packet_buffer tgl_packet_buffer
@@ -351,7 +351,7 @@ static inline void fetch256 (void *buf) {
   }
 }
 
-static inline int in_remaining (void) {
+static inline size_t in_remaining (void) {
   return 4 * (in_end - in_ptr);
 }
 

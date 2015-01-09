@@ -3,10 +3,11 @@
 #define MAX_MIME_TYPES_NUM 10000
 
 #include "mime-types.c"
+#include "tools.h"
 
 
 char *tg_mime_by_filename (const char *filename) {
-  int l = strlen (filename);
+  int l = tstrlen (filename);
   const char *p = filename - 1 + l;
   while (p >= filename && *p != '.') {
     p --;
