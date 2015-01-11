@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with this tgl-library/generate.  If not, see <http://www.gnu.org/licenses/>.
 
-    Copyright Vitaly Valtman 2014
+    Copyright Vitaly Valtman 2014-2015
 
     It is derivative work of VK/KittenPHP-DB-Engine (https://github.com/vk-com/kphp-kdb/)
     Copyright 2012-2013 Vkontakte Ltd

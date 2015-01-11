@@ -16,7 +16,7 @@
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
     Copyright Nikolay Durov, Andrey Lopatin 2012-2013
-              Vitaly Valtman 2013-2014
+              Vitaly Valtman 2013-2015
 */
 
 #ifdef HAVE_CONFIG_H

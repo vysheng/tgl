@@ -15,7 +15,7 @@
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-    Copyright Vitaly Valtman 2014
+    Copyright Vitaly Valtman 2014-2015
 */
 
 #ifdef HAVE_CONFIG_H
@@ -94,3 +94,44 @@ void tgl_register_app_id (struct tgl_state *TLS, int app_id, char *app_hash) {
   TLS->app_hash = tstrdup (app_hash);
 }
 
+struct tgl_state *tgl_state_alloc (void) {
+  struct tgl_state *TLS = (struct tgl_state *)malloc (sizeof (*TLS));
+  if (!TLS) { return NULL; }
+  memset (TLS, 0, sizeof (*TLS));
+  return TLS;
+}
+
+void tgl_incr_verbosity (struct tgl_state *TLS) {
+  TLS->verbosity ++;
+}
+
+void tgl_set_verbosity (struct tgl_state *TLS, int val) {
+  TLS->verbosity = val;
+}
+
+void tgl_enable_pfs (struct tgl_state *TLS) {
+  TLS->enable_pfs = 1;
+}
+
+void tgl_set_test_mode (struct tgl_state *TLS) {
+  TLS->test_mode ++;
+}
+
+void tgl_set_net_methods (struct tgl_state *TLS, struct tgl_net_methods *methods) {
+  TLS->net_methods = methods;
+}
+
+void tgl_set_timer_methods (struct tgl_state *TLS, struct tgl_timer_methods *methods) {
+  TLS->timer_methods = methods;
+}
+
+void tgl_set_ev_base (struct tgl_state *TLS, void *ev_base) {
+  TLS->ev_base = ev_base;
+}
+
+void tgl_set_app_version (struct tgl_state *TLS, const char *app_version) {
+  if (TLS->app_version) {
+    tfree_str (TLS->app_version);
+  }
+  TLS->app_version = tstrdup (app_version);
+}

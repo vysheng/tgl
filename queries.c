@@ -15,7 +15,7 @@
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-    Copyright Vitaly Valtman 2013-2014
+    Copyright Vitaly Valtman 2013-2015
 */
 
 #ifdef HAVE_CONFIG_H
@@ -273,8 +273,17 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
       // bad user input probably
       break;
     case 401:
-      // unauthorized
-      // ignore for now
+      if (!(TLS->locks & TGL_LOCK_PASSWORD)) {
+        TLS->locks |= TGL_LOCK_PASSWORD;
+        tgl_do_check_password (TLS, NULL, NULL);
+      }
+      q->flags &= ~QUERY_ACK_RECEIVED;
+      TLS->timer_methods->insert (q->ev, 1);
+      struct tgl_dc *DC = q->DC;
+      if (!(DC->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
+        q->session_id = 0;
+      }         
+      error_handled = 1;
       break;
     case 403:
       // privacy violation
@@ -407,14 +416,17 @@ void tgl_do_insert_header (struct tgl_state *TLS) {
     uname (&st);
     out_string (st.machine);
     static char buf[4096];
-    tsnprintf (buf, sizeof (buf), "%.999s %.999s %.999s\n", st.sysname, st.release, st.version);
+    tsnprintf (buf, sizeof (buf) - 1, "%.999s %.999s %.999s\n", st.sysname, st.release, st.version);
     out_string (buf);
-    out_string (TGL_VERSION " (build " TGL_BUILD ")");
+    tsnprintf (buf, sizeof (buf) - 1, "%s (TGL %s)\n", TLS->app_version, TGL_VERSION);
+    out_string (buf);
     out_string ("En");
   } else { 
     out_string ("x86");
     out_string ("Linux");
-    out_string (TGL_VERSION);
+    static char buf[4096];
+    tsnprintf (buf, sizeof (buf) - 1, "%s (TGL %s)\n", TLS->app_version, TGL_VERSION);
+    out_string (buf);
     out_string ("en");
   }
 }
@@ -607,7 +619,7 @@ static int sign_in_on_answer (struct tgl_state *TLS, struct query *q) {
 static int sign_in_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, char *error) {
     vlogprintf (E_ERROR, "error_code = %d, error = %.*s\n", error_code, l, error);
     if (q->callback) {
-        ((void (*)(void *, int, struct tgl_user *))q->callback) (q->callback_extra, 0, NULL);
+        ((void (*)(struct tgl_state *, void *, int, struct tgl_user *))q->callback) (TLS, q->callback_extra, 0, NULL);
     }
     return 0;
 }
@@ -3894,35 +3906,325 @@ void tgl_do_send_extf (struct tgl_state *TLS, char *data, int data_len, void (*c
 #endif
 /* }}} */
 
-static void tgl_do_set_password (struct tgl_state *TLS, char *current_password, char *new_password, char *current_salt, char *new_salt, char *hint, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+static int set_password_on_answer (struct tgl_state *TLS, struct query *q) {
+  fetch_bool ();
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 1);
+  }
+  return 0;
+}
+
+static int set_password_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, char *error) {
+  if (error_code == 400) {
+    if (!strcmp (error, "PASSWORD_HASH_INVALID")) {
+      vlogprintf (E_WARNING, "Bad old password\n");
+      if (q->callback) {
+        ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 0);
+      }
+      return 0;
+    }
+    if (!strcmp (error, "NEW_PASSWORD_BAD")) {
+      vlogprintf (E_WARNING, "Bad new password (unchanged or equals hint)\n");
+      if (q->callback) {
+        ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 0);
+      }
+      return 0;
+    }
+    if (!strcmp (error, "NEW_SALT_INVALID")) {
+      vlogprintf (E_WARNING, "Bad new salt\n");
+      if (q->callback) {
+        ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 0);
+      }
+      return 0;
+    }
+  }
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 0);
+  }
+  return 0;
+}
+
+static struct query_methods set_password_methods = {
+  .on_answer = set_password_on_answer,
+  .on_error = set_password_on_error,
+  .type = TYPE_TO_PARAM(bool)
+};
+
+static void tgl_do_act_set_password (struct tgl_state *TLS, char *current_password, char *new_password, char *current_salt, int l, char *new_salt, int l2, char *hint, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
   clear_packet ();
   static char s[512];
   static unsigned char shab[32];
 
-  if (current_password) {
+  if (current_password && current_salt) {
     assert (strlen (current_salt) <= 128);
     assert (strlen (current_password) <= 128);
   }
   assert (strlen (new_salt) <= 128);
   assert (strlen (new_password) <= 128);
 
-  store_int (CODE_account_set_password);
+  out_int (CODE_account_set_password);
 
-  if (current_password) {
-    int l = strlen (current_salt);
-    strcpy (s, current_salt);
+  if (current_password && current_salt) {
+    memcpy (s, current_salt, l);
+    
     int r = strlen (current_password);
     strcpy (s + l, current_password);
   
-    strcpy (s + l + r, current_salt);
+    memcpy (s + l + r, current_salt, l);
 
-    SHA256 (s, 2 * l + r, shab);
-    store_cstring (shab, 32);
+    SHA256 ((void *)s, 2 * l + r, shab);
+    out_cstring ((void *)shab, 32);
   } else {
-    store_string ("");
+    out_string ("");
   }
 
+  if (new_password && strlen (new_password)) {
+    static char d[256];
+    memcpy (d, new_salt, l2);
+    int l = l2;
+    tglt_secure_random (d + l, 16);
+    l += 16;
+    memcpy (s, d, l);
+    
+    int r = strlen (new_password);
+    strcpy (s + l, new_password);
   
+    memcpy (s + l + r, d, l);
+
+    SHA256 ((void *)s, 2 * l + r, shab);
+    
+    out_cstring (d, l);
+    out_cstring ((void *)shab, 32);
+  } else {
+    out_string (new_salt);
+    out_string ("");
+  }
+
+  out_string (hint);
+    
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &set_password_methods, 0, callback, callback_extra);
+}
+
+void tgl_on_new_pwd (struct tgl_state *TLS, char *pwd, void *_T);
+void tgl_on_new2_pwd (struct tgl_state *TLS, char *pwd, void *_T) {
+  void **T = _T;
+  if (strcmp (T[6], pwd)) {
+    tfree_str (T[6]);
+    T[6] = NULL;
+    vlogprintf (E_ERROR, "passwords do not match\n");
+    TLS->callback.get_string (TLS, "new password: ", 1, tgl_on_new_pwd, T);
+    return;
+  }
+  tgl_do_act_set_password (TLS, T[5], T[6], T[1], (long)T[0], T[3], (long)T[2], T[4], T[7], T[8]);
+  tfree (T[1], (long)T[0]);
+  tfree (T[3], (long)T[2]);
+  tfree_str (T[4]);
+  tfree_str (T[5]);
+  tfree_str (T[6]);
+  tfree (T, sizeof (void *) * 9);
+}
+
+void tgl_on_new_pwd (struct tgl_state *TLS, char *pwd, void *_T) {
+  void **T = _T;
+  T[6] = tstrdup (pwd);
+  TLS->callback.get_string (TLS, "retype new password: ", 1, tgl_on_new2_pwd, T);
+}
+
+void tgl_on_old_pwd (struct tgl_state *TLS, char *pwd, void *_T) {
+  void **T = _T;
+  T[5] = tstrdup (pwd);
+  TLS->callback.get_string (TLS, "new password: ", 1, tgl_on_new_pwd, T);
+}
+
+static int set_get_password_on_answer (struct tgl_state *TLS, struct query *q) {
+  unsigned x = fetch_int ();
+  assert (x == CODE_account_password || x == CODE_account_no_password);
+
+  char *new_salt = "";
+  char *current_salt = NULL;
+
+  char *hint = NULL;
+  int l = 0;
+  int l2 = 0;
+  if (x == CODE_account_no_password) {
+    l2 = prefetch_strlen ();
+    new_salt = fetch_str (l2);
+  } else {
+    l = prefetch_strlen ();
+    current_salt = fetch_str (l);
+    
+    l2 = prefetch_strlen ();
+    new_salt = fetch_str (l2);
+    
+    hint = fetch_str_dup ();
+  }
+
+  char *new_hint = q->extra;
+  void **T = talloc0 (sizeof (void *) * 9);
+  T[0] = (void *)(long)l;
+  T[1] = talloc (l);
+  memcpy (T[1], current_salt, l);
+  T[2] = (void *)(long)l2;
+  T[3] = talloc (l2);
+  memcpy (T[3], new_salt, l2);
+  T[4] = new_hint;
+  T[7] = q->callback;
+  T[8] = q->callback_extra;
+
+  if (x == CODE_account_no_password) {
+    TLS->callback.get_string (TLS, "new password: ", 1, tgl_on_new_pwd, T);
+  } else {
+    static char s[512];
+    snprintf (s, 511, "old password (hint %s): ", hint);
+    TLS->callback.get_string (TLS, s, 1, tgl_on_old_pwd, T);
+  }
+  return 0;
+}
+
+static struct query_methods set_get_password_methods = {
+  .on_answer = set_get_password_on_answer,
+  .on_error = q_void_on_error,
+  .type = TYPE_TO_PARAM(account_password)
+};
+
+void tgl_do_set_password (struct tgl_state *TLS, char *hint, void (*callback)(struct tgl_state *TLS, void *extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_account_get_password);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &set_get_password_methods, hint ? tstrdup (hint) : NULL, callback, callback_extra);
+}
+
+static int check_password_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  if (error_code == 400) {
+    vlogprintf (E_ERROR, "bad password\n");
+    tgl_do_check_password (TLS, q->callback, q->callback_extra);
+    return 0;
+  }
+  TLS->locks ^= TGL_LOCK_PASSWORD;
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 0);
+  }
+  return 0;
+}
+
+static int check_password_on_answer (struct tgl_state *TLS, struct query *q) {
+  assert (skip_type_any (TYPE_TO_PARAM (auth_authorization)) >= 0);
+  TLS->locks ^= TGL_LOCK_PASSWORD;
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 1);
+  }
+  return 0;
+}
+
+static struct query_methods check_password_methods = {
+  .on_answer = check_password_on_answer,
+  .on_error = check_password_on_error,
+  .type = TYPE_TO_PARAM(auth_authorization)
+};
+
+
+static void tgl_pwd_got (struct tgl_state *TLS, char *pwd, void *_T) {
+  void **T = _T;
+  
+  clear_packet ();
+  static char s[512];
+  static unsigned char shab[32];
+
+  char *current_password = pwd;
+  char *current_salt = T[1];
+  int current_salt_len = (long)T[0];
+
+  if (current_password && current_salt) {
+    assert (current_salt_len <= 128);
+    assert (strlen (current_password) <= 128);
+  }
+
+  out_int (CODE_auth_check_password);
+
+  if (current_password && current_salt) {
+    int l = current_salt_len;
+    memcpy (s, current_salt, l);
+    
+    int r = strlen (current_password);
+    strcpy (s + l, current_password);
+  
+    memcpy (s + l + r, current_salt, l);
+
+    SHA256 ((void *)s, 2 * l + r, shab);
+    out_cstring ((void *)shab, 32);
+  } else {
+    out_string ("");
+  }
+
+  tfree (T[1], (long)T[0]);
+  tfree_str (T[2]);
+  
+  void *cb = T[3];
+  void *cbe = T[4];
+  
+  tfree (T, sizeof (void *) * 5);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &check_password_methods, 0, cb, cbe);
+}
+
+static int check_get_password_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  TLS->locks ^= TGL_LOCK_PASSWORD;
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback) (TLS, q->callback_extra, 0);
+  }
+  return 0;
+}
+
+static int check_get_password_on_answer (struct tgl_state *TLS, struct query *q) {
+  unsigned x = fetch_int ();
+  assert (x == CODE_account_password || x == CODE_account_no_password);
+
+  char *current_salt = NULL;
+
+  char *hint = NULL;
+  int l = 0;
+  int l2 = 0;
+  if (x == CODE_account_no_password) {
+    l2 = prefetch_strlen ();
+    fetch_str (l2);
+  } else {
+    l = prefetch_strlen ();
+    current_salt = fetch_str (l);
+    
+    l2 = prefetch_strlen ();
+    fetch_str (l2);
+    
+    hint = fetch_str_dup ();
+  }
+
+  if (x == CODE_account_no_password) {
+    TLS->locks ^= TGL_LOCK_PASSWORD;
+    return 0;
+  }
+  static char s[512];
+  snprintf (s, 511, "type password (hint %s): ", hint);
+
+  void **T = talloc0 (sizeof (void *) * 5);
+  T[0] = (void *)(long)l;
+  T[1] = talloc (l);
+  memcpy (T[1], current_salt, l);
+  T[2] = hint;
+  T[3] = q->callback;
+  T[4] = q->callback_extra;
+
+  TLS->callback.get_string (TLS, s, 1, tgl_pwd_got, T);
+  return 0;
+}
+
+static struct query_methods check_get_password_methods = {
+  .on_answer = check_get_password_on_answer,
+  .on_error = check_get_password_on_error,
+  .type = TYPE_TO_PARAM(account_password)
+};
+
+void tgl_do_check_password (struct tgl_state *TLS, void (*callback)(struct tgl_state *TLS, void *extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_account_get_password);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &check_get_password_methods, NULL, callback, callback_extra);
 }
 
 static int send_broadcast_on_answer (struct tgl_state *TLS, struct query *q) {
@@ -4239,4 +4541,182 @@ void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, u
 
 void tgl_do_abort_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E) {
   bl_do_encr_chat_exchange_abort (TLS, E);
+}
+
+void tgl_started_cb (struct tgl_state *TLS, void *arg, int success) {
+  assert (success);
+  TLS->started = 1;
+  if (TLS->callback.started) {
+    TLS->callback.started (TLS);
+  }
+}
+
+void tgl_export_auth_callback (struct tgl_state *TLS, void *arg, int success) {
+  assert (success);
+  int i;
+  for (i = 0; i <= TLS->max_dc_num; i++) if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i])) {
+    return; 
+  }
+  if (TLS->callback.logged_in) {
+    TLS->callback.logged_in (TLS);
+  }
+  
+  tglm_send_all_unsent (TLS);
+  tgl_do_get_difference (TLS, 0, tgl_started_cb, 0);
+}
+
+void tgl_export_all_auth (struct tgl_state *TLS) {
+  int i;
+  for (i = 0; i <= TLS->max_dc_num; i++) if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i])) {
+    tgl_do_export_auth (TLS, i, tgl_export_auth_callback, (void*)(long)TLS->DC_list[i]);    
+  }
+}
+
+void tgl_sign_in_code (struct tgl_state *TLS, char *code, void *_T);
+void tgl_sign_in_result (struct tgl_state *TLS, void *_T, int success, struct tgl_user *U) {
+  void **T = _T;
+  if (success) {
+    tfree_str (T[0]);
+    tfree_str (T[1]);
+    tfree (T, sizeof (void *) * 4);
+  } else {
+    vlogprintf (E_ERROR, "incorrect code\n");
+    TLS->callback.get_string (TLS, "code ('call' for phone call):", 0, tgl_sign_in_code, T);
+    return;
+  }
+  tgl_export_all_auth (TLS);
+}
+
+void tgl_sign_in_code (struct tgl_state *TLS, char *code, void *_T) {
+  void **T = _T;
+  if (!strcmp (code, "call")) {
+    tgl_do_phone_call (TLS, T[0], T[1], 0, 0);
+    TLS->callback.get_string (TLS, "code ('call' for phone call):", 0, tgl_sign_in_code, T);
+    return;
+  }
+  
+  tgl_do_send_code_result (TLS, T[0], T[1], code, tgl_sign_in_result, T);
+}
+
+void tgl_sign_up_code (struct tgl_state *TLS, char *code, void *_T);
+void tgl_sign_up_result (struct tgl_state *TLS, void *_T, int success, struct tgl_user *U) {
+  void **T = _T;
+  if (success) {
+    tfree_str (T[0]);
+    tfree_str (T[1]);
+    tfree_str (T[2]);
+    tfree_str (T[3]);
+    tfree (T, sizeof (void *) * 4);
+  } else {
+    vlogprintf (E_ERROR, "incorrect code\n");
+    TLS->callback.get_string (TLS, "code ('call' for phone call):", 0, tgl_sign_up_code, T);
+    return;
+  }
+  tgl_export_all_auth (TLS);
+}
+
+void tgl_sign_up_code (struct tgl_state *TLS, char *code, void *_T) {
+  void **T = _T;
+  if (!strcmp (code, "call")) {
+    tgl_do_phone_call (TLS, T[0], T[1], 0, 0);
+    TLS->callback.get_string (TLS, "code ('call' for phone call):", 0, tgl_sign_up_code, T);
+    return;
+  }
+  
+  tgl_do_send_code_result_auth (TLS, T[0], T[1], code, T[2], T[3], tgl_sign_up_result, T);
+}
+
+
+void tgl_last_name_cb (struct tgl_state *TLS, char *last_name, void *_T) {
+  void **T = _T;
+  T[3] = tstrdup (last_name);
+  TLS->callback.get_string (TLS, "code ('call' for phone call):", 0, tgl_sign_up_code, T);
+}
+
+void tgl_first_name_cb (struct tgl_state *TLS, char *first_name, void *_T) {
+  void **T = _T;
+  if (strlen (first_name) < 1) {
+    TLS->callback.get_string (TLS, "First name:", 0, tgl_first_name_cb, T);
+    return;
+  }
+  T[2] = tstrdup (first_name);
+  TLS->callback.get_string (TLS, "Last name:", 0, tgl_last_name_cb, T);
+}
+
+void tgl_register_cb (struct tgl_state *TLS, char *yn, void *_T) {
+  void **T = _T;
+  if (strlen (yn) > 1) {
+    TLS->callback.get_string (TLS, "register [Y/n]:", 0, tgl_register_cb, _T);
+  } else if (strlen (yn) == 0 || *yn == 'y' || *yn == 'Y') {
+    TLS->callback.get_string (TLS, "First name:", 0, tgl_first_name_cb, _T);
+  } else if (*yn == 'n' || *yn == 'N') {
+    vlogprintf (E_ERROR, "stopping registration");
+    tfree_str (T[0]);
+    tfree_str (T[1]);
+    tfree (T, sizeof (void *) * 4);
+    tgl_login (TLS);
+  } else {
+    TLS->callback.get_string (TLS, "register [Y/n]:", 0, tgl_register_cb, _T);
+  }
+}
+
+void tgl_sign_in_phone_cb (struct tgl_state *TLS, void *extra, int success, int registered, const char *mhash) {
+  void **T = extra;
+  T[1] = tstrdup (mhash);
+  if (registered) {
+    TLS->callback.get_string (TLS, "code ('call' for phone call):", 0, tgl_sign_in_code, T);
+  } else {
+    TLS->callback.get_string (TLS, "register [Y/n]:", 0, tgl_register_cb, T);
+  }
+}
+
+void tgl_sign_in_phone (struct tgl_state *TLS, char *phone, void *arg) {
+  void **T = talloc0 (sizeof (void *) * 4);
+  T[0] = tstrdup (phone);
+  tgl_do_send_code (TLS, phone, tgl_sign_in_phone_cb, T);
+}
+
+void tgl_sign_in (struct tgl_state *TLS) {
+  if (!tgl_signed_dc (TLS, TLS->DC_working)) {
+    TLS->callback.get_string (TLS, "phone number:", 0, tgl_sign_in_phone, NULL);
+  } else {
+    tgl_export_all_auth (TLS);
+  }
+}
+
+static void check_authorized (struct tgl_state *TLS, void *arg) {
+  int i;
+  int ok = 1;
+  for (i = 0; i <= TLS->max_dc_num; i++) {
+    if (TLS->DC_list[i] && !tgl_authorized_dc (TLS, TLS->DC_list[i])) {
+      ok = 0;
+      break;
+    }
+  }
+
+  if (ok) {
+    TLS->timer_methods->free (TLS->ev_login);
+    TLS->ev_login = NULL;
+    tgl_sign_in (TLS);
+  } else {
+    TLS->timer_methods->insert (TLS->ev_login, 0.1);
+  }
+}
+
+void tgl_login (struct tgl_state *TLS) {
+  int i;
+  int ok = 1;
+  for (i = 0; i <= TLS->max_dc_num; i++) {
+    if (TLS->DC_list[i] && !tgl_authorized_dc (TLS, TLS->DC_list[i])) {
+      ok = 0;
+      break;
+    }
+  }
+  
+  if (!ok) {
+    TLS->ev_login = TLS->timer_methods->alloc (TLS, check_authorized, NULL);
+    TLS->timer_methods->insert (TLS->ev_login, 0.1);
+  } else {
+    tgl_sign_in (TLS);
+  }
 }

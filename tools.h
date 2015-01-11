@@ -15,7 +15,7 @@
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-    Copyright Vitaly Valtman 2013-2014
+    Copyright Vitaly Valtman 2013-2015
 */
 
 #ifndef __TOOLS_H__
@@ -105,7 +105,7 @@ static inline void tgl_free_secure (void *ptr, int size) {
 static inline void hexdump (void *ptr, void *end_ptr) {
   int total = 0;
   while (ptr < end_ptr) {
-    fprintf (stderr, "%08x", (int)*(char *)ptr);
+    fprintf (stderr, "%02x", (int)*(unsigned char *)ptr);
     ptr ++;
     total ++;
     if (total == 16) { 
