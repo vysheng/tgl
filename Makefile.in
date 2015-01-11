@@ -61,7 +61,7 @@ ${EXE}/generate: ${GENERATE_OBJECTS} ${COMMON_OBJECTS}
 ${AUTO}/scheme.tlo: ${AUTO}/scheme.tl ${EXE}/tl-parser
 	${EXE}/tl-parser -e $@ ${AUTO}/scheme.tl
 
-${AUTO}/scheme.tl: ${srcdir}/scheme.tl ${srcdir}/encrypted_scheme.tl ${srcdir}/binlog.tl ${srcdir}/append.tl | ${AUTO}
+${AUTO}/scheme.tl: ${srcdir}/scheme.tl ${srcdir}/encrypted_scheme.tl ${srcdir}/binlog.tl ${srcdir}/mtproto.tl ${srcdir}/append.tl | ${AUTO}
 	cat $^ > $@
 
 ${AUTO}/scheme2.tl: ${AUTO}/scheme.tl ${EXE}/tl-parser
