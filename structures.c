@@ -1399,11 +1399,14 @@ void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M)
       drop = 1;
     }
     //assert (id == fetch_long ());
-    if (!drop) { 
-      long long new_id = fetch_long ();
-      if (P && P->encr_chat.layer >= 17) {
-        assert (new_id == id);
+    long long new_id = fetch_long ();
+    if (!drop && P && P->encr_chat.layer >= 17) {
+      if (new_id != id) {
+        vlogprintf (E_ERROR, "Incorrect message: id = %lld, new_id = %lld\n", id, new_id);
+        drop = 1;
       }
+    }
+    if (!drop) { 
       if (x == CODE_decrypted_message || x == CODE_decrypted_message_service) {
         if (x == CODE_decrypted_message) {
           fetch_int (); // ttl
