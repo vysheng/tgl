@@ -801,6 +801,7 @@ void tgl_do_set_encr_chat_ttl (struct tgl_state *TLS, struct tgl_secret_chat *E,
   assert (M);
   assert (M->action.type == tgl_message_action_set_message_ttl);
   tgl_do_send_msg (TLS, M, callback, callback_extra);
+  bl_do_encr_chat_set_ttl (TLS, E, ttl);
   //print_message (M);
 }
 
