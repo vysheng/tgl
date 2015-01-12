@@ -4567,8 +4567,18 @@ void tgl_export_auth_callback (struct tgl_state *TLS, void *arg, int success) {
 
 void tgl_export_all_auth (struct tgl_state *TLS) {
   int i;
+  int ok = 1;
   for (i = 0; i <= TLS->max_dc_num; i++) if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i])) {
-    tgl_do_export_auth (TLS, i, tgl_export_auth_callback, (void*)(long)TLS->DC_list[i]);    
+    tgl_do_export_auth (TLS, i, tgl_export_auth_callback, (void*)(long)TLS->DC_list[i]);   
+    ok = 0;
+  }
+  if (ok) {
+    if (TLS->callback.logged_in) {
+      TLS->callback.logged_in (TLS);
+    }
+
+    tglm_send_all_unsent (TLS);
+    tgl_do_get_difference (TLS, 0, tgl_started_cb, 0);
   }
 }
 
