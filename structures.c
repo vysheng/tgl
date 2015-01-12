@@ -1642,7 +1642,7 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS) {
       bl_do_encr_chat_set_layer (TLS, E, M->action.layer);      
     }
     if (M->action.type == tgl_message_action_set_message_ttl) {
-      bl_do_encr_chat_set_layer (TLS, E, M->action.ttl);      
+      bl_do_encr_chat_set_ttl (TLS, E, M->action.ttl);      
     }
   }
   return M;
