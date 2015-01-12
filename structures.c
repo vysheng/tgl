@@ -1901,6 +1901,7 @@ void tgls_free_user (struct tgl_state *TLS, struct tgl_user *U) {
   if (U->phone) { tfree_str (U->phone); }
   if (U->real_first_name) { tfree_str (U->real_first_name); }
   if (U->real_last_name) { tfree_str (U->real_last_name); }
+  if (U->status.ev) { tgl_remove_status_expire (TLS, U); }
   tgls_free_photo (TLS, &U->photo);
   tfree (U, sizeof (*U));
 }
