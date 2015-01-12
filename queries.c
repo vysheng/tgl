@@ -1617,7 +1617,7 @@ static struct query_methods send_file_part_methods = {
 
 static struct query_methods send_file_methods = {
   .on_answer = send_file_on_answer,
-  .on_error = msg_send_on_error,
+  .on_error = q_ptr_on_error,
   .type = TYPE_TO_PARAM(messages_stated_message)
 };
 
@@ -1702,9 +1702,9 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
     out_string ("");
   }
 
-  out_string (tg_mime_by_filename (f->file_name));
-
   if (f->flags != -1) {
+    out_string (tg_mime_by_filename (f->file_name));
+
     out_int (CODE_vector);
     if (f->flags & FLAG_DOCUMENT_IMAGE) {
       if (f->flags & FLAG_DOCUMENT_ANIMATED) {
