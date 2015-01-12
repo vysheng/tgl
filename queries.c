@@ -1008,7 +1008,7 @@ void tgl_do_send_encr_msg (struct tgl_state *TLS, struct tgl_message *M, void (*
   if (P->encr_chat.layer < 17) {
     out_random (15 + 4 * (lrand48 () % 3));
   } else {
-    out_int (0);
+    out_int (P->encr_chat.ttl);
   }
   out_cstring ((void *)M->message, M->message_len);
   out_int (CODE_decrypted_message_media_empty);
@@ -1777,7 +1777,7 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   if (P->encr_chat.layer < 17) {
     out_random (15 + 4 * (lrand48 () % 3));
   } else {
-    out_int (0);
+    out_int (P->encr_chat.ttl);
   }
   out_string ("");
   int *save_ptr = packet_ptr;
@@ -2267,7 +2267,7 @@ void tgl_do_send_location(struct tgl_state *TLS, tgl_peer_id_t id, double latitu
     if (P->encr_chat.layer < 17) {
       out_random (15 + 4 * (lrand48 () % 3));
     } else {
-      out_int (0);
+      out_int (P->encr_chat.ttl);
     }
     out_string ("");
     int *save_ptr = packet_ptr;
