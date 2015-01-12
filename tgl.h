@@ -30,11 +30,20 @@
 #define TG_SERVER_3 "174.140.142.6"
 #define TG_SERVER_4 "149.154.167.91"
 #define TG_SERVER_5 "149.154.171.5"
-#define TG_SERVER_DEFAULT 4
+
+#define TG_SERVER_IPV6_1 "2001:b28:f23d:f001::a"
+#define TG_SERVER_IPV6_2 "2001:67c:4e8:f002::a"
+#define TG_SERVER_IPV6_3 "2001:b28:f23d:f003::a"
+#define TG_SERVER_IPV6_4 "2001:67c:4e8:f004::a"
+#define TG_SERVER_IPV6_5 "2001:b28:f23f:f005::a"
+#define TG_SERVER_DEFAULT 2
 
 #define TG_SERVER_TEST_1 "173.240.5.253"
 #define TG_SERVER_TEST_2 "149.154.167.40"
 #define TG_SERVER_TEST_3 "174.140.142.5"
+#define TG_SERVER_TEST_IPV6_1 "2001:b28:f23d:f001::e"
+#define TG_SERVER_TEST_IPV6_2 "2001:67c:4e8:f002::e"
+#define TG_SERVER_TEST_IPV6_3 "2001:b28:f23d:f003::e"
 #define TG_SERVER_TEST_DEFAULT 2
 
 // JUST RANDOM STRING
@@ -223,6 +232,7 @@ struct tgl_state {
   void *ev_login;
 
   char *app_version;
+  int ipv6_enabled;
 };
 #pragma pack(pop)
 //extern struct tgl_state tgl_state;
@@ -386,6 +396,7 @@ void tgl_free_all (struct tgl_state *TLS);
 void tgl_register_app_id (struct tgl_state *TLS, int app_id, char *app_hash);
 
 void tgl_login (struct tgl_state *TLS);
+void tgl_enable_ipv6 (struct tgl_state *TLS);
 
 struct tgl_state *tgl_state_alloc (void);
 #endif

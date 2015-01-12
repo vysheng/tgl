@@ -260,14 +260,15 @@ static void conn_try_write (evutil_socket_t fd, short what, void *arg) {
     event_add (c->write_ev, 0);
   }
 }
-
-struct connection *tgln_create_connection (struct tgl_state *TLS, const char *host, int port, struct tgl_session *session, struct tgl_dc *dc, struct mtproto_methods *methods) {
-  struct connection *c = talloc0 (sizeof (*c));
-  c->TLS = TLS;
-  int fd = socket (AF_INET, SOCK_STREAM, 0);
-  if (fd == -1) {
+  
+static int my_connect (struct connection *c, const char *host) {
+  struct tgl_state *TLS = c->TLS;
+  int v6 = TLS->ipv6_enabled;
+  int fd = socket (v6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) {
     vlogprintf (E_ERROR, "Can not create socket: %m\n");
-    exit (1);
+    start_fail_timer (c);
+    return -1;
   }
   assert (fd >= 0 && fd < MAX_CONNECTIONS);
   if (fd > max_connection_fd) {
@@ -279,29 +280,55 @@ struct connection *tgln_create_connection (struct tgl_state *TLS, const char *ho
   setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &flags, sizeof (flags));
 
   struct sockaddr_in addr;
-  addr.sin_family = AF_INET; 
-  addr.sin_port = htons (port);
-  addr.sin_addr.s_addr = inet_addr (host);
-
+  struct sockaddr_in6 addr6;
+  memset (&addr, 0, sizeof (addr));
+  memset (&addr6, 0, sizeof (addr6));
+  if (v6) {
+    addr6.sin6_family = AF_INET6; 
+    addr6.sin6_port = htons (c->port);
+    if (inet_pton (AF_INET6, host, &addr6.sin6_addr.s6_addr) != 1) {    
+      vlogprintf (E_ERROR, "Bad ipv6 %s\n", host);
+      close (fd);
+      return -1;
+    }
+  } else {
+    addr.sin_family = AF_INET; 
+    addr.sin_port = htons (c->port);
+    if (inet_pton (AF_INET, host, &addr.sin_addr.s_addr) != 1) {
+      vlogprintf (E_ERROR, "Bad ipv4 %s\n", host);
+      close (fd);
+      return -1;
+    }
+  }
 
   fcntl (fd, F_SETFL, O_NONBLOCK);
 
-  if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) == -1) {
-    //vlogprintf (E_ERROR, "Can not connect to %s:%d %m\n", host, port);
+  if (connect (fd, (struct sockaddr *) (v6 ? (void *)&addr6 : (void *)&addr), v6 ? sizeof (addr6) : sizeof (addr)) == -1) {
     if (errno != EINPROGRESS) {
-      vlogprintf (E_ERROR, "Can not connect to %s:%d %m\n", host, port);
       close (fd);
-      tfree (c, sizeof (*c));
-      return 0;
+      return -1;
     }
+  }
+  return fd;
+}
+
+struct connection *tgln_create_connection (struct tgl_state *TLS, const char *host, int port, struct tgl_session *session, struct tgl_dc *dc, struct mtproto_methods *methods) {
+  struct connection *c = talloc0 (sizeof (*c));
+  c->TLS = TLS;
+  c->ip = tstrdup (host);
+  c->port = port;
+  
+  int fd = my_connect (c, c->ip);
+  if (fd < 0) {
+    vlogprintf (E_ERROR, "Can not connect to %s:%d %m\n", host, port);
+    tfree (c, sizeof (*c));
+    return 0;
   }
 
   c->fd = fd;
   c->state = conn_connecting;
   c->last_receive_time = tglt_get_double_time ();
-  c->ip = tstrdup (host);
   c->flags = 0;
-  c->port = port;
   assert (!Connections[fd]);
   Connections[fd] = c;
  
@@ -333,40 +360,16 @@ static void restart_connection (struct connection *c) {
     return;
   }
   
-  c->last_connect_time = time (0);
-  int fd = socket (AF_INET, SOCK_STREAM, 0);
-  if (fd == -1) {
-    vlogprintf (E_ERROR, "Can not create socket: %m\n");
-    exit (1);
-  }
-  assert (fd >= 0 && fd < MAX_CONNECTIONS);
-  if (fd > max_connection_fd) {
-    max_connection_fd = fd;
-  }
-  int flags = -1;
-  setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof (flags));
-  setsockopt (fd, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof (flags));
-  setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &flags, sizeof (flags));
-
-  struct sockaddr_in addr;
-  addr.sin_family = AF_INET; 
-  addr.sin_port = htons (c->port);
   if (strcmp (c->ip, c->dc->ip)) {
     tfree_str (c->ip);
     c->ip = tstrdup (c->dc->ip);
   }
-  addr.sin_addr.s_addr = inet_addr (c->ip);
-
-
-  fcntl (fd, F_SETFL, O_NONBLOCK);
-
-  if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) == -1) {
-    if (errno != EINPROGRESS) {
-      vlogprintf (E_WARNING, "Can not connect to %s:%d %m\n", c->ip, c->port);
-      start_fail_timer (c);
-      close (fd);
-      return;
-    }
+  c->last_connect_time = time (0);
+  int fd = my_connect (c, c->ip);
+  if (fd < 0) {
+    vlogprintf (E_WARNING, "Can not connect to %s:%d %m\n", c->ip, c->port);
+    start_fail_timer (c);
+    return;
   }
 
   c->fd = fd;
@@ -530,51 +533,6 @@ static void try_read (struct connection *c) {
     try_rpc_read (c);
   }
 }
-/*
-int tgl_connections_make_poll_array (struct pollfd *fds, int max) {
-  int _max = max;
-  int i;
-  for (i = 0; i <= max_connection_fd; i++) {
-    if (Connections[i] && Connections[i]->state == conn_failed) {
-      restart_connection (Connections[i]);
-    }
-    if (Connections[i] && Connections[i]->state != conn_failed) {
-      assert (max > 0);
-      struct connection *c = Connections[i];
-      fds[0].fd = c->fd;
-      fds[0].events = POLLERR | POLLHUP | POLLRDHUP | POLLIN;
-      if (c->out_bytes || c->state == conn_connecting) {
-        fds[0].events |= POLLOUT;
-      }
-      fds ++;
-      max --;
-    }
-  }
-  return _max - max;
-}
-
-void tgl_connections_poll_result (struct pollfd *fds, int max) {
-  int i;
-  for (i = 0; i < max; i++) {
-    struct connection *c = Connections[fds[i].fd];
-    if (fds[i].revents & POLLIN) {
-      try_read (c);
-    }
-    if (fds[i].revents & (POLLHUP | POLLERR | POLLRDHUP)) {
-      vlogprintf (E_NOTICE, "fail_connection: events_mask=0x%08x\n", fds[i].revents);
-      fail_connection (c);
-    } else if (fds[i].revents & POLLOUT) {
-      if (c->state == conn_connecting) {
-        vlogprintf (E_DEBUG, "connection ready\n");
-        c->state = conn_ready;
-        c->last_receive_time = tglt_get_double_time ();
-      }
-      if (c->out_bytes) {
-        try_write (c);
-      }
-    }
-  }
-}*/
 
 static void incr_out_packet_num (struct connection *c) {
   c->out_packet_num ++;

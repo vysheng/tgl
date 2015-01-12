@@ -135,3 +135,7 @@ void tgl_set_app_version (struct tgl_state *TLS, const char *app_version) {
   }
   TLS->app_version = tstrdup (app_version);
 }
+
+void tgl_enable_ipv6 (struct tgl_state *TLS) {
+  TLS->ipv6_enabled = 1;
+}

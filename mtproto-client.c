@@ -985,11 +985,52 @@ static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long
 
 static struct mtproto_methods mtproto_methods;
 void tgls_free_session (struct tgl_state *TLS, struct tgl_session *S);
+
+static char *get_ipv6 (struct tgl_state *TLS, int num) {
+  static char res[1<< 10];
+  if (TLS->test_mode) {
+    switch (num) {
+      case 1:
+        strcpy (res, TG_SERVER_TEST_IPV6_1);
+        break;
+      case 2:
+        strcpy (res, TG_SERVER_TEST_IPV6_2);
+        break;
+      case 3:
+        strcpy (res, TG_SERVER_TEST_IPV6_3);
+        break;
+      default:
+        assert (0);
+    }
+  } else {
+    switch (num) {
+      case 1:
+        strcpy (res, TG_SERVER_IPV6_1);
+        break;
+      case 2:
+        strcpy (res, TG_SERVER_IPV6_2);
+        break;
+      case 3:
+        strcpy (res, TG_SERVER_IPV6_3);
+        break;
+      case 4:
+        strcpy (res, TG_SERVER_IPV6_4);
+        break;
+      case 5:
+        strcpy (res, TG_SERVER_IPV6_5);
+        break;
+      default:
+        assert (0);
+    }
+  }
+  return res;
+}
+
 static void fail_connection (struct tgl_state *TLS, struct connection *c) {
   struct tgl_session *S = TLS->net_methods->get_session (c);
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
   TLS->net_methods->free (c);
-  S->c = TLS->net_methods->create_connection (TLS, DC->ip, DC->port, S, DC, &mtproto_methods);
+  S->c = TLS->net_methods->create_connection (TLS, TLS->ipv6_enabled ? get_ipv6 (TLS, DC->id) : DC->ip, DC->port, S, DC, &mtproto_methods);
 }
 
 static void fail_session (struct tgl_state *TLS, struct tgl_session *S) {
@@ -1322,7 +1363,8 @@ void tglmp_dc_create_session (struct tgl_state *TLS, struct tgl_dc *DC) {
   struct tgl_session *S = talloc0 (sizeof (*S));
   assert (RAND_pseudo_bytes ((unsigned char *) &S->session_id, 8) >= 0);
   S->dc = DC;
-  S->c = TLS->net_methods->create_connection (TLS, DC->ip, DC->port, S, DC, &mtproto_methods);
+  //S->c = TLS->net_methods->create_connection (TLS, DC->ip, DC->port, S, DC, &mtproto_methods);
+  S->c = TLS->net_methods->create_connection (TLS, TLS->ipv6_enabled ? get_ipv6 (TLS, DC->id) : DC->ip, DC->port, S, DC, &mtproto_methods);
   if (!S->c) {
     vlogprintf (E_DEBUG, "Can not create connection to DC. Is network down?\n");
     exit (1);
