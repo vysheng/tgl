@@ -45,6 +45,7 @@ libtgl_la_SOURCES =\
 	binlog.c \
 	mtproto-client.c \
 	mtproto-common.c \
+	mtproto-utils.c \
 	queries.c \
 	structures.c \
 	tg-mime-types.c \
@@ -85,7 +86,7 @@ auto/scheme.tlo: auto/scheme.tl tgl-tl-parser
 	${srcdir}/tgl-tl-parser -e $@ auto/scheme.tl
 
 auto/scheme.tl: ${srcdir}/scheme.tl ${srcdir}/encrypted_scheme.tl \
-	${srcdir}/binlog.tl ${srcdir}/append.tl | auto
+	${srcdir}/binlog.tl ${srcdir}/mtproto.tl ${srcdir}/append.tl | auto
 	cat $^ > $@
 
 auto/scheme2.tl: auto/scheme.tl tgl-tl-parser
