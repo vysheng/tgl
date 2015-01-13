@@ -256,10 +256,10 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
             bl_do_set_working_dc (TLS, i);
             q->flags &= ~QUERY_ACK_RECEIVED;
             //q->session_id = 0;
-            struct tgl_dc *DC = q->DC;
-            if (!(DC->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
-              q->session_id = 0;
-            }
+            //struct tgl_dc *DC = q->DC;
+            //if (!(DC->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
+            q->session_id = 0;
+            //}
             q->DC = TLS->DC_working;
             TLS->timer_methods->insert (q->ev, 0);
             error_handled = 1;
