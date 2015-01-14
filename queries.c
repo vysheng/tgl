@@ -1791,7 +1791,7 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   } else {
     out_int (CODE_decrypted_message_media_document);
   }
-  if (!(f->flags & FLAG_DOCUMENT_AUDIO)) {
+  if (f->flags == -1 || !(f->flags & FLAG_DOCUMENT_AUDIO)) {
     out_cstring ("", 0);
     out_int (90);
     out_int (90);
@@ -1809,6 +1809,8 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
     out_int (f->duration);
     out_string (tg_mime_by_filename (f->file_name));
   } else {
+    out_string ("");
+    out_string (tg_mime_by_filename (f->file_name));
     // document
   }
   
@@ -2474,6 +2476,7 @@ struct download {
   int next;
   int fd;
   char *name;
+  char *ext;
   long long id;
   unsigned char *iv;
   unsigned char *key;
@@ -2572,6 +2575,9 @@ static int download_on_error (struct tgl_state *TLS, struct query *q, int error_
     tfree_secure (D->iv, 32);
   }
   tfree_str (D->name);
+  if (D->ext) {
+    tfree_str (D->ext);
+  }
   tfree (D, sizeof (*D));
   return 0;
 }
@@ -2589,7 +2595,11 @@ static void load_next_part (struct tgl_state *TLS, struct download *D, void *cal
     if (!D->id) {
       l = tsnprintf (buf, sizeof (buf), "%s/download_%lld_%d.jpg", TLS->downloads_directory, D->volume, D->local_id);
     } else {
-      l = tsnprintf (buf, sizeof (buf), "%s/download_%lld", TLS->downloads_directory, D->id);
+      if (D->ext) {
+        l = tsnprintf (buf, sizeof (buf), "%s/download_%lld.%s", TLS->downloads_directory, D->id, D->ext);
+      } else {
+        l = tsnprintf (buf, sizeof (buf), "%s/download_%lld", TLS->downloads_directory, D->id);
+      }
     }
     if (l >= (int) sizeof (buf)) {
       vlogprintf (E_ERROR, "Download filename is too long");
@@ -2693,6 +2703,12 @@ void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (
   D->name = 0;
   D->fd = -1;
   D->type = CODE_input_document_file_location;
+  if (V->mime_type) {
+    char *r = tg_extension_by_mime (V->mime_type);
+    if (r) {
+      D->ext = tstrdup (r);
+    }
+  }
   load_next_part (TLS, D, callback, callback_extra);
 }
 
@@ -2709,6 +2725,12 @@ void tgl_do_load_encr_document (struct tgl_state *TLS, struct tgl_encr_document 
   D->key = V->key;
   D->iv = talloc (32);
   memcpy (D->iv, V->iv, 32);
+  if (V->mime_type) {
+    char *r = tg_extension_by_mime (V->mime_type);
+    if (r) {
+      D->ext = tstrdup (r);
+    }
+  }
   load_next_part (TLS, D, callback, callback_extra);
       
   unsigned char md5[16];
