@@ -102,7 +102,6 @@ void bl_do_delete_msg (struct tgl_state *TLS, struct tgl_message *M);
 
 void bl_do_msg_seq_update (struct tgl_state *TLS, long long id);
 void bl_do_msg_update (struct tgl_state *TLS, long long id);
-void bl_do_msg_set_oubound (struct tgl_state *TLS, long long id);
 
 void bl_do_reset_authorization (struct tgl_state *TLS);
 

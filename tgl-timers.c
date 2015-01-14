@@ -17,7 +17,10 @@
 
     Copyright Vitaly Valtman 2013-2015
 */
+#ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
 #ifdef EVENT_V2
 #include <event2/event.h>
 #include <event2/bufferevent.h>

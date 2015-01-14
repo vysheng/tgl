@@ -2,13 +2,33 @@ AC_PREREQ([2.68])
 AC_INIT([telegram-cli], [1.0])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
+AM_INIT_AUTOMAKE([
+    check-news
+    foreign
+    1.11
+    -Wall
+    -Wno-portability
+    silent-rules
+    tar-pax
+    no-dist-gzip
+    dist-xz
+    subdir-objects
+])
+
+AC_PROG_MAKE_SET
+
 
 m4_include([m4_ax_check_openssl.m4])
 m4_include([m4_ax_check_zlib.m4])
 m4_include([m4-ax_gcc_builtin.m4])
 
+AC_CONFIG_MACRO_DIR([m4])
+LT_INIT
+AM_CONDITIONAL([TARGET_LINUX],[test "${host_os}" = "linux-gnu" ||
+                 test "${host_os}" = "linux"])
 # Checks for programs.
 AC_PROG_CC
+
 
 # BSD locations for headers and libraries from packages, Linux locations for self-compiled stuff.
 CPPFLAGS="$CPPFLAGS -I/usr/local/include"
@@ -43,7 +63,7 @@ AC_ARG_ENABLE(libevent,[include libevent-based net and timers],
     AC_CHECK_HEADER(event2/event.h, [AC_DEFINE([EVENT_V2], [1], [Use libevent v2])], [
       AC_CHECK_HEADER(event.h, [AC_DEFINE([EVENT_V1], [1], [Use libevent v1])], [AC_MSG_ERROR([no libevent found])])
     ])
-    EXTRA_OBJECTS="${EXTRA_OBJECTS} objs/tgl-net.o objs/tgl-timers.o"
+    EXTRA_OBJECTS='tgl-net.lo tgl-timers.lo'
   fi
   ],[
   ])
