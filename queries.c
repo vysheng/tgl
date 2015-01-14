@@ -4693,8 +4693,16 @@ void tgl_register_cb (struct tgl_state *TLS, char *yn, void *_T) {
   }
 }
 
+void tgl_sign_in_phone (struct tgl_state *TLS, char *phone, void *arg);
 void tgl_sign_in_phone_cb (struct tgl_state *TLS, void *extra, int success, int registered, const char *mhash) {
   void **T = extra;
+  if (!success) {
+    vlogprintf (E_ERROR, "Incorrect phone number\n");
+    tfree_str (T[0]);
+    tfree (T, sizeof (void *) * 4);
+    TLS->callback.get_string (TLS, "phone number:", 0, tgl_sign_in_phone, NULL);
+    return;
+  }
   T[1] = tstrdup (mhash);
   if (registered) {
     TLS->callback.get_string (TLS, "code ('call' for phone call):", 0, tgl_sign_in_code, T);
