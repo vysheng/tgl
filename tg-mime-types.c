@@ -85,7 +85,6 @@ char *tg_mime_by_filename (const char *filename) {
     mime_init ();
   }
 
-
   static char *def = "application/octet-stream";
   if (strlen (p) > 10) {
     return def;

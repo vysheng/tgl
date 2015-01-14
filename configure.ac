@@ -1,5 +1,5 @@
 AC_PREREQ([2.68])
-AC_INIT([tgl], [0.1])
+AC_INIT([telegram-cli], [1.0])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([
@@ -84,7 +84,7 @@ AC_CHECK_FUNCS([alarm endpwent memset memmove mkdir select socket strdup strndup
 AX_GCC_BUILTIN(__builtin_bswap32)
 
 AC_SUBST(EXTRA_LIBS)
-AC_SUBST([EXTRA_OBJECTS])
+AC_SUBST(EXTRA_OBJECTS)
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 
