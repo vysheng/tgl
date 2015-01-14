@@ -49,7 +49,6 @@ libtgl_la_SOURCES =\
 	queries.c \
 	structures.c \
 	tg-mime-types.c \
-	tgl-serialize.c \
 	tgl.c \
 	tgl.h \
 	tgl-layout.h \
