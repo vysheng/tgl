@@ -104,3 +104,6 @@ auto/constants.h: auto/scheme2.tl ${srcdir}/gen_constants_h.awk
 ###dump_tl_file_SOURCES = auto/auto.c dump-tl-file.c
 ###dump_tl_file_CFLAGS = $(AM_CFLAGS)
 
+clean-local:
+	-rm -rf auto/*
+
