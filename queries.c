@@ -214,6 +214,21 @@ void tglq_query_delete (struct tgl_state *TLS, long long id) {
   TLS->active_queries --;
 }
 
+
+void tglq_free_query (struct query *q, void *extra) {
+  struct tgl_state *TLS = extra;
+  if (!(q->flags & QUERY_ACK_RECEIVED)) {
+    TLS->timer_methods->remove (q->ev);
+  }
+  tfree (q->data, q->data_len * 4);
+  TLS->timer_methods->free (q->ev);
+}
+
+void tglq_query_free_all (struct tgl_state *TLS) {
+  tree_act_ex_query (TLS->queries_tree, tglq_free_query, TLS);
+  TLS->queries_tree = tree_clear_query (TLS->queries_tree);
+}
+
 int tglq_query_error (struct tgl_state *TLS, long long id) {
   assert (fetch_int () == CODE_rpc_error);
   int error_code = fetch_int ();

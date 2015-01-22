@@ -76,6 +76,7 @@ void tgl_do_abort_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E);
 
 void tglq_regen_query (struct tgl_state *TLS, long long id);
 void tglq_query_delete (struct tgl_state *TLS, long long id);
+void tglq_query_free_all (struct tgl_state *TLS);
 // For binlog
 
 //int get_dh_config_on_answer (struct query *q);
