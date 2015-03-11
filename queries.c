@@ -1736,20 +1736,26 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
         out_int (f->h);
       }
     } else if (f->flags & FLAG_DOCUMENT_AUDIO) {
-      out_int (1);
+      out_int (2);
       out_int (CODE_document_attribute_audio);
       out_int (f->duration);
+      out_int (CODE_document_attribute_filename);
+      out_string (s + 1);
     } else if (f->flags & FLAG_DOCUMENT_VIDEO) {
-      out_int (1);
+      out_int (2);
       out_int (CODE_document_attribute_video);
       out_int (f->duration);
       out_int (f->w);
       out_int (f->h);
+      out_int (CODE_document_attribute_filename);
+      out_string (s + 1);
     } else if (f->flags & FLAG_DOCUMENT_STICKER) {
       out_int (1);
       out_int (CODE_document_attribute_sticker);
     } else {
-      out_int (0);
+      out_int (1);
+      out_int (CODE_document_attribute_filename);
+      out_string (s + 1);
     }
 
     if (f->thumb_id > 0) {
