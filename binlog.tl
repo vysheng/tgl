@@ -26,7 +26,7 @@ binlog.userSetFullPhoto id:int photo:Photo = binlog.Update;
 binlog.userSetBlocked id:int blocked:int = binlog.Update;
 binlog.userSetRealName id:int real_first_name:string real_last_name:string = binlog.Update;
 binlog.userSetName id:int first_name:string last_name:string = binlog.Update;
-binlog.userSetPhoto id:int photo:UserProfilePhoto = binlog.Update;
+binlog.userSetPhoto#ab5ebe28 id:int user_photo:UserProfilePhoto = binlog.Update;
 binlog.userSetUsername id:int username:string = binlog.Update;
 
 binlog.encrChatDelete id:int = binlog.Update;
@@ -60,30 +60,30 @@ binlog.chatSetVersion id:int version:int users_num:int = binlog.Update;
 binlog.chatSetAdmin id:int admin:int = binlog.Update;
 binlog.chatSetParticipants id:int version:int participants:%(Vector %binlog.ChatParticipant) = binlog.Update;
 binlog.chatSetFullPhoto id:int photo:Photo = binlog.Update;
-binlog.chatAddParticipant id:int version:int user:%binlog.ChatParticipant = binlog.Update;
+binlog.chatAddParticipant#af182ee9 id:int version:int chat_user:%binlog.ChatParticipant = binlog.Update;
 binlog.chatDelParticipant id:int version:int user:int = binlog.Update;
 
 binlog.createMessageText id:int from_id:int to_type:int to_id:int date:int unread:int text:string = binlog.Update;
-binlog.sendMessageText id:long from_id:int to_type:int to_id:int date:int text:string = binlog.Update;
-binlog.sendMessageActionEncr id:long from_id:int to_type:int to_id:int date:int action:DecryptedMessageAction = binlog.Update;
+binlog.sendMessageText#1ab1eb14 lid:long from_id:int to_type:int to_id:int date:int text:string = binlog.Update;
+binlog.sendMessageActionEncr#342c8519 lid:long from_id:int to_type:int to_id:int date:int decr_action:DecryptedMessageAction = binlog.Update;
 binlog.createMessageTextFwd id:int from_id:int to_type:int to_id:int date:int fwd_from_id:int fwd_date:int unread:int text:string = binlog.Update;
 binlog.createMessageMedia id:int from_id:int to_type:int to_id:int date:int unread:int text:string media:MessageMedia = binlog.Update;
-binlog.createMessageMediaEncr id:long from_id:int to_type:int to_id:int date:int text:string media:DecryptedMessageMedia file:EncryptedFile = binlog.Update;
-binlog.createMessageMediaEncrPending id:long from_id:int to_type:int to_id:int date:int text:string media:DecryptedMessageMedia = binlog.Update;
-binlog.createMessageMediaEncrSent id:long file:EncryptedFile = binlog.Update;
+binlog.createMessageMediaEncr#ee426aff lid:long from_id:int to_type:int to_id:int date:int text:string decr_media:DecryptedMessageMedia file:EncryptedFile = binlog.Update;
+binlog.createMessageMediaEncrPending#25d9b575 lid:long from_id:int to_type:int to_id:int date:int text:string decr_media:DecryptedMessageMedia = binlog.Update;
+binlog.createMessageMediaEncrSent#afdbc52d lid:long file:EncryptedFile = binlog.Update;
 binlog.createMessageMediaFwd id:int from_id:int to_type:int to_id:int date:int fwd_from_id:int fwd_date:int unread:int text:string media:MessageMedia = binlog.Update;
 binlog.createMessageService id:int from_id:int to_type:int to_id:int date:int unread:int action:MessageAction = binlog.Update;
-binlog.createMessageServiceEncr id:long from_id:int to_type:int to_id:int date:int action:DecryptedMessageAction = binlog.Update;
+binlog.createMessageServiceEncr#f06c56fd lid:long from_id:int to_type:int to_id:int date:int decr_action:DecryptedMessageAction = binlog.Update;
 binlog.createMessageServiceFwd id:int from_id:int to_type:int to_id:int date:int fwd_from_id:int fwd_date:int unread:int action:MessageAction = binlog.Update;
 binlog.messageSetUnread id:int = binlog.Update;
-binlog.messageSetUnreadLong id:long = binlog.Update;
-binlog.setMessageSent id:long = binlog.Update;
+binlog.messageSetUnreadLong#25321f01 lid:long = binlog.Update;
+binlog.setMessageSent#ee2b1802 lid:long = binlog.Update;
 binlog.setMsgId old_id:long new_id:int = binlog.Update;
-binlog.deleteMsg id:long = binlog.Update;
-binlog.messageSetOutbound id:long = binlog.Update;
+binlog.deleteMsg#97a2a28c lid:long = binlog.Update;
+binlog.messageSetOutbound#5ff33762 lid:long = binlog.Update;
 
-binlog.msgSeqUpdate id:long = binlog.Update;
-binlog.msgUpdate id:long = binlog.Update;
+binlog.msgSeqUpdate#235bf451 lid:long = binlog.Update;
+binlog.msgUpdate#6dd4d85f lid:long = binlog.Update;
 
 binlog.resetAuthorization = binlog.Update;
 

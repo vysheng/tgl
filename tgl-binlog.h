@@ -22,6 +22,7 @@
 
 //#include "structures.h"
 #include "tgl.h"
+#include "auto/auto-types.h"
 
 void bl_do_set_auth_key_id (struct tgl_state *TLS, int num, unsigned char *buf);
 
@@ -37,6 +38,7 @@ void bl_do_user_set_access_hash (struct tgl_state *TLS, struct tgl_user *U, long
 void bl_do_user_set_phone (struct tgl_state *TLS, struct tgl_user *U, const char *p, int pl);
 void bl_do_user_set_friend (struct tgl_state *TLS, struct tgl_user *U, int friend);
 void bl_do_user_set_full_photo (struct tgl_state *TLS, struct tgl_user *U, const int *start, int len);
+void bl_do_user_set_full_photo_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_photo *DS_P);
 void bl_do_user_set_blocked (struct tgl_state *TLS, struct tgl_user *U, int blocked);
 void bl_do_user_set_real_name (struct tgl_state *TLS, struct tgl_user *U, const char *f, int fl, const char *l, int ll);
 
@@ -79,6 +81,7 @@ void bl_do_chat_set_version (struct tgl_state *TLS, struct tgl_chat *C, int vers
 void bl_do_chat_set_admin (struct tgl_state *TLS, struct tgl_chat *C, int admin);
 void bl_do_chat_set_participants (struct tgl_state *TLS, struct tgl_chat *C, int version, int user_num, struct tgl_chat_user *users);
 void bl_do_chat_set_full_photo (struct tgl_state *TLS, struct tgl_chat *U, const int *start, int len);
+void bl_do_chat_set_full_photo_new (struct tgl_state *TLS, struct tgl_chat *U, struct tl_ds_photo *DS_P);
 void bl_do_chat_add_user (struct tgl_state *TLS, struct tgl_chat *C, int version, int user, int inviter, int date);
 void bl_do_chat_del_user (struct tgl_state *TLS, struct tgl_chat *C, int version, int user);
 

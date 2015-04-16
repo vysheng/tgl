@@ -1,28 +1,3 @@
-/* 
-    This file is part of tgl-library
-
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or (at your option) any later version.
-
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-    Lesser General Public License for more details.
-
-    You should have received a copy of the GNU Lesser General Public
-    License along with this library; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-
-    Copyright Vitaly Valtman 2014-2015
-*/
-
-#include "mtproto-common.h"
-#include "config.h"
-#include <string.h>
-
-#ifndef DISABLE_EXTF
 static int cur_token_len;
 static char *cur_token;
 static int cur_token_real_len;
@@ -45,23 +20,6 @@ static int cur_token_quoted;
   if (cur_token_len == -3 && len >= cur_token_real_len && !memcmp (cur_token, token, cur_token_real_len)) { set_autocomplete_string (token); return 0; }\
   if (len != cur_token_len || memcmp (cur_token, token, cur_token_len)) { return 0; } \
   local_next_token ();
-
-
-static int autocomplete_mode;
-static char *autocomplete_string;
-static int (*autocomplete_fun)(const char *, int, int, char **);
-
-static void set_autocomplete_string (const char *s) {
-  if (autocomplete_string) { free (autocomplete_string); }
-  autocomplete_string = strdup (s);
-  assert (autocomplete_string);
-  autocomplete_mode = 1;
-}
-
-static void set_autocomplete_type (int (*f)(const char *, int, int, char **)) {
-  autocomplete_fun = f;
-  autocomplete_mode = 2;
-}
 
 static int is_int (void) {
   if (cur_token_len <= 0) { return 0; }
@@ -99,6 +57,7 @@ static int is_double (void) {
   return p == cur_token + cur_token_len;
 }
 
+#ifndef IN_AUTOCOMPLETE_H
 static double get_double (void) {
   if (cur_token_len <= 0) { return 0; }
   char c = cur_token[cur_token_len];
@@ -110,41 +69,7 @@ static double get_double (void) {
 
   return val;
 }
-
-static struct paramed_type *paramed_type_dup (struct paramed_type *P) {
-  if (ODDP (P)) { return P; }
-  struct paramed_type *R = malloc (sizeof (*R));
-  assert (R);
-  R->type = malloc (sizeof (*R->type));
-  assert (R->type);
-  memcpy (R->type, P->type, sizeof (*P->type)); 
-  R->type->id = strdup (P->type->id);
-  assert (R->type->id);
-
-  if (P->type->params_num) {
-    R->params = malloc (sizeof (void *) * P->type->params_num);
-    assert (R->params);
-    int i;
-    for (i = 0; i < P->type->params_num; i++) {
-      R->params[i] = paramed_type_dup (P->params[i]);
-    }
-  }
-  return R;
-}
-
-void tgl_paramed_type_free (struct paramed_type *P) {
-  if (ODDP (P)) { return; }
-  if (P->type->params_num) {
-    int i;
-    for (i = 0; i < P->type->params_num; i++) {
-      tgl_paramed_type_free (P->params[i]);
-    }
-    free (P->params);
-  }
-  free (P->type->id);
-  free (P->type);
-  free (P);
-}
+#endif
 
 static char *buffer_pos, *buffer_end;
 
@@ -281,48 +206,50 @@ static void local_next_token (void) {
   }
 }
 
-#define MAX_FVARS 100
-static struct paramed_type *fvars[MAX_FVARS];
-static int fvars_pos;
+static struct paramed_type *paramed_type_dup (struct paramed_type *P) {
+  if (ODDP (P)) { return P; }
+  struct paramed_type *R = malloc (sizeof (*R));
+  assert (R);
+  R->type = malloc (sizeof (*R->type));
+  assert (R->type);
+  memcpy (R->type, P->type, sizeof (*P->type)); 
+  R->type->id = strdup (P->type->id);
+  assert (R->type->id);
 
-static void add_var_to_be_freed (struct paramed_type *P) {
-  assert (fvars_pos < MAX_FVARS);
-  fvars[fvars_pos ++] = P;
-}
-
-static void free_vars_to_be_freed (void) {
-  int i;
-  for (i = 0; i < fvars_pos; i++) {
-    tgl_paramed_type_free (fvars[i]);
-  }
-  fvars_pos = 0;
-}
-
-int tglf_extf_autocomplete (struct tgl_state *TLS, const char *text, int text_len, int index, char **R, char *data, int data_len) {
-  if (index == -1) {
-    buffer_pos = data;
-    buffer_end = data + data_len;
-    autocomplete_mode = 0;
-    local_next_token ();
-    struct paramed_type *P = autocomplete_function_any ();
-    free_vars_to_be_freed ();
-    if (P) { tgl_paramed_type_free (P); }
-  }
-  if (autocomplete_mode == 0) { return -1; }
-  int len = strlen (text);
-  if (autocomplete_mode == 1) {
-    if (index >= 0) { return -1; }
-    index = 0;
-    if (!strncmp (text, autocomplete_string, len)) {
-      *R = strdup (autocomplete_string);
-      assert (*R);
-      return index;
-    } else {
-      return -1;
+  if (P->type->params_num) {
+    R->params = malloc (sizeof (void *) * P->type->params_num);
+    assert (R->params);
+    int i;
+    for (i = 0; i < P->type->params_num; i++) {
+      R->params[i] = paramed_type_dup (P->params[i]);
     }
-  } else {
-    return autocomplete_fun (text, len, index, R);
   }
+  return R;
 }
 
+#ifndef IN_AUTOCOMPLETE_H
+void tgl_paramed_type_free (struct paramed_type *P) {
+  if (ODDP (P)) { return; }
+  if (P->type->params_num) {
+    int i;
+    for (i = 0; i < P->type->params_num; i++) {
+      tgl_paramed_type_free (P->params[i]);
+    }
+    free (P->params);
+  }
+  free (P->type->id);
+  free (P->type);
+  free (P);
+}
+#else
+void tgl_paramed_type_free (struct paramed_type *P);
+#endif
+
+#ifndef IN_AUTOCOMPLETE_H
+struct paramed_type *tglf_extf_store (struct tgl_state *TLS, const char *data, int data_len) { 
+  buffer_pos = (char *)data;
+  buffer_end = (char *)(data + data_len);
+  local_next_token ();
+  return store_function_any ();
+}
 #endif

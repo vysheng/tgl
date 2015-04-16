@@ -34,19 +34,19 @@ inputFile#f52ff27f id:long parts:int name:string md5_checksum:string = InputFile
 
 inputMediaEmpty#9664f57f = InputMedia;
 inputMediaUploadedPhoto#2dc53a7d file:InputFile = InputMedia;
-inputMediaPhoto#8f2ab2ec id:InputPhoto = InputMedia;
+inputMediaPhoto#8f2ab2ec photo_id:InputPhoto = InputMedia;
 inputMediaGeoPoint#f9c44144 geo_point:InputGeoPoint = InputMedia;
 inputMediaContact#a6e45987 phone_number:string first_name:string last_name:string = InputMedia;
 inputMediaUploadedVideo#133ad6f6 file:InputFile duration:int w:int h:int mime_type:string = InputMedia;
 inputMediaUploadedThumbVideo#9912dabf file:InputFile thumb:InputFile duration:int w:int h:int mime_type:string = InputMedia;
-inputMediaVideo#7f023ae6 id:InputVideo = InputMedia;
+inputMediaVideo#7f023ae6 video_id:InputVideo = InputMedia;
 
 inputChatPhotoEmpty#1ca48f57 = InputChatPhoto;
 inputChatUploadedPhoto#94254732 file:InputFile crop:InputPhotoCrop = InputChatPhoto;
 inputChatPhoto#b2e1bf08 id:InputPhoto crop:InputPhotoCrop = InputChatPhoto;
 
 inputGeoPointEmpty#e4c123d6 = InputGeoPoint;
-inputGeoPoint#f3b7acc9 lat:double long:double = InputGeoPoint;
+inputGeoPoint#f3b7acc9 latitude:double longitude:double = InputGeoPoint;
 
 inputPhotoEmpty#1cd7bf0d = InputPhoto;
 inputPhoto#fb95c6c4 id:long access_hash:long = InputPhoto;
@@ -140,7 +140,7 @@ videoEmpty#c10658a8 id:long = Video;
 video#388fa391 id:long access_hash:long user_id:int date:int caption:string duration:int mime_type:string size:int thumb:PhotoSize dc_id:int w:int h:int = Video;
 
 geoPointEmpty#1117dd5f = GeoPoint;
-geoPoint#2049d70c long:double lat:double = GeoPoint;
+geoPoint#2049d70c longitude:double latitude:double = GeoPoint;
 
 auth.checkedPhone#e300cc3b phone_registered:Bool phone_invited:Bool = auth.CheckedPhone;
 
@@ -287,7 +287,7 @@ messages.sentMessageLink#e9db4a3f id:int date:int pts:int seq:int links:Vector<c
 
 inputGeoChat#74d456fa chat_id:int access_hash:long = InputGeoChat;
 
-inputNotifyGeoChatPeer#4d8ddec8 peer:InputGeoChat = InputNotifyPeer;
+inputNotifyGeoChatPeer#4d8ddec8 geo_peer:InputGeoChat = InputNotifyPeer;
 
 geoChat#75eaea5a id:int access_hash:long title:string address:string venue:string geo:GeoPoint photo:ChatPhoto participants_count:int date:int checked_in:Bool version:int = Chat;
 
@@ -305,13 +305,13 @@ geochats.messagesSlice#bc5863e8 count:int messages:Vector<GeoChatMessage> chats:
 messageActionGeoChatCreate#6f038ebc title:string address:string = MessageAction;
 messageActionGeoChatCheckin#c7d53de = MessageAction;
 
-updateNewGeoChatMessage#5a68e3f7 message:GeoChatMessage = Update;
+updateNewGeoChatMessage#5a68e3f7 geo_message:GeoChatMessage = Update;
 
 wallPaperSolid#63117f24 id:int title:string bg_color:int color:int = WallPaper;
 
-updateNewEncryptedMessage#12bcbd9a message:EncryptedMessage qts:int = Update;
+updateNewEncryptedMessage#12bcbd9a encr_message:EncryptedMessage qts:int = Update;
 updateEncryptedChatTyping#1710f156 chat_id:int = Update;
-updateEncryption#b4a2e88d chat:EncryptedChat date:int = Update;
+updateEncryption#b4a2e88d encr_chat:EncryptedChat date:int = Update;
 updateEncryptedMessagesRead#38fe25b7 chat_id:int max_date:int date:int = Update;
 
 encryptedChatEmpty#ab7ec0a0 id:int = EncryptedChat;
@@ -349,10 +349,10 @@ updateChatParticipantDelete#6e5f8c22 chat_id:int user_id:int version:int = Updat
 updateDcOptions#8e5e9873 dc_options:Vector<DcOption> = Update;
 
 inputMediaUploadedAudio#4e498cab file:InputFile duration:int mime_type:string = InputMedia;
-inputMediaAudio#89938781 id:InputAudio = InputMedia;
+inputMediaAudio#89938781 audio_id:InputAudio = InputMedia;
 inputMediaUploadedDocument#ffe76b78 file:InputFile mime_type:string attributes:Vector<DocumentAttribute> = InputMedia;
 inputMediaUploadedThumbDocument#41481486 file:InputFile thumb:InputFile mime_type:string attributes:Vector<DocumentAttribute> = InputMedia;
-inputMediaDocument#d184e841 id:InputDocument = InputMedia;
+inputMediaDocument#d184e841 document_id:InputDocument = InputMedia;
 
 messageMediaDocument#2fda2204 document:Document = MessageMedia;
 messageMediaAudio#c6b68300 audio:Audio = MessageMedia;
@@ -400,7 +400,7 @@ contactFound#ea879f95 user_id:int = ContactFound;
 
 contacts.found#566000e results:Vector<ContactFound> users:Vector<User> = contacts.Found;
 
-updateServiceNotification#382dd3e4 type:string message:string media:MessageMedia popup:Bool = Update;
+updateServiceNotification#382dd3e4 type:string message_text:string media:MessageMedia popup:Bool = Update;
 
 userStatusRecently#e26f42f1 = UserStatus;
 userStatusLastWeek#7bf09fc = UserStatus;

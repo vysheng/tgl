@@ -41,6 +41,9 @@
 
 #include "tgl.h"
 #include "auto.h"
+#include "auto/auto-types.h"
+#include "auto/auto-skip.h"
+#include "auto/auto-store-ds.h"
 
 #include "tgl-structures.h"
 
@@ -1773,6 +1776,16 @@ void bl_do_user_set_full_photo (struct tgl_state *TLS, struct tgl_user *U, const
   add_log_event (TLS, ev, len + 8);
 }
 
+void bl_do_user_set_full_photo_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_photo *DS_P) {
+  if (!DS_P || DS_LVAL (DS_P->id) == U->photo_id) { return; }
+  
+  clear_packet ();
+  out_int (CODE_binlog_user_set_full_photo);
+  out_int (tgl_get_peer_id (U->id));
+  store_ds_type_photo (DS_P, TYPE_TO_PARAM (photo));
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
 void bl_do_user_set_blocked (struct tgl_state *TLS, struct tgl_user *U, int blocked) {
   if (U->blocked == blocked) { return; }
   int *ev = alloc_log_event (12);
@@ -2094,6 +2107,15 @@ void bl_do_chat_set_full_photo (struct tgl_state *TLS, struct tgl_chat *U, const
   ev[1] = tgl_get_peer_id (U->id);
   memcpy (ev + 2, start, len);
   add_log_event (TLS, ev, len + 8);
+}
+
+void bl_do_chat_set_full_photo_new (struct tgl_state *TLS, struct tgl_chat *U, struct tl_ds_photo *DS_P) {
+  if (!DS_P || U->photo.id == DS_LVAL (DS_P->id)) { return; }
+  clear_packet ();
+  out_int (CODE_binlog_chat_set_full_photo);
+  out_int (tgl_get_peer_id (U->id));
+  store_ds_type_photo (DS_P, TYPE_TO_PARAM (photo));
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 
 void bl_do_chat_add_user (struct tgl_state *TLS, struct tgl_chat *C, int version, int user, int inviter, int date) {

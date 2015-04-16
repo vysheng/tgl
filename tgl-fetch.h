@@ -20,13 +20,16 @@
 #ifndef __TGL_FETCH_H__
 #define __TGL_FETCH_H__
 #include "tgl.h"
+#include "auto/auto-types.h"
 
 int tglf_fetch_file_location (struct tgl_state *TLS, struct tgl_file_location *loc);
 int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, struct tgl_user *U);
 int tglf_fetch_user (struct tgl_state *TLS, struct tgl_user *U);
 struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS);
+struct tgl_user *tglf_fetch_alloc_user_new (struct tgl_state *TLS, struct tl_ds_user *DS_U);
 struct tgl_user *tglf_fetch_alloc_user_full (struct tgl_state *TLS);
 struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS);
+struct tgl_chat *tglf_fetch_alloc_chat_new (struct tgl_state *TLS, struct tl_ds_chat *DS_C);
 struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS);
 struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS);
 struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS);

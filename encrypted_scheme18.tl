@@ -9,7 +9,7 @@ decryptedMessageService#73164160 in_seq_no:int out_seq_no:int random_id:long ran
 decryptedMessageMediaEmpty#89f5c4a = DecryptedMessageMedia;
 decryptedMessageMediaPhoto#32798a8c thumb:bytes thumb_w:int thumb_h:int w:int h:int size:int key:bytes iv:bytes = DecryptedMessageMedia;
 //decryptedMessageMediaVideo#4cee6ef3 thumb:bytes thumb_w:int thumb_h:int duration:int w:int h:int size:int key:bytes iv:bytes = DecryptedMessageMedia;
-decryptedMessageMediaGeoPoint#35480a59 lat:double long:double = DecryptedMessageMedia;
+decryptedMessageMediaGeoPoint#35480a59 latitude:double longitude:double = DecryptedMessageMedia;
 decryptedMessageMediaContact#588a0a97 phone_number:string first_name:string last_name:string user_id:int = DecryptedMessageMedia;
 decryptedMessageActionSetMessageTTL#a1733aec ttl_seconds:int = DecryptedMessageAction;
 

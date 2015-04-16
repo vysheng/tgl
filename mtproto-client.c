@@ -52,6 +52,8 @@
 #include "tgl-structures.h"
 #include "tgl-binlog.h"
 #include "auto.h"
+#include "auto/auto-types.h"
+#include "auto/auto-skip.h"
 #include "tgl.h"
 #include "mtproto-client.h"
 #include "tools.h"

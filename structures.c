@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <strings.h>
 #include "tgl-structures.h"
 #include "mtproto-common.h"
 //#include "telegram.h"
@@ -37,6 +38,11 @@
 #include "mtproto-client.h"
 
 #include "tgl.h"
+#include "auto.h"
+#include "auto/auto-types.h"
+#include "auto/auto-skip.h"
+#include "auto/auto-fetch-ds.h"
+#include "auto/auto-free-ds.h"
 
 #define sha1 SHA1
 
@@ -117,27 +123,25 @@ enum tgl_typing_status tglf_fetch_typing (void) {
 
 /* {{{ Fetch */
 
-int tglf_fetch_file_location (struct tgl_state *TLS, struct tgl_file_location *loc) {
-  int x = fetch_int ();
-  assert (x == CODE_file_location_unavailable || x == CODE_file_location);
-
-  if (x == CODE_file_location_unavailable) {
-    loc->dc = -1;
-    loc->volume = fetch_long ();
-    loc->local_id = fetch_int ();
-    loc->secret = fetch_long ();
-  } else {
-    loc->dc = fetch_int ();
-    loc->volume = fetch_long ();
-    loc->local_id = fetch_int ();
-    loc->secret = fetch_long ();
-  }
+int tglf_fetch_file_location_new (struct tgl_state *TLS, struct tgl_file_location *loc, struct tl_ds_file_location *DS_FL) {
+  if (!DS_FL) { return 0; }
+  loc->dc = DS_LVAL (DS_FL->dc_id);
+  loc->volume = DS_LVAL (DS_FL->volume_id);
+  loc->local_id = DS_LVAL (DS_FL->local_id);
+  loc->secret = DS_LVAL (DS_FL->secret);
   return 0;
 }
 
-int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, struct tgl_user *U) {
-  unsigned x = fetch_int ();
-  switch (x) {
+int tglf_fetch_file_location (struct tgl_state *TLS, struct tgl_file_location *loc) {
+  struct tl_ds_file_location *DS_FL = fetch_ds_type_file_location (TYPE_TO_PARAM (file_location));
+  int res = tglf_fetch_file_location_new (TLS, loc, DS_FL);
+  free_ds_type_file_location (DS_FL, TYPE_TO_PARAM (file_location));
+  return res;
+}
+
+int tglf_fetch_user_status_new (struct tgl_state *TLS, struct tgl_user_status *S, struct tgl_user *U, struct tl_ds_user_status *DS_US) {
+  if (!DS_US) { return 0; }
+  switch (DS_US->magic) {
   case CODE_user_status_empty:
     if (S->online) {
       tgl_insert_status_update (TLS, U);
@@ -150,15 +154,14 @@ int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, st
     break;
   case CODE_user_status_online:
     {
-      int when = fetch_int ();
       if (S->online != 1) {
-        S->when = when;
+        S->when = DS_LVAL (DS_US->expires);
         tgl_insert_status_update (TLS, U);
         tgl_insert_status_expire (TLS, U);
         S->online = 1;
       } else {
-        if (when != S->when) {
-          S->when = when;
+        if (DS_LVAL (DS_US->expires) != S->when) {
+          S->when = DS_LVAL (DS_US->expires);
           tgl_remove_status_expire (TLS, U);
           tgl_insert_status_expire (TLS, U);
         }
@@ -173,7 +176,7 @@ int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, st
       }
     }
     S->online = -1;
-    S->when = fetch_int ();
+    S->when = DS_LVAL (DS_US->was_online);
     break;
   case CODE_user_status_recently:
     if (S->online != -2) {
@@ -203,154 +206,156 @@ int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, st
     S->online = -4;
     break;
   default:
-    vlogprintf (E_ERROR, "x = 0x%08x\n", x);
     assert (0);
   }
   return 0;
 }
 
-long long tglf_fetch_user_photo (struct tgl_state *TLS, struct tgl_user *U) {
-  unsigned x = fetch_int ();
-  assert (x == CODE_user_profile_photo || x == CODE_user_profile_photo_old || x == CODE_user_profile_photo_empty);
-  if (x == CODE_user_profile_photo_empty) {
+int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, struct tgl_user *U) {
+  struct tl_ds_user_status *DS_US = fetch_ds_type_user_status (TYPE_TO_PARAM (user_status));
+  int res = tglf_fetch_user_status_new (TLS, S, U, DS_US);
+  free_ds_type_user_status (DS_US, TYPE_TO_PARAM (user_status));
+  return res;
+}
+
+long long tglf_fetch_user_photo_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_user_profile_photo *DS_UPP) {
+  if (!DS_UPP) {
+    return 0;
+  }
+
+  if (DS_UPP->magic == CODE_user_profile_photo_empty) {
     bl_do_set_user_profile_photo (TLS, U, 0, 0, 0);
     return 0;
   }
-  long long photo_id = 1;
-  if (x == CODE_user_profile_photo) {
-    photo_id = fetch_long ();
-  }
+  
+  long long photo_id = DS_LVAL (DS_UPP->photo_id);;
   static struct tgl_file_location big;
   static struct tgl_file_location small;
-  assert (tglf_fetch_file_location (TLS, &small) >= 0);
-  assert (tglf_fetch_file_location (TLS, &big) >= 0);
+  assert (tglf_fetch_file_location_new (TLS, &small, DS_UPP->photo_small) >= 0);
+  assert (tglf_fetch_file_location_new (TLS, &big, DS_UPP->photo_big) >= 0);
 
   bl_do_set_user_profile_photo (TLS, U, photo_id, &big, &small);
   return 0;
 }
 
-int tglf_fetch_user (struct tgl_state *TLS, struct tgl_user *U) {
-  unsigned x = fetch_int ();
-  assert (x == CODE_user_empty || x == CODE_user_self || x == CODE_user_contact ||  x == CODE_user_request || x == CODE_user_foreign || x == CODE_user_deleted);
-  U->id = TGL_MK_USER (fetch_int ());
-  if (x == CODE_user_empty) {
+long long tglf_fetch_user_photo (struct tgl_state *TLS, struct tgl_user *U) {
+  struct tl_ds_user_profile_photo *DS_UPP = fetch_ds_type_user_profile_photo (TYPE_TO_PARAM (user_profile_photo));
+  int res = tglf_fetch_user_photo_new (TLS, U, DS_UPP);
+  free_ds_type_user_profile_photo (DS_UPP, TYPE_TO_PARAM (user_profile_photo));
+  return res;
+}
+
+int tglf_fetch_user_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_user *DS_U) {
+  if (!DS_U) { return 0; }
+  U->id = TGL_MK_USER (DS_LVAL (DS_U->id));
+  if (DS_U->magic == CODE_user_empty) {
     return 0;
   }
   
-  if (x == CODE_user_self) {
+  if (DS_U->magic == CODE_user_self) {
     bl_do_set_our_id (TLS, tgl_get_peer_id (U->id));
   }
   
   int new = !(U->flags & FLAG_CREATED);
   if (new) {
-    int l1 = prefetch_strlen ();
-    assert (l1 >= 0);
-    char *s1 = fetch_str (l1);
-    int l2 = prefetch_strlen ();
-    assert (l2 >= 0);
-    char *s2 = fetch_str (l2);
+    bl_do_user_add (TLS, tgl_get_peer_id (U->id), 
+      DS_STR (DS_U->first_name), 
+      DS_STR (DS_U->last_name), 
+      DS_LVAL (DS_U->access_hash), 
+      DS_STR (DS_U->phone),
+      DS_U->magic == CODE_user_contact
+    );
 
-    int l3 = prefetch_strlen ();
-    char *s3 = fetch_str (l3);
+    bl_do_user_set_username (TLS, U, 
+      DS_STR (DS_U->username)
+    );
     
-    if (x == CODE_user_deleted && !(U->flags & FLAG_DELETED)) {
-      bl_do_user_add (TLS, tgl_get_peer_id (U->id), s1, l1, s2, l2, 0, 0, 0, 0);
-      bl_do_user_set_username (TLS, U, s3, l3);
-      bl_do_user_delete (TLS, U);
-    }
-    if (x != CODE_user_deleted) {
-      long long access_hash = 0;
-      if (x != CODE_user_self) {
-        access_hash = fetch_long ();
-      }
-      int phone_len = 0;
-      char *phone = 0;
-      if (x != CODE_user_foreign) {
-        phone_len = prefetch_strlen ();
-        assert (phone_len >= 0);
-        phone = fetch_str (phone_len);
-      }
-      bl_do_user_add (TLS, tgl_get_peer_id (U->id), s1, l1, s2, l2, access_hash, phone, phone_len, x == CODE_user_contact);
-      bl_do_user_set_username (TLS, U, s3, l3);
-      assert (tglf_fetch_user_photo (TLS, U) >= 0);
-      assert (tglf_fetch_user_status (TLS, &U->status, U) >= 0);
-
-      if (x == CODE_user_self) {
-        fetch_bool ();
-      }
-    }
+    assert (tglf_fetch_user_photo_new (TLS, U, DS_U->photo) >= 0);
+    assert (tglf_fetch_user_status_new (TLS, &U->status, U, DS_U->status) >= 0);
   } else {
-    int l1 = prefetch_strlen ();
-    char *s1 = fetch_str (l1);
-    int l2 = prefetch_strlen ();
-    char *s2 = fetch_str (l2);
+    bl_do_user_set_name (TLS, U, 
+      DS_STR (DS_U->first_name),
+      DS_STR (DS_U->last_name)
+    );
     
-    bl_do_user_set_name (TLS, U, s1, l1, s2, l2);
+    bl_do_user_set_username (TLS, U, 
+      DS_STR (DS_U->username)
+    );
     
-    int l3 = prefetch_strlen ();
-    char *s3 = fetch_str (l3);
-    bl_do_user_set_username (TLS, U, s3, l3);
+    bl_do_user_set_access_hash (TLS, U, 
+      DS_LVAL (DS_U->access_hash)
+    );
+    
+    bl_do_user_set_phone (TLS, U, 
+      DS_STR (DS_U->phone)
+    );
 
-    if (x == CODE_user_deleted && !(U->flags & FLAG_DELETED)) {
-      bl_do_user_delete (TLS, U);
-    }
-    if (x != CODE_user_deleted) {
-      if (x != CODE_user_self) {
-        bl_do_user_set_access_hash (TLS, U, fetch_long ());
-      }
-      if (x != CODE_user_foreign) {
-        int l = prefetch_strlen ();
-        char *s = fetch_str (l);
-        bl_do_user_set_phone (TLS, U, s, l);
-      }
-      assert (tglf_fetch_user_photo (TLS, U) >= 0);
-    
-      tglf_fetch_user_status (TLS, &U->status, U);
-      if (x == CODE_user_self) {
-        fetch_bool ();
-      }
-
-      if (x == CODE_user_contact) {
-        bl_do_user_set_friend (TLS, U, 1);
-      } else {
-        bl_do_user_set_friend (TLS, U, 0);
-      }
-    }
+    assert (tglf_fetch_user_photo_new (TLS, U, DS_U->photo) >= 0);
+    assert (tglf_fetch_user_status_new (TLS, &U->status, U, DS_U->status) >= 0);
+    bl_do_user_set_friend (TLS, U, DS_U->magic == CODE_user_contact);
+  }
+  if (DS_U->magic == CODE_user_deleted && !(U->flags & FLAG_DELETED)) {
+    bl_do_user_delete (TLS, U);
   }
   return 0;
 }
 
+int tglf_fetch_user (struct tgl_state *TLS, struct tgl_user *U) {
+  struct tl_ds_user *DS_U = fetch_ds_type_user (TYPE_TO_PARAM (user));
+  int res = tglf_fetch_user_new (TLS, U, DS_U);
+  free_ds_type_user (DS_U, TYPE_TO_PARAM (user));
+  return res;
+}
+
+void tglf_fetch_user_full_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_user_full *DS_UF) {
+  if (!DS_UF) { return; }
+
+  tglf_fetch_user_new (TLS, U, DS_UF->user);
+  bl_do_user_set_blocked (TLS, U, DS_BVAL (DS_UF->blocked));
+
+  bl_do_user_set_real_name (TLS, U,
+    DS_STR (DS_UF->real_first_name),
+    DS_STR (DS_UF->real_last_name)
+  );
+
+  bl_do_user_set_full_photo_new (TLS, U,
+    DS_UF->profile_photo
+  );
+}
+
 void tglf_fetch_user_full (struct tgl_state *TLS, struct tgl_user *U) {
-  assert (fetch_int () == CODE_user_full);
-  tglf_fetch_alloc_user (TLS);
-  assert (skip_type_any (TYPE_TO_PARAM (contacts_link)) >= 0);
+  struct tl_ds_user_full *DS_UF = fetch_ds_type_user_full (TYPE_TO_PARAM (user_full));
+  tglf_fetch_user_full_new (TLS, U, DS_UF);
+  free_ds_type_user_full (DS_UF, TYPE_TO_PARAM (user_full));
+}
 
-  int *start = in_ptr;
-  assert (skip_type_any (TYPE_TO_PARAM (photo)) >= 0);
-  bl_do_user_set_full_photo (TLS, U, start, 4 * (in_ptr - start));
-
-  assert (skip_type_any (TYPE_TO_PARAM (peer_notify_settings)) >= 0);
-  
-  bl_do_user_set_blocked (TLS, U, fetch_bool ());
-  int l1 = prefetch_strlen ();
-  char *s1 = fetch_str (l1);
-  int l2 = prefetch_strlen ();
-  char *s2 = fetch_str (l2);
-  if (U && (U->flags & FLAG_CREATED)) {
-    bl_do_user_set_real_name (TLS, U, s1, l1, s2, l2);
+void str_to_256 (unsigned char *dst, char *src, int src_len) {
+  if (src_len >= 256) {
+    memcpy (dst, src + src_len - 256, 256);
+  } else {
+    bzero (dst, 256 - src_len);
+    memcpy (dst + 256 - src_len, src, src_len);
   }
 }
 
-void tglf_fetch_encrypted_chat (struct tgl_state *TLS, struct tgl_secret_chat *U) {
-  unsigned x = fetch_int ();
-  assert (x == CODE_encrypted_chat_empty || x == CODE_encrypted_chat_waiting || x == CODE_encrypted_chat_requested ||  x == CODE_encrypted_chat || x == CODE_encrypted_chat_discarded);
-  U->id = TGL_MK_ENCR_CHAT (fetch_int ());
-  if (x == CODE_encrypted_chat_empty) {
+void str_to_32 (unsigned char *dst, char *src, int src_len) {
+  if (src_len >= 32) {
+    memcpy (dst, src + src_len - 32, 32);
+  } else {
+    bzero (dst, 32 - src_len);
+    memcpy (dst + 32 - src_len, src, src_len);
+  }
+}
+
+void tglf_fetch_encrypted_chat_new (struct tgl_state *TLS, struct tgl_secret_chat *U, struct tl_ds_encrypted_chat *DS_EC) {
+  if (!DS_EC) { return; }
+  U->id = TGL_MK_ENCR_CHAT (DS_LVAL (DS_EC->id));
+  if (DS_EC->magic == CODE_encrypted_chat_empty) {
     return;
   }
   int new = !(U->flags & FLAG_CREATED);
  
-  if (x == CODE_encrypted_chat_discarded) {
+  if (DS_EC->magic == CODE_encrypted_chat_discarded) {
     if (new) {
       vlogprintf (E_WARNING, "Unknown chat in deleted state. May be we forgot something...\n");
       return;
@@ -360,404 +365,415 @@ void tglf_fetch_encrypted_chat (struct tgl_state *TLS, struct tgl_secret_chat *U
     return;
   }
 
-  static char g_key[256];
-  static char nonce[256];
+  static unsigned char g_key[256];
+  static unsigned char nonce[256]; // NULL
   if (new) {
-    long long access_hash = fetch_long ();
-    int date = fetch_int ();
-    int admin_id = fetch_int ();
-    int user_id = fetch_int () + admin_id - TLS->our_id;
-
-    if (x == CODE_encrypted_chat_waiting) {
-      vlogprintf (E_WARNING, "Unknown chat in waiting state. May be we forgot something...\n");
+    if (DS_EC->magic != CODE_encrypted_chat_requested) {
+      vlogprintf (E_WARNING, "Unknown chat. May be we forgot something...\n");
       return;
     }
-    if (x == CODE_encrypted_chat_requested || x == CODE_encrypted_chat) {
-      memset (g_key, 0, sizeof (g_key));
-    }
 
-    fetch256 (g_key);
+    str_to_256 (g_key, DS_STR (DS_EC->g_a));
     
-    if (x == CODE_encrypted_chat) {
-      fetch_long (); // fingerprint
-    }
-
-    if (x == CODE_encrypted_chat) {
-      vlogprintf (E_WARNING, "Unknown chat in ok state. May be we forgot something...\n");
-      return;
-    }
-
-    bl_do_encr_chat_requested (TLS, U, access_hash, date, admin_id, user_id, (void *)g_key, (void *)nonce);
-    //write_secret_chat_file ();
+    bl_do_encr_chat_requested (TLS, U, 
+      DS_LVAL (DS_EC->access_hash), 
+      DS_LVAL (DS_EC->date), 
+      DS_LVAL (DS_EC->admin_id), 
+      DS_LVAL (DS_EC->participant_id) + DS_LVAL (DS_EC->admin_id) - TLS->our_id,
+      (void *)g_key,
+      (void *)nonce
+    );
   } else {
-    bl_do_encr_chat_set_access_hash (TLS, U, fetch_long ());
-    bl_do_encr_chat_set_date (TLS, U, fetch_int ());
-    if (fetch_int () != U->admin_id) {
-      vlogprintf (E_WARNING, "Changed admin in secret chat. WTF?\n");
-      return;
+    bl_do_encr_chat_set_access_hash (TLS, U, 
+      DS_LVAL (DS_EC->access_hash)
+    );
+    
+    bl_do_encr_chat_set_date (TLS, U, 
+      DS_LVAL (DS_EC->date)
+    );
+   
+    if (DS_EC->magic == CODE_encrypted_chat_requested) {
+      return; // duplicate?
     }
-    if (U->user_id != U->admin_id + fetch_int () - TLS->our_id) {
-      vlogprintf (E_WARNING, "Changed partner in secret chat. WTF?\n");
-      return;
-    }
-    if (x == CODE_encrypted_chat_waiting) {
+    if (DS_EC->magic == CODE_encrypted_chat_waiting) {
       bl_do_encr_chat_set_state (TLS, U, sc_waiting);
-      //write_secret_chat_file ();
       return; // We needed only access hash from here
     }
     
-    if (x == CODE_encrypted_chat_requested || x == CODE_encrypted_chat) {
-      memset (g_key, 0, sizeof (g_key));
-    }
-   
-    fetch256 (g_key);
+    str_to_256 (g_key, DS_STR (DS_EC->g_a_or_b));
     
-    if (x == CODE_encrypted_chat_requested) {
-      return; // Duplicate?
-    }
-    bl_do_encr_chat_accepted (TLS, U, (void *)g_key, (void *)nonce, fetch_long ());
+    bl_do_encr_chat_accepted (TLS, U, 
+      (void *)g_key, 
+      (void *)nonce, 
+      DS_LVAL (DS_EC->key_fingerprint)
+    );
     //write_secret_chat_file ();
   }
 }
 
-void tglf_fetch_chat (struct tgl_state *TLS, struct tgl_chat *C) {
-  unsigned x = fetch_int ();
-  assert (x == CODE_chat_empty || x == CODE_chat || x == CODE_chat_forbidden);
-  C->id = TGL_MK_CHAT (fetch_int ());
-  if (x == CODE_chat_empty) {
+void tglf_fetch_encrypted_chat (struct tgl_state *TLS, struct tgl_secret_chat *U) {
+  struct tl_ds_encrypted_chat *DS_EC = fetch_ds_type_encrypted_chat (TYPE_TO_PARAM (encrypted_chat));
+  tglf_fetch_encrypted_chat_new (TLS, U, DS_EC);
+  free_ds_type_encrypted_chat (DS_EC, TYPE_TO_PARAM (encrypted_chat));
+}
+
+void tglf_fetch_chat_new (struct tgl_state *TLS, struct tgl_chat *C, struct tl_ds_chat *DS_C) {
+  if (!DS_C) { return; }
+  
+  C->id = TGL_MK_CHAT (DS_LVAL (DS_C->id));
+  if (DS_C->magic == CODE_chat_empty) { 
     return;
   }
   int new = !(C->flags & FLAG_CREATED);
   if (new) {
     int y = 0;
-    if (x == CODE_chat_forbidden) {
+    if (DS_C->magic == CODE_chat_forbidden) {
       y |= FLAG_FORBIDDEN;
     }
-    int l = prefetch_strlen ();
-    char *s = fetch_str (l);
-
+    if (DS_C->left && !DS_BVAL (DS_C->left)) {
+      y |= FLAG_CHAT_IN_CHAT;
+    }
+    
     struct tgl_file_location small;
     struct tgl_file_location big;
     memset (&small, 0, sizeof (small));
     memset (&big, 0, sizeof (big));
-    int users_num = -1;
-    int date = 0;
-    int version = -1;
 
-    if (x == CODE_chat) {
-      unsigned z = fetch_int ();
-      if (z == CODE_chat_photo_empty) {
-        small.dc = -2;
-        big.dc = -2;
-      } else {
-        assert (z == CODE_chat_photo);
-        tglf_fetch_file_location (TLS, &small);
-        tglf_fetch_file_location (TLS, &big);
-      }
-      users_num = fetch_int ();
-      date = fetch_int ();
-      if (fetch_bool ()) {
-        y |= FLAG_CHAT_IN_CHAT;
-      }
-      version = fetch_int ();
-    } else {
-      small.dc = -2;
-      big.dc = -2;
-      users_num = -1;
-      date = fetch_int ();
-      version = -1;
+    if (DS_C->photo) {
+      tglf_fetch_file_location_new (TLS, &small, DS_C->photo->photo_small);
+      tglf_fetch_file_location_new (TLS, &big, DS_C->photo->photo_big);
     }
-
-    bl_do_create_chat (TLS, C, y, s, l, users_num, date, version, &big, &small);
+    
+    bl_do_create_chat (TLS, C, 
+      y, 
+      DS_STR (DS_C->title),
+      DS_LVAL (DS_C->participants_count), 
+      DS_LVAL (DS_C->date), 
+      DS_LVAL (DS_C->version), 
+      &big, &small);
   } else {
-    if (x == CODE_chat_forbidden) {
-      bl_do_chat_forbid (TLS, C, 1);
-    } else {
-      bl_do_chat_forbid (TLS, C, 0);
-    }
-    int l = prefetch_strlen ();
-    char *s = fetch_str (l);
-    bl_do_chat_set_title (TLS, C, s, l);
+    bl_do_chat_forbid (TLS, C, DS_C->magic == CODE_chat_forbidden);
+    
+    bl_do_chat_set_title (TLS, C, 
+      DS_STR (DS_C->title)
+    );
     
     struct tgl_file_location small;
     struct tgl_file_location big;
     memset (&small, 0, sizeof (small));
     memset (&big, 0, sizeof (big));
+
+    if (DS_C->photo) {
+      tglf_fetch_file_location_new (TLS, &small, DS_C->photo->photo_small);
+      tglf_fetch_file_location_new (TLS, &big, DS_C->photo->photo_big);
+    }
     
-    if (x == CODE_chat) {
-      unsigned y = fetch_int ();
-      if (y == CODE_chat_photo_empty) {
-        small.dc = -2;
-        big.dc = -2;
-      } else {
-        assert (y == CODE_chat_photo);
-        tglf_fetch_file_location (TLS, &small);
-        tglf_fetch_file_location (TLS, &big);
-      }
-      bl_do_chat_set_photo (TLS, C, &big, &small);
-      int users_num = fetch_int ();
-      bl_do_chat_set_date (TLS, C, fetch_int ());
-      bl_do_chat_set_set_in_chat (TLS, C, fetch_bool ());
-      bl_do_chat_set_version (TLS, C, users_num, fetch_int ());
-    } else {
-      bl_do_chat_set_date (TLS, C, fetch_int ());
+    bl_do_chat_set_photo (TLS, C, 
+      &big, &small
+    );
+
+    bl_do_chat_set_date (TLS, C, 
+      DS_LVAL (DS_C->date)
+    );
+    
+    bl_do_chat_set_set_in_chat (TLS, C, 
+      DS_C->left && !DS_BVAL (DS_C->left)
+    );
+      
+    bl_do_chat_set_version (TLS, C, 
+      DS_LVAL (DS_C->participants_count),
+      DS_LVAL (DS_C->version)
+    );
+  }
+}
+
+void tglf_fetch_chat (struct tgl_state *TLS, struct tgl_chat *C) {
+  struct tl_ds_chat *DS_C = fetch_ds_type_chat (TYPE_TO_PARAM (chat));
+  tglf_fetch_chat_new (TLS, C, DS_C);
+  free_ds_type_chat (DS_C, TYPE_TO_PARAM (chat));
+}
+
+void tglf_fetch_chat_full_new (struct tgl_state *TLS, struct tgl_chat *C, struct tl_ds_messages_chat_full *DS_MCF) {
+  if (!DS_MCF) { return; }
+  struct tl_ds_chat_full *DS_CF = DS_MCF->full_chat;
+
+  C->id = TGL_MK_CHAT (DS_LVAL (DS_CF->id));
+
+  if (DS_MCF->users) {
+    int i;
+    for (i = 0; i < DS_LVAL (DS_MCF->users->cnt); i++) {
+      tglf_fetch_alloc_user_new (TLS, DS_MCF->users->data[i]);
     }
   }
+
+  if (DS_MCF->chats) {
+    int i;
+    for (i = 0; i < DS_LVAL (DS_MCF->chats->cnt); i++) {
+      tglf_fetch_alloc_chat_new (TLS, DS_MCF->chats->data[i]);
+    }
+  }
+
+  if (DS_CF->participants) {
+    struct tl_ds_chat_participants *DS_CP = DS_CF->participants;
+    bl_do_chat_set_admin (TLS, C, DS_LVAL (DS_CP->admin_id));
+  
+    int users_num = DS_LVAL (DS_CP->participants->cnt);
+    struct tgl_chat_user *users = talloc (sizeof (struct tgl_chat_user) * users_num);
+    int i;
+    for (i = 0; i < users_num; i++) {
+      users[i].user_id = DS_LVAL (DS_CP->participants->data[i]->user_id);
+      users[i].inviter_id = DS_LVAL (DS_CP->participants->data[i]->inviter_id);
+      users[i].date = DS_LVAL (DS_CP->participants->data[i]->date);
+    }
+    
+    if (DS_LVAL (DS_CP->version) > 0) {
+      bl_do_chat_set_participants (TLS, C, 
+        DS_LVAL (DS_CP->version), 
+        users_num, users
+      );
+    }
+
+    tfree (users, sizeof (struct tgl_chat_user) * users_num);
+  }
+  
+  bl_do_chat_set_full_photo_new (TLS, C, DS_CF->chat_photo);
 }
 
 void tglf_fetch_chat_full (struct tgl_state *TLS, struct tgl_chat *C) {
-  unsigned x = fetch_int ();
-  assert (x == CODE_messages_chat_full);
-  assert (fetch_int () == CODE_chat_full); 
-  C->id = TGL_MK_CHAT (fetch_int ());
-  x = fetch_int ();
-  int version = 0;
-  struct tgl_chat_user *users = 0;
-  int users_num = 0;
-  int admin_id = 0;
+  struct tl_ds_messages_chat_full *DS_MCF = fetch_ds_type_messages_chat_full (TYPE_TO_PARAM (messages_chat_full));
+  tglf_fetch_chat_full_new (TLS, C, DS_MCF);
+  free_ds_type_messages_chat_full (DS_MCF, TYPE_TO_PARAM (messages_chat_full));
+}
 
-  if (x == CODE_chat_participants) {
-    assert (fetch_int () == tgl_get_peer_id (C->id));
-    admin_id =  fetch_int ();
-    assert (fetch_int () == CODE_vector);
-    users_num = fetch_int ();
-    users = talloc (sizeof (struct tgl_chat_user) * users_num);
-    int i;
-    for (i = 0; i < users_num; i++) {
-      assert (fetch_int () == (int)CODE_chat_participant);
-      users[i].user_id = fetch_int ();
-      users[i].inviter_id = fetch_int ();
-      users[i].date = fetch_int ();
-    }
-    version = fetch_int ();
-  } else {
-    fetch_int ();
-  }
-  int *start = in_ptr;
-  assert (skip_type_any (TYPE_TO_PARAM (photo)) >= 0);
-  int *end = in_ptr;
-  assert (skip_type_any (TYPE_TO_PARAM (peer_notify_settings)) >= 0);
+void tglf_fetch_photo_size_new (struct tgl_state *TLS, struct tgl_photo_size *S, struct tl_ds_photo_size *DS_PS) {
+  memset (S, 0, sizeof (*S));
 
-  int n, i;
-  assert (fetch_int () == CODE_vector);
-  n = fetch_int ();
-  for (i = 0; i < n; i++) {
-    tglf_fetch_alloc_chat (TLS);
+  S->type = DS_STR_DUP (DS_PS->type);
+  S->w = DS_LVAL (DS_PS->w);
+  S->h = DS_LVAL (DS_PS->h);
+  S->size = DS_LVAL (DS_PS->size);
+  if (DS_PS->bytes) {
+    S->size = DS_PS->bytes->len;
   }
-  assert (fetch_int () == CODE_vector);
-  n = fetch_int ();
-  for (i = 0; i < n; i++) {
-    tglf_fetch_alloc_user (TLS);
-  }
-  if (admin_id) {
-    bl_do_chat_set_admin (TLS, C, admin_id);
-  }
-  if (version > 0) {
-    bl_do_chat_set_participants (TLS, C, version, users_num, users);
-    tfree (users, sizeof (struct tgl_chat_user) * users_num);
-  }
-  bl_do_chat_set_full_photo (TLS, C, start, 4 * (end - start));
 }
 
 void tglf_fetch_photo_size (struct tgl_state *TLS, struct tgl_photo_size *S) {
-  memset (S, 0, sizeof (*S));
-  unsigned x = fetch_int ();
-  assert (x == CODE_photo_size || x == CODE_photo_cached_size || x == CODE_photo_size_empty);
-  S->type = fetch_str_dup ();
-  if (x != CODE_photo_size_empty) {
-    tglf_fetch_file_location (TLS, &S->loc);
-    S->w = fetch_int ();
-    S->h = fetch_int ();
-    if (x == CODE_photo_size) {
-      S->size = fetch_int ();
-    } else {
-      S->size = prefetch_strlen ();
-      fetch_str (S->size);
-    }
-  }
+  struct tl_ds_photo_size *DS_PS = fetch_ds_type_photo_size (TYPE_TO_PARAM (photo_size));
+  tglf_fetch_photo_size_new (TLS, S, DS_PS);
+  free_ds_type_photo_size (DS_PS, TYPE_TO_PARAM (photo_size));
+}
+
+void tglf_fetch_geo_new (struct tgl_state *TLS, struct tgl_geo *G, struct tl_ds_geo_point *DS_GP) {
+  G->longitude = DS_LVAL (DS_GP->longitude);
+  G->latitude = DS_LVAL (DS_GP->latitude);
 }
 
 void tglf_fetch_geo (struct tgl_state *TLS, struct tgl_geo *G) {
-  unsigned x = fetch_int ();
-  if (x == CODE_geo_point) {
-    G->longitude = fetch_double ();
-    G->latitude = fetch_double ();
-  } else {
-    assert (x == CODE_geo_point_empty);
-    G->longitude = 0;
-    G->latitude = 0;
+  struct tl_ds_geo_point *DS_GP = fetch_ds_type_geo_point (TYPE_TO_PARAM (geo_point));
+  tglf_fetch_geo_new (TLS, G, DS_GP);
+  free_ds_type_geo_point (DS_GP, TYPE_TO_PARAM (geo_point));
+}
+
+void tglf_fetch_photo_new (struct tgl_state *TLS, struct tgl_photo *P, struct tl_ds_photo *DS_P) {
+  if (!DS_P) { return; }
+  memset (P, 0, sizeof (*P));
+  P->id = DS_LVAL (DS_P->id);
+  if (DS_P->magic == CODE_photo_empty) { return; }
+  P->access_hash = DS_LVAL (DS_P->access_hash);
+  P->user_id = DS_LVAL (DS_P->user_id);
+  P->date = DS_LVAL (DS_P->date);
+  P->caption = DS_STR_DUP (DS_P->caption);
+  tglf_fetch_geo_new (TLS, &P->geo, DS_P->geo);
+  
+  P->sizes_num = DS_LVAL (DS_P->sizes->cnt);
+  P->sizes = talloc (sizeof (struct tgl_photo_size) * P->sizes_num);
+  int i;
+  for (i = 0; i < P->sizes_num; i++) {
+    tglf_fetch_photo_size_new (TLS, &P->sizes[i], DS_P->sizes->data[i]);
   }
 }
 
 void tglf_fetch_photo (struct tgl_state *TLS, struct tgl_photo *P) {
-  memset (P, 0, sizeof (*P));
-  unsigned x = fetch_int ();
-  assert (x == CODE_photo_empty || x == CODE_photo);
-  P->id = fetch_long ();
-  if (x == CODE_photo_empty) { return; }
-  P->access_hash = fetch_long ();
-  P->user_id = fetch_int ();
-  P->date = fetch_int ();
-  P->caption = fetch_str_dup ();
-  tglf_fetch_geo (TLS, &P->geo);
-  assert (fetch_int () == CODE_vector);
-  P->sizes_num = fetch_int ();
-  P->sizes = talloc (sizeof (struct tgl_photo_size) * P->sizes_num);
-  int i;
-  for (i = 0; i < P->sizes_num; i++) {
-    tglf_fetch_photo_size (TLS, &P->sizes[i]);
-  }
+  struct tl_ds_photo *DS_P = fetch_ds_type_photo (TYPE_TO_PARAM (photo));
+  tglf_fetch_photo_new (TLS, P, DS_P);
+  free_ds_type_photo (DS_P, TYPE_TO_PARAM (photo));
+}
+
+void tglf_fetch_video_new (struct tgl_state *TLS, struct tgl_document *V, struct tl_ds_video *DS_V) {
+  if (!DS_V) { return; }
+
+  memset (V, 0, sizeof (*V));
+  V->flags = FLAG_DOCUMENT_VIDEO;
+  V->id = DS_LVAL (DS_V->id);
+  if (DS_V->magic == CODE_video_empty) { return; }
+
+  V->access_hash = DS_LVAL (DS_V->access_hash);
+  V->user_id = DS_LVAL (DS_V->user_id);
+  V->date = DS_LVAL (DS_V->date);
+  V->caption = DS_STR_DUP (DS_V->caption);
+  V->duration = DS_LVAL (DS_V->duration);
+  V->mime_type = DS_STR_DUP (DS_V->mime_type);
+  V->size = DS_LVAL (DS_V->size);
+  tglf_fetch_photo_size_new (TLS, &V->thumb, DS_V->thumb);
+
+  V->dc_id = DS_LVAL (DS_V->dc_id);
+  V->w = DS_LVAL (DS_V->w);
+  V->h = DS_LVAL (DS_V->h);
 }
 
 void tglf_fetch_video (struct tgl_state *TLS, struct tgl_document *V) {
-  memset (V, 0, sizeof (*V));
-  V->flags = FLAG_DOCUMENT_VIDEO;
-  unsigned x = fetch_int ();
-  V->id = fetch_long ();
-  if (x == CODE_video_empty) { return; }
-  V->access_hash = fetch_long ();
-  V->user_id = fetch_int ();
-  V->date = fetch_int ();
-  V->caption = fetch_str_dup ();
-  V->duration = fetch_int ();
-  V->mime_type = fetch_str_dup ();
-  V->size = fetch_int ();
-  tglf_fetch_photo_size (TLS, &V->thumb);
-  V->dc_id = fetch_int ();
-  V->w = fetch_int ();
-  V->h = fetch_int ();
+  struct tl_ds_video *DS_V = fetch_ds_type_video (TYPE_TO_PARAM (video));
+  tglf_fetch_video_new (TLS, V, DS_V);
+  free_ds_type_video (DS_V, TYPE_TO_PARAM (video));
 }
 
-void tglf_fetch_audio (struct tgl_state *TLS, struct tgl_document *V) {
-  memset (V, 0, sizeof (*V));
-  V->flags = FLAG_DOCUMENT_AUDIO;
-  unsigned x = fetch_int ();
-  V->id = fetch_long ();
-  if (x == CODE_audio_empty) { return; }
-  V->access_hash = fetch_long ();
-  V->user_id = fetch_int ();
-  V->date = fetch_int ();
-  V->duration = fetch_int ();
-  V->mime_type = fetch_str_dup ();
-  V->size = fetch_int ();
-  V->dc_id = fetch_int ();
+void tglf_fetch_audio_new (struct tgl_state *TLS, struct tgl_document *A, struct tl_ds_audio *DS_A) {
+  if (!DS_A) { return; }
+  memset (A, 0, sizeof (*A));
+  A->flags = FLAG_DOCUMENT_AUDIO;
+  A->id = DS_LVAL (DS_A->id);
+  if (DS_A->magic == CODE_audio_empty) { return; }
+  A->access_hash = DS_LVAL (DS_A->access_hash);
+  A->user_id = DS_LVAL (DS_A->user_id);
+  A->date = DS_LVAL (DS_A->date);
+  A->duration = DS_LVAL (DS_A->duration);
+  A->mime_type = DS_STR_DUP (DS_A->mime_type);
+  A->size = DS_LVAL (DS_A->size);
+  A->dc_id = DS_LVAL (DS_A->dc_id);
 }
 
-void tglf_fetch_document_attribute (struct tgl_state *TLS, struct tgl_document *V) {
-  unsigned x = fetch_int ();
-  switch (x) {
+void tglf_fetch_audio (struct tgl_state *TLS, struct tgl_document *A) {
+  struct tl_ds_audio *DS_A = fetch_ds_type_audio (TYPE_TO_PARAM (audio));
+  tglf_fetch_audio_new (TLS, A, DS_A);
+  free_ds_type_audio (DS_A, TYPE_TO_PARAM (audio));
+}
+
+void tglf_fetch_document_attribute_new (struct tgl_state *TLS, struct tgl_document *D, struct tl_ds_document_attribute *DS_DA) {
+  switch (DS_DA->magic) {
   case CODE_document_attribute_image_size:
-    V->flags |= FLAG_DOCUMENT_IMAGE;
-    V->w = fetch_int ();
-    V->h = fetch_int ();
+    D->flags |= FLAG_DOCUMENT_IMAGE;
+    D->w = DS_LVAL (DS_DA->w);
+    D->h = DS_LVAL (DS_DA->h);
     return;
   case CODE_document_attribute_animated:
-    V->flags |= FLAG_DOCUMENT_ANIMATED;
+    D->flags |= FLAG_DOCUMENT_ANIMATED;
     return;
   case CODE_document_attribute_sticker:
-    V->flags |= FLAG_DOCUMENT_STICKER;
+    D->flags |= FLAG_DOCUMENT_STICKER;
     return;
   case CODE_document_attribute_video:
-    V->flags |= FLAG_DOCUMENT_VIDEO;
-    V->duration = fetch_int ();
-    V->w = fetch_int ();
-    V->h = fetch_int ();
+    D->flags |= FLAG_DOCUMENT_VIDEO;
+    D->duration = DS_LVAL (DS_DA->duration);
+    D->w = DS_LVAL (DS_DA->w);
+    D->h = DS_LVAL (DS_DA->h);
     return;
   case CODE_document_attribute_audio:
-    V->flags |= FLAG_DOCUMENT_AUDIO;
-    V->duration = fetch_int ();
+    D->flags |= FLAG_DOCUMENT_AUDIO;
+    D->duration = DS_LVAL (DS_DA->duration);
     return;
   case CODE_document_attribute_filename:
-    V->caption = fetch_str_dup ();
+    D->caption = DS_STR_DUP (DS_DA->file_name);
     return;
   default:
-    vlogprintf (E_ERROR, "x = 0x%08x\n", x);
     assert (0);
   }
 }
 
-void tglf_fetch_document (struct tgl_state *TLS, struct tgl_document *V) {
-  memset (V, 0, sizeof (*V));
-  unsigned x = fetch_int ();
-  V->id = fetch_long ();
-  if (x == CODE_document_empty) { return; }
-  if (x == CODE_document_l19) {
-    V->access_hash = fetch_long ();
-    V->user_id = fetch_int ();
-    V->date = fetch_int ();
-    V->caption = fetch_str_dup ();
-    V->mime_type = fetch_str_dup ();
-    V->size = fetch_int ();
-    tglf_fetch_photo_size (TLS, &V->thumb);
-    V->dc_id = fetch_int ();
-  } else {
-    V->access_hash = fetch_long ();
-    V->date = fetch_int ();
-    V->mime_type = fetch_str_dup ();
-    V->size = fetch_int ();
-    tglf_fetch_photo_size (TLS, &V->thumb);
-    V->dc_id = fetch_int ();
+void tglf_fetch_document_attribute (struct tgl_state *TLS, struct tgl_document *D) {
+  struct tl_ds_document_attribute *DS_D = fetch_ds_type_document_attribute (TYPE_TO_PARAM (document_attribute));
+  tglf_fetch_document_attribute_new (TLS, D, DS_D);
+  free_ds_type_document_attribute (DS_D, TYPE_TO_PARAM (document_attribute));
+}
 
-    assert (fetch_int () == CODE_vector);
-    int num = fetch_int ();
+void tglf_fetch_document_new (struct tgl_state *TLS, struct tgl_document *D, struct tl_ds_document *DS_D) {
+  if (!DS_D) { return; }
+  memset (D, 0, sizeof (*D));
+  D->id = DS_LVAL (DS_D->id);
+  if (DS_D->magic == CODE_document_empty) { return; }
+
+  D->access_hash = DS_LVAL (DS_D->access_hash);
+  D->user_id = DS_LVAL (DS_D->user_id);
+  D->date = DS_LVAL (DS_D->date);
+  D->caption = DS_STR_DUP (DS_D->file_name);
+  D->mime_type = DS_STR_DUP (DS_D->mime_type);
+  D->size = DS_LVAL (DS_D->size);
+  D->dc_id = DS_LVAL (DS_D->dc_id);
+
+  tglf_fetch_photo_size_new (TLS, &D->thumb, DS_D->thumb);
+
+  if (DS_D->attributes) {
     int i;
-    for (i = 0; i < num; i++) {
-      tglf_fetch_document_attribute (TLS, V);
+    for (i = 0; i < DS_LVAL (DS_D->attributes->cnt); i++) {
+      tglf_fetch_document_attribute_new (TLS, D, DS_D->attributes->data[i]);
     }
   }
 }
 
-void tglf_fetch_message_action (struct tgl_state *TLS, struct tgl_message_action *M) {
+void tglf_fetch_document (struct tgl_state *TLS, struct tgl_document *D) {
+  struct tl_ds_document *DS_D = fetch_ds_type_document (TYPE_TO_PARAM (document));
+  tglf_fetch_document_new (TLS, D, DS_D);
+  free_ds_type_document (DS_D, TYPE_TO_PARAM (document));
+}
+
+void tglf_fetch_message_action_new (struct tgl_state *TLS, struct tgl_message_action *M, struct tl_ds_message_action *DS_MA) {
+  if (!DS_MA) { return; }
   memset (M, 0, sizeof (*M));
-  unsigned x = fetch_int ();
-  switch (x) {
+  
+  switch (DS_MA->magic) {
   case CODE_message_action_empty:
     M->type = tgl_message_action_none;
     break;
   case CODE_message_action_geo_chat_create:
     {
       M->type = tgl_message_action_geo_chat_create;
-      int l = prefetch_strlen (); // title
-      char *s = fetch_str (l);
-      int l2 = prefetch_strlen (); // checkin
-      char *s2 = fetch_str (l2);
-      vlogprintf (E_ERROR, "Message action: Created geochat %.*s in address %.*s. You are in magic land now, since nobody ever tested geochats in this app\n", l, s, l2, s2);
+      assert (0);
+      //vlogprintf (E_ERROR, "Message action: Created geochat %.*s in address %.*s. You are in magic land now, since nobody ever tested geochats in this app\n", DS_STR (DS_MA->title), DS_STR (DS_MA->address));
     }
     break;
   case CODE_message_action_geo_chat_checkin:
     M->type = tgl_message_action_geo_chat_checkin;
     break;
   case CODE_message_action_chat_create:
-    M->type = tgl_message_action_chat_create;
-    M->title = fetch_str_dup ();
-    assert (fetch_int () == (int)CODE_vector);
-    M->user_num = fetch_int ();
-    M->users = talloc (M->user_num * 4);
-    fetch_ints (M->users, M->user_num);
+    {
+      M->type = tgl_message_action_chat_create;
+      M->title = DS_STR_DUP (DS_MA->title);
+    
+      M->user_num = DS_LVAL (DS_MA->users->cnt);
+      M->users = talloc (M->user_num * 4);
+      int i;
+      for (i = 0; i < M->user_num; i++) {
+        M->users[i] = DS_LVAL (DS_MA->users->data[i]);
+      }
+    }
     break;
   case CODE_message_action_chat_edit_title:
     M->type = tgl_message_action_chat_edit_title;
-    M->new_title = fetch_str_dup ();
+    M->new_title = DS_STR_DUP (DS_MA->title);
     break;
   case CODE_message_action_chat_edit_photo:
     M->type = tgl_message_action_chat_edit_photo;
-    tglf_fetch_photo (TLS, &M->photo);
+    tglf_fetch_photo_new (TLS, &M->photo, DS_MA->photo);
     break;
   case CODE_message_action_chat_delete_photo:
     M->type = tgl_message_action_chat_delete_photo;
     break;
   case CODE_message_action_chat_add_user:
     M->type = tgl_message_action_chat_add_user;
-    M->user = fetch_int ();
+    M->user = DS_LVAL (DS_MA->user_id);
     break;
   case CODE_message_action_chat_delete_user:
     M->type = tgl_message_action_chat_delete_user;
-    M->user = fetch_int ();
+    M->user = DS_LVAL (DS_MA->user_id);
     break;
   default:
-    vlogprintf (E_ERROR, "type = %d\n", x);
     assert (0);
   }
+}
+
+void tglf_fetch_message_action (struct tgl_state *TLS, struct tgl_message_action *MA) {
+  struct tl_ds_message_action *DS_MA = fetch_ds_type_message_action (TYPE_TO_PARAM (message_action));
+  tglf_fetch_message_action_new (TLS, MA, DS_MA);
+  free_ds_type_message_action (DS_MA, TYPE_TO_PARAM (message_action));
 }
 
 void tglf_fetch_message_short (struct tgl_state *TLS, struct tgl_message *M) {
@@ -850,58 +866,60 @@ void tglf_fetch_message_short_chat (struct tgl_state *TLS, struct tgl_message *M
 }
 
 
-void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *M) {
+void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_message_media *DS_MM) {
+  if (!DS_MM) { return; }
   memset (M, 0, sizeof (*M));
-  //M->type = fetch_int ();
-  int x = fetch_int ();
-  switch (x) {
+  switch (DS_MM->magic) {
   case CODE_message_media_empty:
     M->type = tgl_message_media_none;
     break;
   case CODE_message_media_photo:
     M->type = tgl_message_media_photo;
-    tglf_fetch_photo (TLS, &M->photo);
+    tglf_fetch_photo_new (TLS, &M->photo, DS_MM->photo);
     break;
   case CODE_message_media_video:
     M->type = tgl_message_media_document;
-    tglf_fetch_video (TLS, &M->document);
+    tglf_fetch_video_new (TLS, &M->document, DS_MM->video);
     break;
   case CODE_message_media_audio:
     M->type = tgl_message_media_document;
-    tglf_fetch_audio (TLS, &M->document);
+    tglf_fetch_audio_new (TLS, &M->document, DS_MM->audio);
     break;
   case CODE_message_media_document:
     M->type = tgl_message_media_document;
-    tglf_fetch_document (TLS, &M->document);
+    tglf_fetch_document_new (TLS, &M->document, DS_MM->document);
     break;
   case CODE_message_media_geo:
     M->type = tgl_message_media_geo;
-    tglf_fetch_geo (TLS, &M->geo);
+    tglf_fetch_geo_new (TLS, &M->geo, DS_MM->geo);
     break;
   case CODE_message_media_contact:
     M->type = tgl_message_media_contact;
-    M->phone = fetch_str_dup ();
-    M->first_name = fetch_str_dup ();
-    M->last_name = fetch_str_dup ();
-    M->user_id = fetch_int ();
+    M->phone = DS_STR_DUP (DS_MM->phone_number);
+    M->first_name = DS_STR_DUP (DS_MM->first_name);
+    M->last_name = DS_STR_DUP (DS_MM->last_name);
+    M->user_id = DS_LVAL (DS_MM->user_id);
     break;
   case CODE_message_media_unsupported:
     M->type = tgl_message_media_unsupported;
-    M->data_size = prefetch_strlen ();
-    M->data = talloc (M->data_size);
-    memcpy (M->data, fetch_str (M->data_size), M->data_size);
     break;
   default:
-    vlogprintf (E_ERROR, "type = 0x%08x\n", M->type);
     assert (0);
   }
 }
 
-void tglf_fetch_message_media_encrypted (struct tgl_state *TLS, struct tgl_message_media *M) {
+void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *MM) {
+  struct tl_ds_message_media *DS_MM = fetch_ds_type_message_media (TYPE_TO_PARAM (message_media));
+  tglf_fetch_message_media_new (TLS, MM, DS_MM);
+  free_ds_type_message_media (DS_MM, TYPE_TO_PARAM (message_media));
+}
+
+void tglf_fetch_message_media_encrypted_new (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_decrypted_message_media *DS_DMM) {
+  if (!DS_DMM) { return; }
+
   memset (M, 0, sizeof (*M));
-  unsigned x = fetch_int ();
   int l;
-  switch (x) {
+  switch (DS_DMM->magic) {
   case CODE_decrypted_message_media_empty:
     M->type = tgl_message_media_none;
     //M->type = CODE_message_media_empty;
@@ -913,153 +931,53 @@ void tglf_fetch_message_media_encrypted (struct tgl_state *TLS, struct tgl_messa
     fetch_str (l); // thumb
     fetch_int (); // thumb_w
     fetch_int (); // thumb_h
-    M->encr_photo.w = fetch_int ();
-    M->encr_photo.h = fetch_int ();
-    M->encr_photo.size = fetch_int ();
-    
-    l = prefetch_strlen  ();
-    assert (l > 0);
+    M->encr_photo.w = DS_LVAL (DS_DMM->w);
+    M->encr_photo.h = DS_LVAL (DS_DMM->h);
+    M->encr_photo.size = DS_LVAL (DS_DMM->size);
+   
     M->encr_photo.key = talloc (32);
-    memset (M->encr_photo.key, 0, 32);
-    if (l <= 32) {
-      memcpy (M->encr_photo.key + (32 - l), fetch_str (l), l);
-    } else {
-      memcpy (M->encr_photo.key, fetch_str (l) + (l - 32), 32);
-    }
+    str_to_32 (M->encr_photo.key, DS_STR (DS_DMM->key));
     M->encr_photo.iv = talloc (32);
-    l = prefetch_strlen  ();
-    assert (l > 0);
-    memset (M->encr_photo.iv, 0, 32);
-    if (l <= 32) {
-      memcpy (M->encr_photo.iv + (32 - l), fetch_str (l), l);
-    } else {
-      memcpy (M->encr_photo.iv, fetch_str (l) + (l - 32), 32);
-    }
+    str_to_32 (M->encr_photo.iv, DS_STR (DS_DMM->iv));
     break;
   case CODE_decrypted_message_media_video:
   case CODE_decrypted_message_media_video_l12:
     //M->type = CODE_decrypted_message_media_video;
     M->type = tgl_message_media_document_encr;
     M->encr_document.flags = FLAG_DOCUMENT_VIDEO;
-
-    l = prefetch_strlen ();
-    fetch_str (l); // thumb
-    fetch_int (); // thumb_w
-    fetch_int (); // thumb_h
-    M->encr_document.duration = fetch_int ();
-    if (x == CODE_decrypted_message_media_video) {
-      M->encr_document.mime_type = fetch_str_dup ();
-    }
-    M->encr_document.w = fetch_int ();
-    M->encr_document.h = fetch_int ();
-    M->encr_document.size = fetch_int ();
     
-    l = prefetch_strlen  ();
-    assert (l > 0);
-    M->encr_document.key = talloc0 (32);
-    if (l <= 32) {
-      memcpy (M->encr_document.key + (32 - l), fetch_str (l), l);
-    } else {
-      memcpy (M->encr_document.key, fetch_str (l) + (l - 32), 32);
-    }
+    M->encr_document.w = DS_LVAL (DS_DMM->w);
+    M->encr_document.h = DS_LVAL (DS_DMM->h);
+    M->encr_document.size = DS_LVAL (DS_DMM->size);
+    M->encr_document.duration = DS_LVAL (DS_DMM->duration);
+    M->encr_document.mime_type = DS_STR_DUP (DS_DMM->mime_type);
+   
+    M->encr_document.key = talloc (32);
+    str_to_32 (M->encr_document.key, DS_STR (DS_DMM->key));
     M->encr_document.iv = talloc (32);
-    l = prefetch_strlen  ();
-    assert (l > 0);
-    memset (M->encr_document.iv, 0, 32);
-    if (l <= 32) {
-      memcpy (M->encr_document.iv + (32 - l), fetch_str (l), l);
-    } else {
-      memcpy (M->encr_document.iv, fetch_str (l) + (l - 32), 32);
-    }
+    str_to_32 (M->encr_document.iv, DS_STR (DS_DMM->iv));
     break;
-  case CODE_decrypted_message_media_audio:
-  case CODE_decrypted_message_media_audio_l12:
-    M->type = tgl_message_media_document_encr;
-    M->encr_document.flags = FLAG_DOCUMENT_AUDIO;
-    
-    M->encr_document.duration = fetch_int ();
-    if (x == CODE_decrypted_message_media_audio) {
-      M->encr_document.mime_type = fetch_str_dup ();
-    }
-    M->encr_document.size = fetch_int ();
-    
-    l = prefetch_strlen  ();
-    assert (l > 0);
-    M->encr_document.key = talloc0 (32);
-    if (l <= 32) {
-      memcpy (M->encr_document.key + (32 - l), fetch_str (l), l);
-    } else {
-      memcpy (M->encr_document.key, fetch_str (l) + (l - 32), 32);
-    }
-    M->encr_document.iv = talloc0 (32);
-    l = prefetch_strlen  ();
-    assert (l > 0);
-    if (l <= 32) {
-      memcpy (M->encr_document.iv + (32 - l), fetch_str (l), l);
-    } else {
-      memcpy (M->encr_document.iv, fetch_str (l) + (l - 32), 32);
-    }
-    break;
-  case CODE_decrypted_message_media_document:
-    M->type = tgl_message_media_document_encr;
-    M->encr_document.flags = 0;
-    l = prefetch_strlen ();
-    fetch_str (l); // thumb
-    fetch_int (); // thumb_w
-    fetch_int (); // thumb_h
-    M->encr_document.caption = fetch_str_dup ();
-    M->encr_document.mime_type = fetch_str_dup ();
-    M->encr_document.size = fetch_int ();
-    
-    l = prefetch_strlen  ();
-    assert (l > 0);
-    M->encr_document.key = talloc0 (32);
-    if (l <= 32) {
-      memcpy (M->encr_document.key + (32 - l), fetch_str (l), l);
-    } else {
-      memcpy (M->encr_document.key, fetch_str (l) + (l - 32), 32);
-    }
-    M->encr_document.iv = talloc0 (32);
-    l = prefetch_strlen  ();
-    assert (l > 0);
-    if (l <= 32) {
-      memcpy (M->encr_document.iv + (32 - l), fetch_str (l), l);
-    } else {
-      memcpy (M->encr_document.iv, fetch_str (l) + (l - 32), 32);
-    }
-    break;
-/*  case CODE_decrypted_message_media_file:
-    M->type = x;
-    M->encr_file.filename = fetch_str_dup ();
-    l = prefetch_strlen ();
-    fetch_str (l); // thumb
-    l = fetch_int ();
-    assert (l > 0);
-    M->encr_file.key = talloc (l);
-    memcpy (M->encr_file.key, fetch_str (l), l);
-    
-    l = fetch_int ();
-    assert (l > 0);
-    M->encr_file.iv = talloc (l);
-    memcpy (M->encr_file.iv, fetch_str (l), l);
-    break;
-  */  
   case CODE_decrypted_message_media_geo_point:
     M->type = tgl_message_media_geo;
-    M->geo.latitude = fetch_double ();
-    M->geo.longitude = fetch_double ();
+    M->geo.latitude = DS_LVAL (DS_DMM->latitude);
+    M->geo.longitude = DS_LVAL (DS_DMM->longitude);
     break;
   case CODE_decrypted_message_media_contact:
     M->type = tgl_message_media_contact;
-    M->phone = fetch_str_dup ();
-    M->first_name = fetch_str_dup ();
-    M->last_name = fetch_str_dup ();
-    M->user_id = fetch_int ();
+    M->phone = DS_STR_DUP (DS_DMM->phone_number);
+    M->first_name = DS_STR_DUP (DS_DMM->first_name);
+    M->last_name = DS_STR_DUP (DS_DMM->last_name);
+    M->user_id = DS_LVAL (DS_DMM->user_id);
     break;
   default:
-    vlogprintf (E_ERROR, "type = 0x%08x\n", x);
     assert (0);
   }
+}
+
+void tglf_fetch_message_media_encrypted (struct tgl_state *TLS, struct tgl_message_media *MM) {
+  struct tl_ds_decrypted_message_media *DS_DMM = fetch_ds_type_decrypted_message_media (TYPE_TO_PARAM (decrypted_message_media));
+  tglf_fetch_message_media_encrypted_new (TLS, MM, DS_DMM);
+  free_ds_type_decrypted_message_media (DS_DMM, TYPE_TO_PARAM (decrypted_message_media));
 }
 
 void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_message_action *M) {
@@ -1506,20 +1424,25 @@ static void increase_peer_size (struct tgl_state *TLS) {
   }
 }
 
-struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS) {
-  int data[2];
-  prefetch_data (data, 8);
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_USER (data[1]));
+struct tgl_user *tglf_fetch_alloc_user_new (struct tgl_state *TLS, struct tl_ds_user *DS_U) {
+  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->id)));
   if (!U) {
     TLS->users_allocated ++;
     U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_USER (data[1]);
+    U->id = TGL_MK_USER (DS_LVAL (DS_U->id));
     TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
   }
-  tglf_fetch_user (TLS, &U->user);
+  tglf_fetch_user_new (TLS, &U->user, DS_U);
   return &U->user;
+}
+
+struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS) {
+  struct tl_ds_user *DS_U = fetch_ds_type_user (TYPE_TO_PARAM (user));
+  struct tgl_user *res = tglf_fetch_alloc_user_new (TLS, DS_U);
+  free_ds_type_user (DS_U, TYPE_TO_PARAM (user));
+  return res;
 }
 
 struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS) {
@@ -1678,20 +1601,25 @@ struct tgl_message *tglf_fetch_alloc_message_short_chat (struct tgl_state *TLS) 
   return M;
 }
 
-struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS) {
-  int data[2];
-  prefetch_data (data, 8);
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_CHAT (data[1]));
+struct tgl_chat *tglf_fetch_alloc_chat_new (struct tgl_state *TLS, struct tl_ds_chat *DS_C) {
+  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_CHAT (DS_LVAL (DS_C->id)));
   if (!U) {
     TLS->chats_allocated ++;
     U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_CHAT (data[1]);
+    U->id = TGL_MK_CHAT (DS_LVAL (DS_C->id));
     TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
   }
-  tglf_fetch_chat (TLS, &U->chat);
+  tglf_fetch_chat_new (TLS, &U->chat, DS_C);
   return &U->chat;
+}
+
+struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS) {
+  struct tl_ds_chat *DS_C = fetch_ds_type_chat (TYPE_TO_PARAM (chat));
+  struct tgl_chat *res = tglf_fetch_alloc_chat_new (TLS, DS_C);
+  free_ds_type_chat (DS_C, TYPE_TO_PARAM (chat));
+  return res;
 }
 
 struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS) {

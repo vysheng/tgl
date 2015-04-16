@@ -58,6 +58,8 @@ struct tl_type {
 #define NAME_MAYBE_FALSE 0x27930a7b
 #define NAME_BOOL_FALSE 0xbc799737
 #define NAME_BOOL_TRUE 0x997275b5
+#define NAME_BYTES 0x0ee1379f
+
 
 #define FLAG_OPT_VAR (1 << 17)
 #define FLAG_EXCL (1 << 18)

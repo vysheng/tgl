@@ -51,6 +51,8 @@
 #include "tgl-binlog.h"
 #include "updates.h"
 #include "auto.h"
+#include "auto/auto-types.h"
+#include "auto/auto-skip.h"
 #include "tgl.h"
 #include "tg-mime-types.h"
 #include "mtproto-utils.h"

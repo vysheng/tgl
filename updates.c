@@ -22,6 +22,8 @@
 #include "mtproto-common.h"
 #include "tgl-binlog.h"
 #include "auto.h"
+#include "auto/auto-types.h"
+#include "auto/auto-skip.h"
 #include "tgl-structures.h"
 #include "tree.h"
 
