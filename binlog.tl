@@ -87,5 +87,8 @@ binlog.msgUpdate#6dd4d85f lid:long = binlog.Update;
 
 binlog.resetAuthorization = binlog.Update;
 
+binlog.messageNew#427cfcdb flags:# lid:long from_id:int to_type:int to_id:int fwd_from_id:flags.16?int fwd_date:flags.16?int date:int message:flags.17?string media:flags.18?MessageMedia action:flags.19?MessageAction = binlog.Update;
+
+binlog.messageEncrNew#6cf7cabc flags:# lid:long from_id:int to_type:int to_id:int date:int message:flags.17?string encr_media:flags.18?DecryptedMessageMedia encr_action:flags.19?DecryptedMessageAction file:flags.20?EncryptedFile = binlog.Update;
 //binlog.addDc id:int ip:string port:int auth_key_id:long auth_key:64*[int] = binlog.Update;
 ---functions---

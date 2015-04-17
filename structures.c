@@ -93,8 +93,9 @@ char *tgls_default_create_print_name (struct tgl_state *TLS, tgl_peer_id_t id, c
   return tstrdup (s);
 }
 
-enum tgl_typing_status tglf_fetch_typing (void) {
-  switch (fetch_int ()) {
+enum tgl_typing_status tglf_fetch_typing_new (struct tl_ds_send_message_action *DS_SMA) {
+  if (!DS_SMA) { return 0; }
+  switch (DS_SMA->magic) {
   case CODE_send_message_typing_action:
     return tgl_typing_typing;
   case CODE_send_message_cancel_action:
@@ -119,6 +120,13 @@ enum tgl_typing_status tglf_fetch_typing (void) {
     assert (0);
     return tgl_typing_none;
   }
+}
+
+enum tgl_typing_status tglf_fetch_typing (void) {
+  struct tl_ds_send_message_action *DS_SMA = fetch_ds_type_send_message_action (TYPE_TO_PARAM (send_message_action));
+  enum tgl_typing_status res = tglf_fetch_typing_new (DS_SMA);
+  free_ds_type_send_message_action (DS_SMA, TYPE_TO_PARAM (send_message_action));
+  return res;
 }
 
 /* {{{ Fetch */
@@ -555,6 +563,8 @@ void tglf_fetch_photo_size_new (struct tgl_state *TLS, struct tgl_photo_size *S,
   if (DS_PS->bytes) {
     S->size = DS_PS->bytes->len;
   }
+
+  tglf_fetch_file_location_new (TLS, &S->loc, DS_PS->location); 
 }
 
 void tglf_fetch_photo_size (struct tgl_state *TLS, struct tgl_photo_size *S) {
@@ -918,7 +928,6 @@ void tglf_fetch_message_media_encrypted_new (struct tgl_state *TLS, struct tgl_m
   if (!DS_DMM) { return; }
 
   memset (M, 0, sizeof (*M));
-  int l;
   switch (DS_DMM->magic) {
   case CODE_decrypted_message_media_empty:
     M->type = tgl_message_media_none;
@@ -926,11 +935,7 @@ void tglf_fetch_message_media_encrypted_new (struct tgl_state *TLS, struct tgl_m
     break;
   case CODE_decrypted_message_media_photo:
     M->type = tgl_message_media_photo_encr;
-    //M->type = x;
-    l = prefetch_strlen ();
-    fetch_str (l); // thumb
-    fetch_int (); // thumb_w
-    fetch_int (); // thumb_h
+    
     M->encr_photo.w = DS_LVAL (DS_DMM->w);
     M->encr_photo.h = DS_LVAL (DS_DMM->h);
     M->encr_photo.size = DS_LVAL (DS_DMM->size);
@@ -980,22 +985,22 @@ void tglf_fetch_message_media_encrypted (struct tgl_state *TLS, struct tgl_messa
   free_ds_type_decrypted_message_media (DS_DMM, TYPE_TO_PARAM (decrypted_message_media));
 }
 
-void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_message_action *M) {
-  unsigned x = fetch_int ();
-  switch (x) {
+void tglf_fetch_message_action_encrypted_new (struct tgl_state *TLS, struct tgl_message_action *M, struct tl_ds_decrypted_message_action *DS_DMA) {
+  if (!DS_DMA) { return; }
+  
+  switch (DS_DMA->magic) {
   case CODE_decrypted_message_action_set_message_t_t_l:
     M->type = tgl_message_action_set_message_ttl;
-    M->ttl = fetch_int ();
+    M->ttl = DS_LVAL (DS_DMA->ttl_seconds);
     break;
   case CODE_decrypted_message_action_read_messages: 
     M->type = tgl_message_action_read_messages;
     { 
-      assert (fetch_int () == CODE_vector);
-      int n = fetch_int ();
-      M->read_cnt = n;
-      while (n -- > 0) {
-        long long id = fetch_long ();
-        struct tgl_message *N = tgl_message_get (TLS, id);
+      M->read_cnt = DS_LVAL (DS_DMA->random_ids->cnt);
+      
+      int i;
+      for (i = 0; i < M->read_cnt; i++) {
+        struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_DMA->random_ids->data[i]));
         if (N) {
           N->unread = 0;
         }
@@ -1004,163 +1009,118 @@ void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_mess
     break;
   case CODE_decrypted_message_action_delete_messages: 
     M->type = tgl_message_action_delete_messages;
-    { 
-      assert (fetch_int () == CODE_vector);
-      int n = fetch_int ();
-      M->delete_cnt = n;
-      while (n -- > 0) {
-        fetch_long ();
-      }
-    }
     break;
   case CODE_decrypted_message_action_screenshot_messages: 
     M->type = tgl_message_action_screenshot_messages;
     { 
-      assert (fetch_int () == CODE_vector);
-      int n = fetch_int ();
-      M->screenshot_cnt = n;
-      while (n -- > 0) {
-        fetch_long ();
-      }
+      M->screenshot_cnt = DS_LVAL (DS_DMA->random_ids->cnt);
     }
     break;
   case CODE_decrypted_message_action_notify_layer: 
     M->type = tgl_message_action_notify_layer;
-    M->layer = fetch_int ();
+    M->layer = DS_LVAL (DS_DMA->layer);
     break;
   case CODE_decrypted_message_action_flush_history:
     M->type = tgl_message_action_flush_history;
     break;
   case CODE_decrypted_message_action_typing:
     M->type = tgl_message_action_typing;
-    M->typing = tglf_fetch_typing ();
+    M->typing = tglf_fetch_typing_new (DS_DMA->action);
     break;
   case CODE_decrypted_message_action_resend:
     M->type = tgl_message_action_resend;
-    M->start_seq_no = fetch_int ();
-    M->end_seq_no = fetch_int ();
+    M->start_seq_no = DS_LVAL (DS_DMA->start_seq_no);
+    M->end_seq_no = DS_LVAL (DS_DMA->end_seq_no);
     break;
   case CODE_decrypted_message_action_noop:
     M->type = tgl_message_action_noop;
     break;
   case CODE_decrypted_message_action_request_key:
     M->type = tgl_message_action_request_key;
-    M->exchange_id = fetch_long ();
+    
+    M->exchange_id = DS_LVAL (DS_DMA->exchange_id);
     M->g_a = talloc (256);
-    fetch256 (M->g_a);
+    str_to_256 (M->g_a, DS_STR (DS_DMA->g_a));
     break;
   case CODE_decrypted_message_action_accept_key:
     M->type = tgl_message_action_accept_key;
-    M->exchange_id = fetch_long ();
+    
+    M->exchange_id = DS_LVAL (DS_DMA->exchange_id);
     M->g_a = talloc (256);
-    fetch256 (M->g_a);
-    M->key_fingerprint = fetch_long ();
+    str_to_256 (M->g_a, DS_STR (DS_DMA->g_b));
+    M->key_fingerprint = DS_LVAL (DS_DMA->key_fingerprint);
     break;
   case CODE_decrypted_message_action_commit_key:
     M->type = tgl_message_action_commit_key;
-    M->exchange_id = fetch_long ();
-    M->key_fingerprint = fetch_long ();
+    
+    M->exchange_id = DS_LVAL (DS_DMA->exchange_id);
+    M->key_fingerprint = DS_LVAL (DS_DMA->key_fingerprint);
     break;
   case CODE_decrypted_message_action_abort_key:
     M->type = tgl_message_action_abort_key;
-    M->exchange_id = fetch_long ();
+    
+    M->exchange_id = DS_LVAL (DS_DMA->exchange_id);
     break;
   default:
-    vlogprintf (E_ERROR, "x = 0x%08x\n", x);
     assert (0);
   }
 }
 
-tgl_peer_id_t tglf_fetch_peer_id (struct tgl_state *TLS) {
-  unsigned x =fetch_int ();
-  if (x == CODE_peer_user) {
-    return TGL_MK_USER (fetch_int ());
+void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_message_action *MA) {
+  struct tl_ds_decrypted_message_action *DS_DMA = fetch_ds_type_decrypted_message_action (TYPE_TO_PARAM (decrypted_message_action));
+  tglf_fetch_message_action_encrypted_new (TLS, MA, DS_DMA);
+  free_ds_type_decrypted_message_action (DS_DMA, TYPE_TO_PARAM (decrypted_message_action));
+}
+
+tgl_peer_id_t tglf_fetch_peer_id_new (struct tgl_state *TLS, struct tl_ds_peer *DS_P) {
+  if (DS_P->magic == CODE_peer_user) {
+    return TGL_MK_USER (DS_LVAL (DS_P->user_id));
   } else {
-    assert (CODE_peer_chat);
-    return TGL_MK_CHAT (fetch_int ());
+    return TGL_MK_CHAT (DS_LVAL (DS_P->chat_id));
   }
+}
+
+tgl_peer_id_t tglf_fetch_peer_id (struct tgl_state *TLS) {
+  struct tl_ds_peer *DS_P = fetch_ds_type_peer (TYPE_TO_PARAM (peer));
+  tgl_peer_id_t id = tglf_fetch_peer_id_new (TLS, DS_P);
+  free_ds_type_peer (DS_P, TYPE_TO_PARAM (peer));
+  return id;
+}
+
+void tglf_fetch_message_new (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_message *DS_M) {
+  if (!DS_M || DS_M->magic == CODE_message_empty) { return; }
+  
+  assert (M->id == DS_LVAL (DS_M->id));
+  
+  tgl_peer_id_t to_id = tglf_fetch_peer_id_new (TLS, DS_M->to_id);
+
+  int new = !(M->flags & FLAG_CREATED);
+
+  if (new) {
+    bl_do_create_message_new (TLS, DS_LVAL (DS_M->id),
+      DS_LVAL (DS_M->from_id), 
+      tgl_get_peer_type (to_id), tgl_get_peer_id (to_id),
+      DS_LVAL (DS_M->fwd_from_id), DS_LVAL (DS_M->fwd_date),
+      DS_LVAL (DS_M->date),
+      DS_STR (DS_M->message),
+      DS_M->media,
+      DS_M->action,
+      NULL,
+      DS_LVAL (DS_M->flags) & 3
+    );
+  }
+  
+  bl_do_set_unread (TLS, M, DS_LVAL (DS_M->flags) & 1);
 }
 
 void tglf_fetch_message (struct tgl_state *TLS, struct tgl_message *M) {
-  unsigned x = fetch_int ();
-  assert (x == CODE_message_empty || x == CODE_message || x == CODE_message_forwarded || x == CODE_message_service);
-  int flags = 0;
-  if (x != CODE_message_empty) {
-    flags = fetch_int ();
-  }
-  int id = fetch_int ();
-  assert (M->id == id);
-  if (x == CODE_message_empty) {
-    return;
-  }
-  int fwd_from_id = 0;
-  int fwd_date = 0;
-
-  if (x == CODE_message_forwarded) {
-    fwd_from_id = fetch_int ();
-    fwd_date = fetch_int ();
-  }
-  int from_id = fetch_int ();
-  tgl_peer_id_t to_id = tglf_fetch_peer_id (TLS);
-
-  //fetch_bool (); // out.
-
-  //int unread = fetch_bool ();
-  int date = fetch_int ();
-
-  int unread = (flags & 1) != 0;
-  int new = !(M->flags & FLAG_CREATED);
-
-  if (x == CODE_message_service) {
-    int *start = in_ptr;
-
-    assert (skip_type_any (TYPE_TO_PARAM (message_action)) >= 0);
-    
-    if (new) {
-      if (fwd_from_id) {
-        bl_do_create_message_service_fwd (TLS, id, from_id, tgl_get_peer_type (to_id), tgl_get_peer_id (to_id), date, fwd_from_id, fwd_date, unread, start, (in_ptr - start));
-      } else {
-        bl_do_create_message_service (TLS, id, from_id, tgl_get_peer_type (to_id), tgl_get_peer_id (to_id), date, unread, start, (in_ptr - start));
-      }
-    }
-  } else {
-    int l = prefetch_strlen ();
-    char *s = fetch_str (l);
-    int *start = in_ptr;
-    
-    assert (skip_type_any (TYPE_TO_PARAM (message_media)) >= 0);
-
-    if (new) {
-      if (fwd_from_id) {
-        bl_do_create_message_media_fwd (TLS, id, from_id, tgl_get_peer_type (to_id), tgl_get_peer_id (to_id), date, fwd_from_id, fwd_date, unread, l, s, start, in_ptr - start);
-      } else {
-        bl_do_create_message_media (TLS, id, from_id, tgl_get_peer_type (to_id), tgl_get_peer_id (to_id), date, unread, l, s, start, in_ptr - start);
-      }
-    }
-  }
-  bl_do_set_unread (TLS, M, unread);
+  struct tl_ds_message *DS_M = fetch_ds_type_message (TYPE_TO_PARAM (message));
+  tglf_fetch_message_new (TLS, M, DS_M);
+  free_ds_type_message (DS_M, TYPE_TO_PARAM (message));
 }
 
 void tglf_tglf_fetch_geo_message (struct tgl_state *TLS, struct tgl_message *M) {
-  memset (M, 0, sizeof (*M));
-  unsigned x = fetch_int ();
-  assert (x == CODE_geo_chat_message_empty || x == CODE_geo_chat_message || x == CODE_geo_chat_message_service);
-  M->to_id = TGL_MK_GEO_CHAT (fetch_int ());
-  M->id = fetch_int ();
-  if (x == CODE_geo_chat_message_empty) {
-    M->flags |= 1;
-    return;
-  }
-  M->from_id = TGL_MK_USER (fetch_int ());
-  M->date = fetch_int ();
-  if (x == CODE_geo_chat_message_service) {
-    M->service = 1;
-    tglf_fetch_message_action (TLS, &M->action);
-  } else {
-    M->message = fetch_str_dup ();
-    M->message_len = strlen (M->message);
-    tglf_fetch_message_media (TLS, &M->media);
-  }
+  assert (0);
 }
 
 static int *decr_ptr;
@@ -1225,184 +1185,129 @@ static int decrypt_encrypted_message (struct tgl_secret_chat *E) {
   return 0;
 }
 
-void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M) {
-  unsigned x = fetch_int ();
-  assert (x == CODE_encrypted_message || x == CODE_encrypted_message_service);
-  unsigned sx = x;
+void tglf_fetch_encrypted_message_new (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_encrypted_message *DS_EM) {
+  if (DS_EM) { return; }
+
   int new = !(M->flags & FLAG_CREATED);
-  long long id = fetch_long ();
-  int to_id = fetch_int ();
-  tgl_peer_id_t chat = TGL_MK_ENCR_CHAT (to_id);
-  int date = fetch_int ();
+  if (!new) {
+    return;
+  }
   
-  tgl_peer_t *P = tgl_peer_get (TLS, chat);
-  if (!P) {
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (DS_LVAL (DS_EM->chat_id)));
+  if (!P || P->encr_chat.state != sc_ok) {
     vlogprintf (E_WARNING, "Encrypted message to unknown chat. Dropping\n");
-    M->flags |= FLAG_MESSAGE_EMPTY;
+    return;
   }
 
-
-  int len = prefetch_strlen ();
-  assert ((len & 15) == 8);
-  decr_ptr = (void *)fetch_str (len);
-  decr_end = decr_ptr + (len / 4);
-  int ok = 0;
-  if (P) {
-    if (P->encr_chat.exchange_state == tgl_sce_committed && P->encr_chat.key_fingerprint == *(long long *)decr_ptr) {
-      tgl_do_confirm_exchange (TLS, (void *)P, 0);
-      assert (P->encr_chat.exchange_state == tgl_sce_none);
-    }
-    long long key_fingerprint = P->encr_chat.exchange_state != tgl_sce_committed ? P->encr_chat.key_fingerprint : P->encr_chat.exchange_key_fingerprint;
-    if (*(long long *)decr_ptr != key_fingerprint) {
-      vlogprintf (E_WARNING, "Encrypted message with bad fingerprint to chat %s\n", P->print_name);
-      P = 0;
-    }
-    decr_ptr += 2;
+  decr_ptr = (void *)DS_EM->bytes->data;
+  decr_end = decr_ptr + (DS_EM->bytes->len / 4);
+  
+  if (P->encr_chat.exchange_state == tgl_sce_committed && P->encr_chat.key_fingerprint == *(long long *)decr_ptr) {
+    tgl_do_confirm_exchange (TLS, (void *)P, 0);
+    assert (P->encr_chat.exchange_state == tgl_sce_none);
   }
-  int l = 0;
-  char *s = 0;
-  int *start = 0;
-  int *end = 0;
-  x = 0;
-  int out_seq_no = -1;
-  int in_seq_no = -1;
-  int drop = 0;
-  if (P && decrypt_encrypted_message (&P->encr_chat) >= 0 && new) {
-    ok = 1;
-    int *save_in_ptr = in_ptr;
-    int *save_in_end = in_end;
-    in_ptr = decr_ptr;
-    int ll = fetch_int ();
-    in_end = in_ptr + ll; 
-    x = fetch_int ();
-    if (x == CODE_decrypted_message_layer) {
-      ll = prefetch_strlen ();
-      fetch_str (ll); // random_bytes
-
-      int layer = fetch_int ();
-      assert (layer >= 0);
-      if (P && ((P->flags) & FLAG_CREATED)) {
-        bl_do_encr_chat_set_layer (TLS, (void *)P, layer);
-      }
-      //x = fetch_int ();
-      //assert (x == CODE_decrypted_message || x == CODE_decrypted_message_service);
-      
-
-      out_seq_no = fetch_int ();
-      in_seq_no = fetch_int ();
-      if (in_seq_no / 2 != P->encr_chat.in_seq_no) {
-        vlogprintf (E_WARNING, "Hole in seq in secret chat. in_seq_no = %d, expect_seq_no = %d\n", in_seq_no / 2, P->encr_chat.in_seq_no);
-        drop = 1;
-      }
-      if ((in_seq_no & 1)  != 1 - (P->encr_chat.admin_id == TLS->our_id) || 
-          (out_seq_no & 1) != (P->encr_chat.admin_id == TLS->our_id)) {
-        vlogprintf (E_WARNING, "Bad msg admin\n");
-        drop = 1;
-      }
-      if (out_seq_no / 2 > P->encr_chat.out_seq_no) {
-        vlogprintf (E_WARNING, "In seq no is bigger than our's out seq no (out_seq_no = %d, our_out_seq_no = %d). Drop\n", out_seq_no / 2, P->encr_chat.out_seq_no);
-        drop = 1;
-      }
-      if (out_seq_no / 2 < P->encr_chat.last_in_seq_no) {
-        vlogprintf (E_WARNING, "Clients in_seq_no decreased (out_seq_no = %d, last_out_seq_no = %d). Drop\n", out_seq_no / 2, P->encr_chat.last_in_seq_no);
-        drop = 1;
-      }
-      //vlogprintf (E_WARNING, "in = %d, out = %d\n", in_seq_no, out_seq_no);
-      //P->encr_chat.in_seq_no = in_seq_no / 2;
-      x = fetch_int ();
-      vlogprintf (E_DEBUG - 2, "layer = %d, in = %d, out = %d\n", layer, in_seq_no, out_seq_no);
-    }
-    if (!(x == CODE_decrypted_message || x == CODE_decrypted_message_service || x == CODE_decrypted_message_l16 || x == CODE_decrypted_message_service_l16)) {
-      vlogprintf (E_ERROR, "Incorrect message: x = 0x%08x\n", x);
-      drop = 1;
-    }
-    //assert (id == fetch_long ());
-    long long new_id = fetch_long ();
-    if (!drop && P && P->encr_chat.layer >= 17) {
-      if (new_id != id) {
-        vlogprintf (E_ERROR, "Incorrect message: id = %lld, new_id = %lld\n", id, new_id);
-        drop = 1;
-      }
-    }
-    if (!drop) { 
-      if (x == CODE_decrypted_message || x == CODE_decrypted_message_service) {
-        if (x == CODE_decrypted_message) {
-          fetch_int (); // ttl
-        }
-      } else {
-        ll = prefetch_strlen ();
-        fetch_str (ll); // random_bytes
-      }
-      if (x == CODE_decrypted_message || x == CODE_decrypted_message_l16) {
-        l = prefetch_strlen ();
-        s = fetch_str (l);
-        start = in_ptr;
-        assert (skip_type_any (TYPE_TO_PARAM (decrypted_message_media)) >= 0);
-        end = in_ptr;
-      } else {
-        start = in_ptr;
-        if (skip_type_any (TYPE_TO_PARAM (decrypted_message_action)) < 0) {
-          vlogprintf (E_ERROR, "Can not decrypt: Skipped %ld int out of %ld. Magic = 0x%08x\n", (long)(in_ptr - start), (long)(in_end - start), *start);
-          drop = 1;
-        }
-        end = in_ptr;
-      }
-    }
-    in_ptr = save_in_ptr;
-    in_end = save_in_end;
-  } 
-  if (sx == CODE_encrypted_message) {
-    if (ok) {
-      int *start_file = in_ptr;
-      assert (skip_type_any (TYPE_TO_PARAM (encrypted_file)) >= 0);
-      if (x == CODE_decrypted_message || x == CODE_decrypted_message_l16) {
-        if (!drop) {
-          bl_do_create_message_media_encr (TLS, id, P->encr_chat.user_id, TGL_PEER_ENCR_CHAT, to_id, date, l, s, start, end - start, start_file, in_ptr - start_file);
-        }
-      } else if (x == CODE_decrypted_message_service || x == CODE_decrypted_message_service_l16) {
-        if (!drop) {
-          bl_do_create_message_service_encr (TLS, id, P->encr_chat.user_id, TGL_PEER_ENCR_CHAT, to_id, date, start, end - start);
-        }
-      }
-    } else {
-      if (!drop) {
-        assert (skip_type_any (TYPE_TO_PARAM (encrypted_file)) >= 0);
-        M->media.type = CODE_message_media_empty;
-      }
-    }    
-  } else {
-    if (ok && (x == CODE_decrypted_message_service || x == CODE_decrypted_message_service_l16)) {
-      if (!drop) {
-        bl_do_create_message_service_encr (TLS, id, P->encr_chat.user_id, TGL_PEER_ENCR_CHAT, to_id, date, start, end - start);
-      }
-    }
+  
+  long long key_fingerprint = P->encr_chat.exchange_state != tgl_sce_committed ? P->encr_chat.key_fingerprint : P->encr_chat.exchange_key_fingerprint;
+  if (*(long long *)decr_ptr != key_fingerprint) {
+    vlogprintf (E_WARNING, "Encrypted message with bad fingerprint to chat %s\n", P->print_name);
+    return;
   }
-  if (!drop) {
-    if (in_seq_no >= 0 && out_seq_no >= 0) {
-      bl_do_encr_chat_update_seq (TLS, (void *)P, in_seq_no / 2 + 1, out_seq_no / 2);
-      assert (P->encr_chat.in_seq_no == in_seq_no / 2 + 1);
-    }
+  
+  decr_ptr += 2;
+
+  if (decrypt_encrypted_message (&P->encr_chat) < 0) {
+    return;
   }
+  
+  int *save_in_ptr = in_ptr;
+  int *save_in_end = in_end;
+    
+  in_ptr = decr_ptr;
+  int ll = fetch_int ();
+  in_end = in_ptr + ll; 
+
+  if (skip_type_decrypted_message_layer (TYPE_TO_PARAM (decrypted_message_layer)) < 0 || in_ptr != in_end) {
+    vlogprintf (E_WARNING, "can not fetch message\n");
+    return;
+  }
+
+  in_ptr = decr_ptr;
+
+  struct tl_ds_decrypted_message_layer *DS_DML = fetch_ds_type_decrypted_message_layer (TYPE_TO_PARAM (decrypted_message_layer));
+  assert (DS_DML);
+
+  in_ptr = save_in_ptr;
+  in_end = save_in_end;
+
+  bl_do_encr_chat_set_layer (TLS, (void *)P, DS_LVAL (DS_DML->layer));
+
+  int in_seq_no = DS_LVAL (DS_DML->in_seq_no);
+  int out_seq_no = DS_LVAL (DS_DML->out_seq_no);
+  if (in_seq_no / 2 != P->encr_chat.in_seq_no) {
+    vlogprintf (E_WARNING, "Hole in seq in secret chat. in_seq_no = %d, expect_seq_no = %d\n", in_seq_no / 2, P->encr_chat.in_seq_no);
+    free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
+    return;
+  }
+  if ((in_seq_no & 1)  != 1 - (P->encr_chat.admin_id == TLS->our_id) || 
+      (out_seq_no & 1) != (P->encr_chat.admin_id == TLS->our_id)) {
+    vlogprintf (E_WARNING, "Bad msg admin\n");
+    free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
+    return;
+  }
+  if (out_seq_no / 2 > P->encr_chat.out_seq_no) {
+    vlogprintf (E_WARNING, "In seq no is bigger than our's out seq no (out_seq_no = %d, our_out_seq_no = %d). Drop\n", out_seq_no / 2, P->encr_chat.out_seq_no);
+    free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
+    return;
+  }
+  if (out_seq_no / 2 < P->encr_chat.last_in_seq_no) {
+    vlogprintf (E_WARNING, "Clients in_seq_no decreased (out_seq_no = %d, last_out_seq_no = %d). Drop\n", out_seq_no / 2, P->encr_chat.last_in_seq_no);
+    free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
+    return;
+  }
+
+  struct tl_ds_decrypted_message *DS_DM = DS_DML->message;
+  if (M->id != DS_LVAL (DS_DM->random_id)) {
+    vlogprintf (E_ERROR, "Incorrect message: id = %lld, new_id = %lld\n", M->id, DS_LVAL (DS_DM->random_id));
+    free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
+    return;
+  }
+  
+  bl_do_create_message_encr_new (TLS, M->id, P->encr_chat.user_id, TGL_PEER_ENCR_CHAT, tgl_get_peer_id (P->id), DS_LVAL (DS_EM->date), DS_STR (DS_DM->message), DS_DM->media, DS_DM->action, DS_EM->file, 0);
+
+  if (in_seq_no >= 0 && out_seq_no >= 0) {
+    bl_do_encr_chat_update_seq (TLS, (void *)P, in_seq_no / 2 + 1, out_seq_no / 2);
+    assert (P->encr_chat.in_seq_no == in_seq_no / 2 + 1);
+  }
+  
+  free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
 }
 
-void tglf_fetch_encrypted_message_file (struct tgl_state *TLS, struct tgl_message_media *M) {
-  unsigned x = fetch_int ();
-  assert (x == CODE_encrypted_file || x == CODE_encrypted_file_empty);
-  if (x == CODE_encrypted_file_empty) {
+void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M) {
+  struct tl_ds_encrypted_message *DS_EM = fetch_ds_type_encrypted_message (TYPE_TO_PARAM (encrypted_message));
+  tglf_fetch_encrypted_message_new (TLS, M, DS_EM);
+  free_ds_type_encrypted_message (DS_EM, TYPE_TO_PARAM (encrypted_message));
+}
+
+void tglf_fetch_encrypted_message_file_new (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_encrypted_file *DS_EF) {
+  if (DS_EF->magic == CODE_encrypted_file_empty) {
     assert (M->type != tgl_message_media_photo_encr && M->type != tgl_message_media_document_encr);
   } else {
     assert (M->type == tgl_message_media_document_encr || M->type == tgl_message_media_photo_encr);
 
-    M->encr_photo.id = fetch_long();
-    M->encr_photo.access_hash = fetch_long();
+    M->encr_photo.id = DS_LVAL (DS_EF->id);
+    M->encr_photo.access_hash = DS_LVAL (DS_EF->access_hash);
     if (!M->encr_photo.size) {
-      M->encr_photo.size = fetch_int ();
-    } else {
-      fetch_int ();
+      M->encr_photo.size = DS_LVAL (DS_EF->size);
     }
-    M->encr_photo.dc_id = fetch_int();
-    M->encr_photo.key_fingerprint = fetch_int();
+    M->encr_photo.dc_id = DS_LVAL (DS_EF->dc_id);
+    M->encr_photo.key_fingerprint = DS_LVAL (DS_EF->key_fingerprint);
   }
+}
+
+void tglf_fetch_encrypted_message_file (struct tgl_state *TLS, struct tgl_message_media *M) {
+  struct tl_ds_encrypted_file *DS_EF = fetch_ds_type_encrypted_file (TYPE_TO_PARAM (encrypted_file));
+  tglf_fetch_encrypted_message_file_new (TLS, M, DS_EF);
+  free_ds_type_encrypted_file (DS_EF, TYPE_TO_PARAM (encrypted_file));
 }
 
 static int id_cmp (struct tgl_message *M1, struct tgl_message *M2) {
@@ -1445,89 +1350,84 @@ struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS) {
   return res;
 }
 
-struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS) {
-  int data[2];
-  prefetch_data (data, 8);
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (data[1]));
+struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat_new (struct tgl_state *TLS, struct tl_ds_encrypted_chat *DS_EC) {
+  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (DS_LVAL (DS_EC->id)));
   if (!U) {
     U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_ENCR_CHAT (data[1]);
+    U->id = TGL_MK_ENCR_CHAT (DS_LVAL (DS_EC->id));
     TLS->encr_chats_allocated ++;
     TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
   }
-  tglf_fetch_encrypted_chat (TLS, &U->encr_chat);
+  tglf_fetch_encrypted_chat_new (TLS, &U->encr_chat, DS_EC);
   return &U->encr_chat;
 }
 
-struct tgl_user *tglf_fetch_alloc_user_full (struct tgl_state *TLS) {
-  int data[3];
-  prefetch_data (data, 12);
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_USER (data[2]));
+struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS) {
+  struct tl_ds_encrypted_chat *DS_EC = fetch_ds_type_encrypted_chat (TYPE_TO_PARAM (encrypted_chat));
+  struct tgl_secret_chat *U = tglf_fetch_alloc_encrypted_chat_new (TLS, DS_EC);
+  free_ds_type_encrypted_chat (DS_EC, TYPE_TO_PARAM (encrypted_chat));
+  return U;
+}
+
+struct tgl_user *tglf_fetch_alloc_user_full_new (struct tgl_state *TLS, struct tl_ds_user_full *DS_U) {
+  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->user->id)));
   if (U) {
-    tglf_fetch_user_full (TLS, &U->user);
+    tglf_fetch_user_full_new (TLS, &U->user, DS_U);
     return &U->user;
   } else {
     TLS->users_allocated ++;
     U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_USER (data[2]);
+    U->id = TGL_MK_USER (DS_LVAL (DS_U->user->id));
     TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    tglf_fetch_user_full (TLS, &U->user);
+    tglf_fetch_user_full_new (TLS, &U->user, DS_U);
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
     return &U->user;
   }
 }
 
-struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS) {
-  int data[3];
-  prefetch_data (data, 12);
-  struct tgl_message *M = tgl_message_get (TLS, data[0] != (int)CODE_message_empty ? data[2] : data[1]);
+struct tgl_user *tglf_fetch_alloc_user_full (struct tgl_state *TLS) {
+  struct tl_ds_user_full *DS_U = fetch_ds_type_user_full (TYPE_TO_PARAM (user_full));
+  struct tgl_user *res = tglf_fetch_alloc_user_full_new (TLS, DS_U);
+  free_ds_type_user_full (DS_U, TYPE_TO_PARAM (user_full));
+  return res;
+}
+
+struct tgl_message *tglf_fetch_alloc_message_new (struct tgl_state *TLS, struct tl_ds_message *DS_M) {
+  struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_M->id));
 
   if (!M) {
-    M = tglm_message_alloc (TLS, data[0] != (int)CODE_message_empty ? data[2] : data[1]);
+    M = tglm_message_alloc (TLS, DS_LVAL (DS_M->id));
   }
-  tglf_fetch_message (TLS, M);
+  tglf_fetch_message_new (TLS, M, DS_M);
+  return M;
+}
+
+struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS) {
+  struct tl_ds_message *DS_M = fetch_ds_type_message (TYPE_TO_PARAM (message));
+  struct tgl_message *M = tglf_fetch_alloc_message_new (TLS, DS_M);
+  free_ds_type_message (DS_M, TYPE_TO_PARAM (message));
   return M;
 }
 
 struct tgl_message *tglf_fetch_alloc_geo_message (struct tgl_state *TLS) {
-  struct tgl_message *M = talloc (sizeof (*M));
-  tglf_tglf_fetch_geo_message (TLS, M);
-  struct tgl_message *M1 = tree_lookup_message (TLS->message_tree, M);
-  TLS->messages_allocated ++;
-  if (M1) {
-    tglm_message_del_use (TLS, M1);
-    tglm_message_del_peer (TLS, M1);
-    tgls_clear_message (TLS, M1);
-    memcpy (M1, M, sizeof (*M));
-    tfree (M, sizeof (*M));
-    tglm_message_add_use (TLS, M1);
-    tglm_message_add_peer (TLS, M1);
-    TLS->messages_allocated --;
-    return M1;
-  } else {
-    tglm_message_add_use (TLS, M);
-    tglm_message_add_peer (TLS, M);
-    TLS->message_tree = tree_insert_message (TLS->message_tree, M, lrand48 ());
-    return M;
-  }
+  assert (0);
+  return NULL;
 }
 
-struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS) {
-  int data[3];
-  prefetch_data (data, 12);
-  struct tgl_message *M = tgl_message_get (TLS, *(long long *)(data + 1));
+struct tgl_message *tglf_fetch_alloc_encrypted_message_new (struct tgl_state *TLS, struct tl_ds_encrypted_message *DS_EM) {
+  struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_EM->random_id));
 
   if (!M) {
     M = talloc0 (sizeof (*M));
-    M->id = *(long long *)(data + 1);
+    M->id = DS_LVAL (DS_EM->random_id);
     tglm_message_insert_tree (TLS, M);
     TLS->messages_allocated ++;
     assert (tgl_message_get (TLS, M->id) == M);
   }
-  tglf_fetch_encrypted_message (TLS, M);
+  tglf_fetch_encrypted_message_new (TLS, M, DS_EM);
 
   if (M->flags & FLAG_CREATED) {
     tgl_peer_t *_E = tgl_peer_get (TLS, M->to_id);
@@ -1568,6 +1468,13 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS) {
       bl_do_encr_chat_set_ttl (TLS, E, M->action.ttl);      
     }
   }
+  return M;
+}
+
+struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS) {
+  struct tl_ds_encrypted_message *DS_EM = fetch_ds_type_encrypted_message (TYPE_TO_PARAM (encrypted_message));
+  struct tgl_message *M = tglf_fetch_alloc_encrypted_message_new (TLS, DS_EM);
+  free_ds_type_encrypted_message (DS_EM, TYPE_TO_PARAM (encrypted_message));
   return M;
 }
 
@@ -1622,23 +1529,28 @@ struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS) {
   return res;
 }
 
-struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS) {
-  int data[3];
-  prefetch_data (data, 12);
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_CHAT (data[2]));
+struct tgl_chat *tglf_fetch_alloc_chat_full_new (struct tgl_state *TLS, struct tl_ds_messages_chat_full *DS_MCF) {
+  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_CHAT (DS_LVAL (DS_MCF->full_chat->id)));
   if (U) {
-    tglf_fetch_chat_full (TLS, &U->chat);
+    tglf_fetch_chat_full_new (TLS, &U->chat, DS_MCF);
     return &U->chat;
   } else {
     TLS->chats_allocated ++;
     U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_CHAT (data[2]);
+    U->id = TGL_MK_CHAT (DS_LVAL (DS_MCF->full_chat->id));
     TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    tglf_fetch_chat_full (TLS, &U->chat);
+    tglf_fetch_chat_full_new (TLS, &U->chat, DS_MCF);
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
     return &U->chat;
   }
+}
+
+struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS) {
+  struct tl_ds_messages_chat_full *DS_C = fetch_ds_type_messages_chat_full (TYPE_TO_PARAM (messages_chat_full));
+  struct tgl_chat *res = tglf_fetch_alloc_chat_full_new (TLS, DS_C);
+  free_ds_type_messages_chat_full (DS_C, TYPE_TO_PARAM (messages_chat_full));
+  return res;
 }
 /* }}} */
 

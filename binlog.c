@@ -44,6 +44,8 @@
 #include "auto/auto-types.h"
 #include "auto/auto-skip.h"
 #include "auto/auto-store-ds.h"
+#include "auto/auto-fetch-ds.h"
+#include "auto/auto-free-ds.h"
 
 #include "tgl-structures.h"
 
@@ -1345,9 +1347,90 @@ static int fetch_comb_binlog_encr_chat_exchange_abort (struct tgl_state *TLS, vo
   return 0;
 }
 
+static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
+  struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->lid));
+  if (!M) {
+    M = tglm_message_alloc (TLS, DS_LVAL (DS_U->lid));
+  } else {
+    assert (!(M->flags & FLAG_CREATED));
+  }
+  
+  M->flags |= FLAG_CREATED;
+  M->from_id = TGL_MK_USER (DS_LVAL (DS_U->from_id));
+  M->to_id = tgl_set_peer_id (DS_LVAL (DS_U->to_type), DS_LVAL (DS_U->to_id));
+  M->date = DS_LVAL (DS_U->date);;
+  
+  if (DS_LVAL (DS_U->flags) & (1 << 16)) {
+    M->fwd_from_id = TGL_MK_USER (DS_LVAL (DS_U->fwd_from_id));
+    M->fwd_date = DS_LVAL (DS_U->fwd_date);
+  }
+  
+  M->unread = DS_LVAL (DS_U->flags) & 1;
+  M->out = DS_LVAL (DS_U->flags) & 2;
+
+  if (DS_U->action) {
+    tglf_fetch_message_action_new (TLS, &M->action, DS_U->action);
+    M->service = 1;
+  } 
+  if (DS_U->message) {
+    M->message_len = DS_U->message->len;
+    M->message = DS_STR_DUP (DS_U->message);
+  }
+  if (DS_U->media) {
+    tglf_fetch_message_media_new (TLS, &M->media, DS_U->media);
+  }
+  //M->unread = 1;
+
+  tglm_message_insert (TLS, M);
+  return 0;
+}
+
+static int fetch_comb_binlog_message_encr_new (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
+  struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->lid));
+  if (!M) {
+    M = tglm_message_alloc (TLS, DS_LVAL (DS_U->lid));
+  } else {
+    assert (!(M->flags & FLAG_CREATED));
+  }
+  M->flags |= FLAG_CREATED | FLAG_ENCRYPTED;
+  M->from_id = TGL_MK_USER (DS_LVAL (DS_U->from_id));
+  M->to_id = tgl_set_peer_id (DS_LVAL (DS_U->to_type), DS_LVAL (DS_U->to_id));
+  M->date = DS_LVAL (DS_U->date);
+
+  struct tgl_secret_chat *E = (void *)tgl_peer_get (TLS, M->to_id);
+  assert (E);
+
+  M->unread = DS_LVAL (DS_U->flags) & 1;
+  M->out = tgl_get_peer_id (M->from_id) == TLS->our_id;
+ 
+  if (DS_U->message) {
+    M->message_len = DS_U->message->len;
+    M->message = DS_STR_DUP (DS_U->message);
+  }
+
+  if (DS_U->encr_media) {
+    tglf_fetch_message_media_encrypted_new (TLS, &M->media, DS_U->encr_media);
+  }
+
+  if (DS_U->encr_action) {
+    tglf_fetch_message_action_encrypted_new (TLS, &M->action, DS_U->encr_action);
+  }
+
+  if (DS_U->file) {
+    tglf_fetch_encrypted_message_file_new (TLS, &M->media, DS_U->file);
+  }
+
+  if (!M->out && M->action.type == tgl_message_action_notify_layer) {
+    E->layer = M->action.layer;
+  }
+
+  tglm_message_insert (TLS, M);
+  return 0;
+}
+
 #define FETCH_COMBINATOR_FUNCTION(NAME) \
   case CODE_ ## NAME:\
-    ok = fetch_comb_ ## NAME (TLS, 0); \
+    ok = fetch_comb_ ## NAME (TLS, DS_U); \
     break; \
     
 
@@ -1360,6 +1443,9 @@ static void replay_log_event (struct tgl_state *TLS) {
   in_ptr = rptr;
   in_end = wptr;
   assert (skip_type_any (TYPE_TO_PARAM(binlog_update)) >= 0);
+  in_end = in_ptr;
+  in_ptr = rptr;
+  struct tl_ds_binlog_update *DS_U = fetch_ds_type_binlog_update (TYPE_TO_PARAM (binlog_update));
   in_end = in_ptr;
   in_ptr = rptr;
 
@@ -1446,13 +1532,17 @@ static void replay_log_event (struct tgl_state *TLS) {
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_commit)
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_confirm)
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_abort)
+  FETCH_COMBINATOR_FUNCTION (binlog_message_new)
+  FETCH_COMBINATOR_FUNCTION (binlog_message_encr_new)
   default:
     vlogprintf (E_ERROR, "Unknown op 0x%08x\n", op);
     assert (0);
   }
   assert (ok >= 0);
 
-  assert (in_ptr == in_end);
+  free_ds_type_binlog_update (DS_U, TYPE_TO_PARAM (binlog_update));
+  in_ptr = in_end;
+  //assert (in_ptr == in_end);
   binlog_pos += (in_ptr - rptr) * 4;
   rptr = in_ptr;
 }
@@ -2150,6 +2240,81 @@ void bl_do_create_message_text (struct tgl_state *TLS, int msg_id, int from_id, 
   out_int (date);
   out_int (unread);
   out_cstring (s, l);
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
+void bl_do_create_message_new (struct tgl_state *TLS, long long id, int from_id, int to_type, int to_id, int fwd_from_id, int fwd_date, int date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, void *reply, int flags) {
+  clear_packet ();
+  assert (!(flags & 0xffff0000));
+  out_int (CODE_binlog_message_new);
+  int *flags_p = packet_ptr;
+  out_int (flags);
+  assert (*flags_p == flags);
+
+  out_long (id);
+  out_int (from_id);
+  out_int (to_type);
+  out_int (to_id);
+  if (fwd_from_id > 0) {
+    (*flags_p) |= (1 << 16);
+    out_int (fwd_from_id);
+    out_int (fwd_date);
+  }
+  out_int (date);
+  if (message) {
+    (*flags_p) |= (1 << 17);
+    out_cstring (message, message_len);
+  }
+
+  if (media) {
+    (*flags_p) |= (1 << 18);
+    store_ds_type_message_media (media, TYPE_TO_PARAM (message_media));
+  }
+
+  if (action) {
+    (*flags_p) |= (1 << 19);
+    store_ds_type_message_action (action, TYPE_TO_PARAM (message_action));
+  }
+
+  assert (!reply);
+  add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
+void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int from_id, int to_type, int to_id, int date, const char *message, int message_len, struct tl_ds_decrypted_message_media *media, struct tl_ds_decrypted_message_action *action, struct tl_ds_encrypted_file *file, int flags) {
+  clear_packet ();
+  assert (!(flags & 0xffff0000));
+  out_int (CODE_binlog_message_encr_new);
+  int *flags_p = packet_ptr;
+  out_int (flags);
+  assert (*flags_p == flags);
+
+  out_long (id);
+  out_int (from_id);
+  out_int (to_type);
+  out_int (to_id);
+  out_int (date);
+  
+  if (message) {
+    (*flags_p) |= (1 << 17);
+    out_cstring (message, message_len);
+  }
+
+  if (media) {
+    (*flags_p) |= (1 << 18);
+    store_ds_type_decrypted_message_media (media, TYPE_TO_PARAM (decrypted_message_media));
+  }
+
+  if (action) {
+    (*flags_p) |= (1 << 19);
+    store_ds_type_decrypted_message_action (action, TYPE_TO_PARAM (decrypted_message_action));
+  }
+  
+  if (file) {
+    (*flags_p) |= (1 << 20);
+    store_ds_type_encrypted_file (file, TYPE_TO_PARAM (encrypted_file));
+  }
+
+  
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 

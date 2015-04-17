@@ -109,5 +109,8 @@ void bl_do_msg_set_oubound (struct tgl_state *TLS, long long id);
 
 void bl_do_reset_authorization (struct tgl_state *TLS);
 
+void bl_do_create_message_new (struct tgl_state *TLS, long long id, int from_id, int to_type, int to_id, int fwd_from_id, int fwd_date, int date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, void *reply, int flags);
+
+void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int from_id, int to_type, int to_id, int date, const char *message, int message_len, struct tl_ds_decrypted_message_media *media, struct tl_ds_decrypted_message_action *action, struct tl_ds_encrypted_file *file, int flags);
 //void bl_do_add_dc (int id, const char *ip, int l, int port, long long auth_key_id, const char *auth_key);
 #endif

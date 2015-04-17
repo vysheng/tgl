@@ -829,6 +829,9 @@ int gen_field_fetch_ds (struct arg *arg, int *vars, int num, int empty) {
       printf ("%s}\n", offset);
     }
   }
+  if (arg->exist_var_num >= 0) {
+    printf ("  }\n");
+  }
   return 0;
 }
 
@@ -851,10 +854,10 @@ int gen_field_free_ds (struct arg *arg, int *vars, int num, int empty) {
       assert (t == NAME_VAR_NUM);
       if (arg->id && strlen (arg->id)) {
         if (vars[arg->var_num] == 0) {
-          printf ("%sstruct paramed_type *var%d = *result->%s;\n", offset, arg->var_num, arg->id);
+          printf ("%sstruct paramed_type *var%d = INT2PTR (*D->%s);\n", offset, arg->var_num, arg->id);
           vars[arg->var_num] = 2;
         } else if (vars[arg->var_num] == 2) {
-          printf ("%sassert (vars%d == INT2PTR (*result->%s));\n", offset, arg->var_num, arg->id);
+          printf ("%sassert (vars%d == INT2PTR (*D->%s));\n", offset, arg->var_num, arg->id);
         }
         printf ("%stfree (D->%s, sizeof (*D->%s));\n", offset, arg->id, arg->id);
       } else {
@@ -904,6 +907,9 @@ int gen_field_free_ds (struct arg *arg, int *vars, int num, int empty) {
       }
     }
   }
+  if (arg->exist_var_num >= 0) {
+    printf ("  }\n");
+  }
   return 0;
 }
 
@@ -926,10 +932,10 @@ int gen_field_store_ds (struct arg *arg, int *vars, int num, int empty) {
       assert (t == NAME_VAR_NUM);
       if (arg->id && strlen (arg->id)) {
         if (vars[arg->var_num] == 0) {
-          printf ("%sstruct paramed_type *var%d = *result->%s;\n", offset, arg->var_num, arg->id);
+          printf ("%sstruct paramed_type *var%d = INT2PTR (*D->%s);\n", offset, arg->var_num, arg->id);
           vars[arg->var_num] = 2;
         } else if (vars[arg->var_num] == 2) {
-          printf ("%sassert (vars%d == INT2PTR (*result->%s));\n", offset, arg->var_num, arg->id);
+          printf ("%sassert (vars%d == INT2PTR (*D->%s));\n", offset, arg->var_num, arg->id);
         }
         printf ("%sout_int (PTR2INT (var%d));\n", offset, arg->var_num);
       } else {
@@ -978,6 +984,9 @@ int gen_field_store_ds (struct arg *arg, int *vars, int num, int empty) {
       printf ("%s  }\n", offset);
       printf ("%s}\n", offset);
     }
+  }
+  if (arg->exist_var_num >= 0) {
+    printf ("  }\n");
   }
   return 0;
 }

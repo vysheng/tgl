@@ -38,11 +38,14 @@ struct tgl_message *tglf_fetch_alloc_message_short (struct tgl_state *TLS);
 struct tgl_message *tglf_fetch_alloc_message_short_chat (struct tgl_state *TLS);
 struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS);
 void tglf_fetch_encrypted_message_file (struct tgl_state *TLS, struct tgl_message_media *M);
+tgl_peer_id_t tglf_fetch_peer_id_new (struct tgl_state *TLS, struct tl_ds_peer *DS_P);
 tgl_peer_id_t tglf_fetch_peer_id (struct tgl_state *TLS);
 
 void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *M);
+void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_message_media *DS_MM);
 void tglf_fetch_message_media_encrypted (struct tgl_state *TLS, struct tgl_message_media *M);
 void tglf_fetch_message_action (struct tgl_state *TLS, struct tgl_message_action *M);
+void tglf_fetch_message_action_new (struct tgl_state *TLS, struct tgl_message_action *M, struct tl_ds_message_action *DS_MA);
 void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_message_action *M);
 void tglf_fetch_photo (struct tgl_state *TLS, struct tgl_photo *P);
 
@@ -54,4 +57,8 @@ void tglf_fetch_video (struct tgl_state *TLS, struct tgl_document *V);
 void tglf_fetch_document (struct tgl_state *TLS, struct tgl_document *V);
 void tglf_fetch_message (struct tgl_state *TLS, struct tgl_message *M);
 void tglf_fetch_geo_message (struct tgl_state *TLS, struct tgl_message *M);
+
+void tglf_fetch_encrypted_message_file_new (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_encrypted_file *DS_EF);
+void tglf_fetch_message_media_encrypted_new (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_decrypted_message_media *DS_DMM);
+void tglf_fetch_message_action_encrypted_new (struct tgl_state *TLS, struct tgl_message_action *M, struct tl_ds_decrypted_message_action *DS_DMA);
 #endif
