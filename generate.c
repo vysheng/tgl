@@ -2521,7 +2521,7 @@ void gen_store_ds_source (void) {
   printf ("  switch (T->type->name) {\n");
   for (i = 0; i < tn; i++) if (tps[i]->id[0] != '#' && strcmp (tps[i]->id, "Type") && tps[i]->name) {
     printf ("  case 0x%08x: store_ds_type_%s (D, T); return;\n", tps[i]->name, tps[i]->print_id);
-    printf ("  case 0x%08x: store_ds_type_%s (D, T); return;\n", ~tps[i]->name, tps[i]->print_id);
+    printf ("  case 0x%08x: store_ds_type_bare_%s (D, T); return;\n", ~tps[i]->name, tps[i]->print_id);
   }
   printf ("  default: return; }\n");
   printf ("}\n");

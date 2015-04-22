@@ -27,7 +27,7 @@
 #define TGL_MAX_DC_NUM 100
 #define TG_SERVER_1 "149.154.175.50"
 #define TG_SERVER_2 "149.154.167.51"
-#define TG_SERVER_3 "174.140.142.6"
+#define TG_SERVER_3 "149.154.175.100"
 #define TG_SERVER_4 "149.154.167.91"
 #define TG_SERVER_5 "149.154.171.5"
 
@@ -51,7 +51,7 @@
 #define TGL_VERSION "1.2.0"
 
 #define TGL_ENCRYPTED_LAYER 17
-#define TGL_SCHEME_LAYER 22
+#define TGL_SCHEME_LAYER 27
 
 struct connection;
 struct mtproto_methods;

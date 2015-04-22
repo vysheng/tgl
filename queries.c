@@ -93,6 +93,11 @@ struct send_file {
 #define memcmp8(a,b) memcmp ((a), (b), 8)
 DEFINE_TREE (query, struct query *, memcmp8, 0) ;
 
+static int mystreq1 (const char *a, const char *b, int l) {
+  if ((int)strlen (a) != l) { return 1; }
+  return memcmp (a, b, l);
+}
+
 /* {{{ COMMON */
 
 struct query *tglq_query_get (struct tgl_state *TLS, long long id) {
@@ -228,6 +233,8 @@ void tglq_query_delete (struct tgl_state *TLS, long long id) {
   TLS->active_queries --;
 }
 
+static void resend_query_cb (struct tgl_state *TLS, void *_q, int success);
+
 int tglq_query_error (struct tgl_state *TLS, long long id) {
   assert (fetch_int () == CODE_rpc_error);
   int error_code = fetch_int ();
@@ -287,17 +294,14 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
       // bad user input probably
       break;
     case 401:
-      if (!(TLS->locks & TGL_LOCK_PASSWORD)) {
-        TLS->locks |= TGL_LOCK_PASSWORD;
-        tgl_do_check_password (TLS, NULL, NULL);
-      }
-      q->flags &= ~QUERY_ACK_RECEIVED;
-      TLS->timer_methods->insert (q->ev, 1);
-      struct tgl_dc *DC = q->DC;
-      if (!(DC->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
-        q->session_id = 0;
-      }         
-      error_handled = 1;
+      if (!mystreq1 ("SESSION_PASSWORD_NEEDED", error, error_len)) {
+        if (!(TLS->locks & TGL_LOCK_PASSWORD)) {
+          TLS->locks |= TGL_LOCK_PASSWORD;
+          tgl_do_check_password (TLS, resend_query_cb, q);
+        }
+        res = 1;
+        error_handled = 1;
+      } 
       break;
     case 403:
       // privacy violation
@@ -735,6 +739,7 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   }
   clear_packet ();
   out_int (CODE_messages_send_message);
+  out_int (0);
   out_peer_id (TLS, M->to_id);
   out_cstring (M->message, M->message_len);
   out_long (M->id);
@@ -772,7 +777,7 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *m
   int peer_id = tgl_get_peer_id (id);
   int date = time (0);
 
-  bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, msg, len, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING);
+  bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, msg, len, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED);
 
   struct tgl_message *M = tgl_message_get (TLS, t);
   assert (M);
@@ -812,7 +817,10 @@ static int mark_read_on_receive (struct tgl_state *TLS, struct query *q, void *D
   struct tl_ds_messages_affected_history *DS_MAH = D;
 
   int r = tgl_check_pts_diff (TLS, DS_LVAL (DS_MAH->pts), DS_LVAL (DS_MAH->pts_count));
-  assert (!r);
+
+  if (r > 0) {
+    bl_do_set_pts (TLS, DS_LVAL (DS_MAH->pts));
+  }
 
   int offset = DS_LVAL (DS_MAH->offset);
   int *t = q->extra;
@@ -854,7 +862,6 @@ void tgl_do_messages_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, int max
   out_peer_id (TLS, id);
   out_int (max_id);
   out_int (offset);
-  out_int (CODE_bool_true);
   int *t = talloc (12);
   t[0] = tgl_get_peer_type (id);
   t[1] = tgl_get_peer_id (id);
@@ -1900,6 +1907,23 @@ void tgl_do_get_user_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_
   }
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &user_info_methods, 0, callback, callback_extra);
 }
+
+static void resend_query_cb (struct tgl_state *TLS, void *_q, int success) {
+  assert (success);
+  
+  bl_do_dc_signed (TLS, TLS->DC_working->id);
+
+  struct query *q = _q;
+  
+  clear_packet ();
+  out_int (CODE_users_get_full_user);
+  out_int (CODE_input_user_self);
+  tglq_send_query (TLS, q->DC, packet_ptr - packet_buffer, packet_buffer, &user_info_methods, 0, q->callback, q->callback_extra);
+
+  tfree (q->data, 4 * q->data_len);
+  TLS->timer_methods->free (q->ev);
+  tfree (q, sizeof (*q));
+}
 /* }}} */
 
 /* {{{ Load photo/video */
@@ -2224,6 +2248,7 @@ static struct query_methods export_auth_methods = {
 
 void tgl_do_export_auth (struct tgl_state *TLS, int num, void (*callback) (struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
   clear_packet ();
+  vlogprintf (E_ERROR, "num = %d\n", num);
   out_int (CODE_auth_export_authorization);
   out_int (num);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &export_auth_methods, TLS->DC_list[num], callback, callback_extra);

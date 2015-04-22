@@ -827,7 +827,7 @@ static int work_new_session_created (struct tgl_state *TLS, struct connection *c
   fetch_long (); // first message id
   fetch_long (); // unique_id
   TLS->net_methods->get_dc (c)->server_salt = fetch_long ();
-  if (TLS->started && !(TLS->locks & TGL_LOCK_DIFF) && TLS->DC_working->has_auth) {
+  if (TLS->started && !(TLS->locks & TGL_LOCK_DIFF) && (TLS->DC_working->flags & TGLDCF_LOGGED_IN)) {
     tgl_do_get_difference (TLS, 0, 0, 0);
   }
   return 0;

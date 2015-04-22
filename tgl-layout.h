@@ -80,7 +80,7 @@
 #define TGL_FLAGS_UNCHANGED 0xffff
 
 #define TGLDCF_AUTHORIZED 1
-#define TGLDCF_LOGGED_IN 4
+#define TGLDCF_LOGGED_IN 8
 
 #pragma pack(push,4)
 
@@ -135,7 +135,6 @@ struct tgl_dc {
 
   int server_time_delta;
   double server_time_udelta;
-  int has_auth;
 };
 
 enum tgl_message_media_type {
@@ -151,6 +150,7 @@ enum tgl_message_media_type {
   //tgl_message_media_video_encr,
   //tgl_message_media_audio_encr,
   tgl_message_media_document_encr,
+  tgl_message_media_webpage
 };
 
 enum tgl_message_action_type {
@@ -482,6 +482,23 @@ struct tgl_message_action {
   };
 };
 
+struct tgl_webpage {
+  long long id;
+  char *url;
+  char *display_url;
+  char *type;
+  char *site_name;
+  char *title;
+  char *description;
+  struct tgl_photo *photo;
+  char *embed_url;
+  char *embed_type;
+  int embed_width;
+  int embed_height;
+  int duration;
+  char *author;
+};
+
 struct tgl_message_media {
   enum tgl_message_media_type type;
   union {
@@ -490,6 +507,7 @@ struct tgl_message_media {
     //struct tgl_audio audio;
     struct tgl_document document;
     struct tgl_encr_document encr_document;
+    struct tgl_webpage webpage;
 
     struct tgl_geo geo;
     struct {
@@ -519,10 +537,7 @@ struct tgl_message {
   int fwd_date;
   tgl_peer_id_t from_id;
   tgl_peer_id_t to_id;
-  int out;
-  int unread;
   int date;
-  int service;
   union {
     struct tgl_message_action action;
     struct {

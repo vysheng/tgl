@@ -86,7 +86,7 @@ int tgl_authorized_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
 
 int tgl_signed_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
   assert (DC);
-  return DC->has_auth;
+  return (DC->flags & TGLDCF_LOGGED_IN) != 0;
 }
 
 void tgl_register_app_id (struct tgl_state *TLS, int app_id, char *app_hash) {

@@ -220,7 +220,7 @@ void tgl_do_send_encr_msg_action (struct tgl_state *TLS, struct tgl_message *M, 
 }
 
 void tgl_do_send_encr_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
-  if (M->service) {
+  if (M->flags & TGLMF_SERVICE) {
     tgl_do_send_encr_msg_action (TLS, M, callback, callback_extra);
     return;
   }

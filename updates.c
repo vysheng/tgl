@@ -38,13 +38,14 @@ static void fetch_dc_option_new (struct tgl_state *TLS, struct tl_ds_dc_option *
 }
 
 int tgl_check_pts_diff (struct tgl_state *TLS, int pts, int pts_count) {
+  if (!pts_count) { return 0; }
   if (TLS->pts) {
     if (pts <= TLS->pts) {
       vlogprintf (E_NOTICE, "Duplicate message with pts=%d\n", pts);
       return -1;
     }
-    if (pts > TLS->pts + 1) {
-      vlogprintf (E_NOTICE, "Hole in pts (pts = %d, cur_pts = %d)\n", pts, TLS->pts);
+    if (pts > TLS->pts + pts_count) {
+      vlogprintf (E_NOTICE, "Hole in pts (pts = %d, count = %d, cur_pts = %d)\n", pts, pts_count, TLS->pts);
       tgl_do_get_difference (TLS, 0, 0, 0);
       return -1;
     }

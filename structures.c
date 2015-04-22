@@ -54,11 +54,6 @@ DEFINE_TREE(peer_by_name,tgl_peer_t *,peer_cmp_name,0)
 DEFINE_TREE(message,struct tgl_message *,id_cmp,0)
 
 
-
-
-
-
-
 char *tgls_default_create_print_name (struct tgl_state *TLS, tgl_peer_id_t id, const char *a1, const char *a2, const char *a3, const char *a4) {
   const char *d[4];
   d[0] = a1; d[1] = a2; d[2] = a3; d[3] = a4;
@@ -157,7 +152,9 @@ int tglf_fetch_user_status_new (struct tgl_state *TLS, struct tgl_user_status *S
     {
       if (S->online != 1) {
         S->when = DS_LVAL (DS_US->expires);
-        tgl_insert_status_update (TLS, U);
+        if (S->online) {
+          tgl_insert_status_update (TLS, U);
+        }
         tgl_insert_status_expire (TLS, U);
         S->online = 1;
       } else {
@@ -171,7 +168,9 @@ int tglf_fetch_user_status_new (struct tgl_state *TLS, struct tgl_user_status *S
     break;
   case CODE_user_status_offline:
     if (S->online != -1) {
-      tgl_insert_status_update (TLS, U);
+      if (S->online) {
+        tgl_insert_status_update (TLS, U);
+      }
       if (S->online == 1) {
         tgl_remove_status_expire (TLS, U);
       }
@@ -181,7 +180,9 @@ int tglf_fetch_user_status_new (struct tgl_state *TLS, struct tgl_user_status *S
     break;
   case CODE_user_status_recently:
     if (S->online != -2) {
-      tgl_insert_status_update (TLS, U);
+      if (S->online) {
+        tgl_insert_status_update (TLS, U);
+      }
       if (S->online == 1) {
         tgl_remove_status_expire (TLS, U);
       }
@@ -190,7 +191,9 @@ int tglf_fetch_user_status_new (struct tgl_state *TLS, struct tgl_user_status *S
     break;
   case CODE_user_status_last_week:
     if (S->online != -3) {
-      tgl_insert_status_update (TLS, U);
+      if (S->online) {
+        tgl_insert_status_update (TLS, U);
+      }
       if (S->online == 1) {
         tgl_remove_status_expire (TLS, U);
       }
@@ -199,7 +202,9 @@ int tglf_fetch_user_status_new (struct tgl_state *TLS, struct tgl_user_status *S
     break;
   case CODE_user_status_last_month:
     if (S->online != -4) {
-      tgl_insert_status_update (TLS, U);
+      if (S->online) {
+        tgl_insert_status_update (TLS, U);
+      }
       if (S->online == 1) {
         tgl_remove_status_expire (TLS, U);
       }
@@ -209,23 +214,6 @@ int tglf_fetch_user_status_new (struct tgl_state *TLS, struct tgl_user_status *S
   default:
     assert (0);
   }
-  return 0;
-}
-
-long long tglf_fetch_set_user_photo_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_user_profile_photo *DS_UPP) {
-  if (!DS_UPP) {
-    return 0;
-  }
-
-  if (DS_UPP->magic == CODE_user_profile_photo_empty) {
-    U->photo_small.dc = -2;
-    U->photo_big.dc = -2;
-    return 0;
-  }
-  
-  assert (tglf_fetch_file_location_new (TLS, &U->photo_small, DS_UPP->photo_small) >= 0);
-  assert (tglf_fetch_file_location_new (TLS, &U->photo_big, DS_UPP->photo_big) >= 0);
-
   return 0;
 }
 
@@ -280,6 +268,8 @@ void tglf_fetch_user_full_new (struct tgl_state *TLS, struct tgl_user *U, struct
   
   if (DS_BVAL (DS_UF->blocked)) {
     flags |= TGLUF_BLOCKED;
+  } else {
+    flags &= ~TGLUF_BLOCKED;
   }
 
   bl_do_user_new (TLS, tgl_get_peer_id (U->id), 
@@ -404,7 +394,7 @@ void tglf_fetch_chat_new (struct tgl_state *TLS, struct tgl_chat *C, struct tl_d
   if (!(flags & TGLCF_CREATED)) {
     flags |= TGLCF_CREATE | TGLCF_CREATED;
   }
- 
+
   bl_do_chat_new (TLS, tgl_get_peer_id (C->id),
     DS_STR (DS_C->title),
     DS_C->participants_count, 
@@ -752,7 +742,28 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     M->user_id = DS_LVAL (DS_MM->user_id);
     break;
   case CODE_message_media_unsupported:
+  case CODE_message_media_unsupported_l22:
     M->type = tgl_message_media_unsupported;
+    break;
+  case CODE_message_media_web_page:
+    M->type = tgl_message_media_webpage;
+    M->webpage.id = DS_LVAL (DS_MM->webpage->id);
+    M->webpage.url = DS_STR_DUP (DS_MM->webpage->url);
+    M->webpage.display_url = DS_STR_DUP (DS_MM->webpage->display_url);
+    M->webpage.type = DS_STR_DUP (DS_MM->webpage->type);
+    M->webpage.site_name = DS_STR_DUP (DS_MM->webpage->site_name);
+    M->webpage.title = DS_STR_DUP (DS_MM->webpage->title);
+    if (DS_MM->webpage->photo) {
+      M->webpage.photo = talloc0 (sizeof (struct tgl_photo));
+      tglf_fetch_photo_new (TLS, M->webpage.photo, DS_MM->webpage->photo);
+    }
+    M->webpage.description = DS_STR_DUP (DS_MM->webpage->description);
+    M->webpage.embed_url = DS_STR_DUP (DS_MM->webpage->embed_url);
+    M->webpage.embed_type = DS_STR_DUP (DS_MM->webpage->embed_type);
+    M->webpage.embed_width = DS_LVAL (DS_MM->webpage->embed_width);
+    M->webpage.embed_height = DS_LVAL (DS_MM->webpage->embed_height);
+    M->webpage.duration = DS_LVAL (DS_MM->webpage->duration);
+    M->webpage.author = DS_STR_DUP (DS_MM->webpage->author);
     break;
   default:
     assert (0);
@@ -831,7 +842,7 @@ void tglf_fetch_message_action_encrypted_new (struct tgl_state *TLS, struct tgl_
       for (i = 0; i < M->read_cnt; i++) {
         struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_DMA->random_ids->data[i]));
         if (N) {
-          N->unread = 0;
+          N->flags &= ~TGLMF_UNREAD;
         }
       }
     }
@@ -914,18 +925,26 @@ void tglf_fetch_message_new (struct tgl_state *TLS, struct tgl_message *M, struc
 
   if (new) {
     int peer_id = tgl_get_peer_id (to_id);
-    int peer_type = tgl_get_peer_id (to_id);
+    int peer_type = tgl_get_peer_type (to_id);
+
+    int flags = 0;
+    if (DS_LVAL (DS_M->flags) & 1) {
+      flags |= TGLMF_UNREAD;
+    }
+    if (DS_LVAL (DS_M->flags) & 2) {
+      flags |= TGLMF_OUT;
+    }
 
     bl_do_create_message_new (TLS, DS_LVAL (DS_M->id),
       DS_M->from_id,
-      &peer_id, &peer_type,
+      &peer_type, &peer_id,
       DS_M->fwd_from_id, DS_M->fwd_date,
       DS_M->date,
       DS_STR (DS_M->message),
       DS_M->media,
       DS_M->action,
       NULL,
-      (DS_LVAL (DS_M->flags) & 3) | TGLMF_CREATE | TGLMF_CREATED
+      flags | TGLMF_CREATE | TGLMF_CREATED
     );
   }
 }
@@ -1400,6 +1419,21 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
     tfree_secure (M->encr_photo.key, 32);
     tfree_secure (M->encr_photo.iv, 32);
     return;
+  case tgl_message_media_webpage:
+    if (M->webpage.url) { tfree_str (M->webpage.url); }
+    if (M->webpage.display_url) { tfree_str (M->webpage.display_url); }
+    if (M->webpage.title) { tfree_str (M->webpage.title); }
+    if (M->webpage.site_name) { tfree_str (M->webpage.site_name); }
+    if (M->webpage.type) { tfree_str (M->webpage.type); }
+    if (M->webpage.description) { tfree_str (M->webpage.description); }
+    if (M->webpage.photo) {
+      tgls_free_photo (TLS, M->webpage.photo);
+      tfree (M->webpage.photo, sizeof (*M->webpage.photo));
+    }
+    if (M->webpage.embed_url) { tfree_str (M->webpage.embed_url); }
+    if (M->webpage.embed_type) { tfree_str (M->webpage.embed_type); }
+    if (M->webpage.author) { tfree_str (M->webpage.author); }
+    return;
   default:
     vlogprintf (E_ERROR, "type = 0x%08x\n", M->type);
     assert (0);
@@ -1450,7 +1484,7 @@ void tgls_free_message_action (struct tgl_state *TLS, struct tgl_message_action 
 }
 
 void tgls_clear_message (struct tgl_state *TLS, struct tgl_message *M) {
-  if (!M->service) {
+  if (!(M->flags & TGLMF_SERVICE)) {
     if (M->message) { tfree (M->message, M->message_len + 1); }
     tgls_free_message_media (TLS, &M->media);
   } else {
@@ -1805,5 +1839,12 @@ void tglf_fetch_int_array (int *dst, struct tl_ds_vector *src, int len) {
   assert (len <= *src->f1);
   for (i = 0; i < len; i++) {
     dst[i] = *(int *)src->f2[i];
+  }
+}
+
+void tglf_fetch_int_tuple (int *dst, int **src, int len) {
+  int i;
+  for (i = 0; i < len; i++) {
+    dst[i] = *src[i];
   }
 }
