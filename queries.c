@@ -55,6 +55,7 @@
 #include "auto/auto-skip.h"
 #include "auto/auto-free-ds.h"
 #include "auto/auto-fetch-ds.h"
+#include "auto/auto-print-ds.h"
 #include "tgl.h"
 #include "tg-mime-types.h"
 #include "mtproto-utils.h"
@@ -3243,10 +3244,14 @@ void tgl_do_send_typing (struct tgl_state *TLS, tgl_peer_id_t id, enum tgl_typin
 /* }}} */
 
 /* {{{ Extd query */
-#if (0)
+#ifndef DISABLE_EXTF
+
+
+char *tglf_extf_print_ds (struct tgl_state *TLS, void *DS, struct paramed_type *T);
+
 static int ext_query_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   if (q->callback) {
-    char *buf = tglf_extf_fetch (TLS, q->type);
+    char *buf = tglf_extf_print_ds (TLS, D, q->type);
     ((void (*)(struct tgl_state *, void *, int, char *))q->callback) (TLS, q->callback_extra, 1, buf);
   }
   tgl_paramed_type_free (q->type);

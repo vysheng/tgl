@@ -991,6 +991,98 @@ int gen_field_store_ds (struct arg *arg, int *vars, int num, int empty) {
   return 0;
 }
 
+int gen_field_print_ds (struct arg *arg, int *vars, int num, int empty) {
+  assert (arg);
+  char *offset = "  ";
+  int o = 0;
+  if (arg->exist_var_num >= 0) {
+    printf ("  if (PTR2INT (var%d) & (1 << %d)) {\n", arg->exist_var_num, arg->exist_var_bit);
+    offset = "    ";
+    o = 2;
+  }
+  if (!empty) {
+    printf("%sif (multiline_output >= 2) { print_offset (); }\n", offset);
+  }
+  if (arg->id && strlen (arg->id) && !empty) {
+    printf ("%sif (!disable_field_names) { eprintf (\" %s :\"); }\n", offset, arg->id);
+  }
+  if (arg->var_num >= 0) {
+    assert (TL_TREE_METHODS (arg->type)->type (arg->type) == NODE_TYPE_TYPE);
+    int t = ((struct tl_tree_type *)arg->type)->type->name;
+    if (t == NAME_VAR_TYPE) {
+      fprintf (stderr, "Not supported yet\n");
+      assert (0);
+    } else {
+      if (arg->id && strlen (arg->id)) {
+        if (vars[arg->var_num] == 0) {
+          printf ("%sstruct paramed_type *var%d = INT2PTR (*DS->%s);\n", offset, arg->var_num, arg->id);
+          vars[arg->var_num] = 2;
+        } else if (vars[arg->var_num] == 2) {
+          printf ("%sassert (vars%d == INT2PTR (*DS->%s));\n", offset, arg->var_num, arg->id);
+        }
+      } else {
+        if (vars[arg->var_num] == 0) {
+          printf ("%sstruct paramed_type *var%d = INT2PTR (*DS->f%d);\n", offset, arg->var_num, num - 1);
+          vars[arg->var_num] = 2;
+        } else if (vars[arg->var_num] == 2) {
+          printf ("%sassert (vars%d == *DS->f%d);\n", offset, arg->var_num, num - 1);
+        }
+      }
+      printf ("%seprintf (\" %%d\", (int)PTR2INT (var%d));\n", offset, arg->var_num);
+    }
+  } else {
+    int t = TL_TREE_METHODS (arg->type)->type (arg->type);
+    if (t == NODE_TYPE_TYPE || t == NODE_TYPE_VAR_TYPE) {    
+      printf ("%sstruct paramed_type *field%d = \n", offset, num);
+      assert (gen_create (arg->type, vars, 2 + o) >= 0);
+      printf (";\n");
+      int bare = arg->flags & FLAG_BARE;
+      if (!bare && t == NODE_TYPE_TYPE) {
+        bare = ((struct tl_tree_type *)arg->type)->self.flags & FLAG_BARE;
+      }
+      int any = (t == NODE_TYPE_VAR_TYPE);
+      int vec = ((struct tl_tree_type *)arg->type)->type->name == NAME_VECTOR;
+      if (arg->id && strlen (arg->id)) {
+        printf ("%sprint_ds_type_%s%s (%sDS->%s, field%d);\n", offset, bare ? "bare_" : "", any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, vec ? "(void *)" : "", arg->id, num);      
+      } else {
+        printf ("%sprint_ds_type_%s%s (%sDS->f%d, field%d);\n", offset, bare ? "bare_" : "", any ? "any" : ((struct tl_tree_type *)arg->type)->type->print_id, vec ? "(void *)" : "", num - 1, num);      
+      }
+    } else {
+      assert (t == NODE_TYPE_ARRAY);
+      printf ("%sint multiplicity%d = PTR2INT (\n", offset, num);
+      assert (gen_create (((struct tl_tree_array *)arg->type)->multiplicity, vars, 2 + o) >= 0);
+      printf ("%s);\n", offset);
+      printf ("%sstruct paramed_type *field%d = \n", offset, num);
+      assert (gen_create (((struct tl_tree_array *)arg->type)->args[0]->type, vars, 2 + o) >= 0);
+      printf (";\n");
+      printf ("%seprintf (\" [\");\n", offset);
+      printf ("%sif (multiline_output >= 1) { eprintf (\"\\n\"); }\n", offset);
+      printf ("%sif (multiline_output >= 1) { multiline_offset += multiline_offset_size;}\n", offset);
+      printf ("%s{\n", offset);
+      printf ("%s  int i = 0;\n", offset);
+      printf ("%s  while (i < multiplicity%d) {\n", offset, num);
+      printf ("%s    if (multiline_output >= 1) { print_offset (); }\n", offset);
+      if (arg->id && strlen (arg->id)) {
+        printf ("%s    print_ds_type_%s (DS->%s[i ++], field%d);\n", offset, "any", arg->id, num);
+      } else {
+        printf ("%s    print_ds_type_%s (DS->f%d[i ++], field%d);\n", offset, "any", num - 1, num);
+      }
+      printf ("%s    if (multiline_output >= 1) { eprintf (\"\\n\"); }\n", offset);
+      printf ("%s  }\n", offset);
+      printf ("%s}\n", offset);
+      printf ("%sif (multiline_output >= 1) { multiline_offset -= multiline_offset_size; print_offset ();}\n", offset);
+      printf ("%seprintf (\" ]\");\n", offset);
+    }
+  }
+  if (!empty) {
+    printf("%sif (multiline_output >= 2) { eprintf (\"\\n\"); }\n", offset);
+  }
+  if (arg->exist_var_num >= 0) {
+    printf ("  }\n");
+  }
+  return 0;
+}
+
 int gen_field_autocomplete_excl (struct arg *arg, int *vars, int num, int from_func) {
   assert (arg);
   assert (arg->var_num < 0);
@@ -1462,6 +1554,60 @@ void gen_constructor_store_ds (struct tl_combinator *c) {
   printf ("}\n"); 
 }
 
+void gen_constructor_print_ds (struct tl_combinator *c) {
+  printf ("int print_ds_constructor_%s (", c->print_id);
+  print_c_type_name (c->result, "", 0);
+  printf ("DS, struct paramed_type *T) {\n");
+  int i;
+  for (i = 0; i < c->args_num; i++) if (c->args[i]->flags & FLAG_EXCL) {
+    printf (" return -1;\n");
+    printf ("}\n");
+    return;
+  }
+  static char s[10000];
+  sprintf (s, "T");
+  
+  int *vars = malloc0 (c->var_num * 4);;
+  gen_uni_skip (c->result, s, vars, 1, 0);
+
+  if (c->name == NAME_INT) {
+    printf ("  eprintf (\" %%d\", *DS);\n");
+    printf ("  return 0;\n");
+    printf ("}\n");
+    return;
+  } else if (c->name == NAME_LONG) {
+    printf ("  eprintf (\" %%lld\", *DS);\n");
+    printf ("  return 0;\n");
+    printf ("}\n");
+    return;
+  } else if (c->name == NAME_STRING || c->name == NAME_BYTES) {
+    printf ("  print_escaped_string (DS->data, DS->len);\n");
+    printf ("  return 0;\n");
+    printf ("}\n");
+    return;
+  } else if (c->name == NAME_DOUBLE) {
+    printf ("  eprintf (\" %%lf\", *DS);\n");
+    printf ("  return 0;\n");
+    printf ("}\n");
+    return;
+  }
+ 
+  assert (c->result->methods->type (c->result) == NODE_TYPE_TYPE);
+  int empty = is_empty (((struct tl_tree_type *)c->result)->type);
+  if (!empty) {
+    printf ("  eprintf (\" %s\");\n", c->id);
+    printf ("  if (multiline_output >= 2) { eprintf (\"\\n\"); }\n");
+  }
+  
+
+  for (i = 0; i < c->args_num; i++) if (!(c->args[i]->flags & FLAG_OPT_VAR)) {
+    assert (gen_field_print_ds (c->args[i], vars, i + 1, empty) >= 0);
+  }
+  free (vars);
+  printf ("  return 0;\n");
+  printf ("}\n"); 
+}
+
 void gen_type_skip (struct tl_type *t) {
   printf ("int skip_type_%s (struct paramed_type *T) {\n", t->print_id);
   printf ("  if (in_remaining () < 4) { return -1;}\n");
@@ -1697,6 +1843,41 @@ void gen_type_store_ds (struct tl_type *t) {
       }
       printf ("  store_ds_constructor_%s (D, T); return; \n", t->constructors[0]->print_id);
     }
+    printf ("}\n");
+  }
+}
+
+void gen_type_print_ds (struct tl_type *t) {
+  int empty = is_empty (t);;
+  int k;
+  for (k = 0; k < 2; k++) {
+    printf ("int print_ds_type_%s%s (", k ? "bare_" : "", t->print_id);
+    print_c_type_name (t->constructors[0]->result, "", 0);
+    printf ("DS, struct paramed_type *T) {\n");
+    printf ("  int res;\n");
+    if (!empty) {
+      printf ("  if (multiline_output >= 2) { multiline_offset += multiline_offset_size; }\n");
+      printf ("  eprintf (\" (\");\n");
+    }
+    if (t->constructors_num > 1) {
+      printf ("  switch (DS->magic) {\n");
+      int i;
+      for (i = 0; i < t->constructors_num; i++) {
+         printf ("  case 0x%08x: res = print_ds_constructor_%s (DS, T); break;\n", t->constructors[i]->name, t->constructors[i]->print_id);
+      }
+      printf ("  default: return -1;\n");
+      printf ("  }\n");
+    } else {
+      printf ("  res = print_ds_constructor_%s (DS, T);\n", t->constructors[0]->print_id);
+    }
+    if (!empty) {
+      printf ("  if (res >= 0) {\n");
+      printf ("    if (multiline_output >= 2) { multiline_offset -= multiline_offset_size; print_offset (); }\n");
+      printf ("    eprintf (\" )\");\n");
+      //printf ("    if (multiline_output >= 2) { printf (\"\\n\"); }\n");
+      printf ("  }\n");
+    }
+    printf ("  return res;\n");
     printf ("}\n");
   }
 }
@@ -2555,6 +2736,61 @@ void gen_store_ds_header (void) {
   printf ("void store_ds_type_any (void *D, struct paramed_type *T);\n");
 }
 
+void gen_print_ds_header (void) {
+  printf ("#include \"auto.h\"\n");
+  printf ("#include \"auto-types.h\"\n");
+  printf ("#include <assert.h>\n");
+  printf ("#include <stdio.h>\n");
+
+  printf ("struct tgl_state;\n");
+  printf ("char *tglf_extf_print_ds (struct tgl_state *TLS, void *DS, struct paramed_type *T);\n");
+
+  int i, j;
+  for (i = 0; i < tn; i++) {
+    for (j = 0; j < tps[i]->constructors_num; j ++) {
+      printf ("int print_ds_constructor_%s (", tps[i]->constructors[j]->print_id);
+      print_c_type_name (tps[i]->constructors[j]->result, "", 0);
+      printf ("DS, struct paramed_type *T);\n");
+    }
+  }
+  for (i = 0; i < tn; i++) if (tps[i]->id[0] != '#' && strcmp (tps[i]->id, "Type")) {
+    printf ("int print_ds_type_%s (", tps[i]->print_id);
+    print_c_type_name (tps[i]->constructors[0]->result, "", 0);
+    printf ("DS, struct paramed_type *T);\n");
+    printf ("int print_ds_type_bare_%s (", tps[i]->print_id);
+    print_c_type_name (tps[i]->constructors[0]->result, "", 0);
+    printf ("DS, struct paramed_type *T);\n");
+  }
+  printf ("int print_ds_type_any (void *DS, struct paramed_type *T);\n");
+}
+
+void gen_print_ds_source (void) {
+  printf ("#include \"auto.h\"\n");
+  printf ("#include <assert.h>\n");
+
+  printf ("#include \"auto/auto-print-ds.h\"\n");
+  printf ("#include \"auto/auto-skip.h\"\n");
+  printf ("#include \"auto-static-print-ds.c\"\n");
+  printf ("#include \"mtproto-common.h\"\n");
+  int i, j;
+  for (i = 0; i < tn; i++) {
+    for (j = 0; j < tps[i]->constructors_num; j ++) {
+      gen_constructor_print_ds (tps[i]->constructors[j]);
+    }
+  }
+  for (i = 0; i < tn; i++) if (tps[i]->id[0] != '#' && strcmp (tps[i]->id, "Type")) {
+    gen_type_print_ds (tps[i]);
+  }
+  printf ("int print_ds_type_any (void *DS, struct paramed_type *T) {\n");
+  printf ("  switch (T->type->name) {\n");
+  for (i = 0; i < tn; i++) if (tps[i]->id[0] != '#' && strcmp (tps[i]->id, "Type") && tps[i]->name) {
+    printf ("  case 0x%08x: return print_ds_type_%s (DS, T);\n", tps[i]->name, tps[i]->print_id);
+    printf ("  case 0x%08x: return print_ds_type_bare_%s (DS, T);\n", ~tps[i]->name, tps[i]->print_id);
+  }
+  printf ("  default: return -1; }\n");
+  printf ("}\n");
+}
+
 int parse_tlo_file (void) {
   buf_end = buf_ptr + (buf_size / 4);
   assert (get_int () == TLS_SCHEMA_V2);
@@ -2653,6 +2889,10 @@ int parse_tlo_file (void) {
       gen_store_ds_source ();
     } else if (!strcmp (gen_what[i], "store-ds-header")) {
       gen_store_ds_header ();
+    } else if (!strcmp (gen_what[i], "print-ds")) {
+      gen_print_ds_source ();
+    } else if (!strcmp (gen_what[i], "print-ds-header")) {
+      gen_print_ds_header ();
     } else {
       assert (0);
     }
