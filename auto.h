@@ -53,6 +53,7 @@ static inline void *memdup (const void *d, int len) {
 
 #define DS_LVAL(x) ((x) ? *(x) : 0)
 #define DS_STR(x) ((x) ? (x)->data : NULL), ((x) ? (x)->len : 0)
+#define DS_RSTR(x) ((x) ? (x)->len : 0), ((x) ? (x)->data : NULL)
 #define DS_STR_DUP(x) memdup(((x) ? (x)->data : NULL), ((x) ? (x)->len + 1: 0))
 #define DS_BVAL(x) ((x) && ((x)->magic == CODE_bool_true))
 

@@ -614,7 +614,7 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
   }
 
   if (!temp_key) {
-    bl_do_set_auth_key_id (TLS, DC->id, (unsigned char *)DC->auth_key);
+    bl_do_set_auth_key (TLS, DC->id, (unsigned char *)DC->auth_key);
     sha1 ((unsigned char *)DC->auth_key, 256, sha1_buffer);
   } else {
     sha1 ((unsigned char *)DC->temp_auth_key, 256, sha1_buffer);
@@ -953,16 +953,11 @@ static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long
   case CODE_rpc_result:
     return work_rpc_result (TLS, c, msg_id);
   case CODE_update_short:
-    tglu_work_update_short (TLS, c, msg_id);
-    return 0;
   case CODE_updates:
-    tglu_work_updates (TLS, c, msg_id);
-    return 0;
   case CODE_update_short_message:
-    tglu_work_update_short_message (TLS, c, msg_id);
-    return 0;
   case CODE_update_short_chat_message:
-    tglu_work_update_short_chat_message (TLS, c, msg_id);
+  case CODE_updates_too_long:
+    tglu_work_any_updates (TLS);
     return 0;
   case CODE_gzip_packed:
     return work_packed (TLS, c, msg_id);
@@ -974,9 +969,6 @@ static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long
     return work_detailed_info (TLS, c, msg_id);
   case CODE_msg_new_detailed_info:
     return work_new_detailed_info (TLS, c, msg_id);
-  case CODE_updates_too_long:
-    tglu_work_updates_to_long (TLS, c, msg_id);
-    return 0;
   case CODE_bad_msg_notification:
     return work_bad_msg_notification (TLS, c, msg_id);
   }

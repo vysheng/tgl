@@ -19,7 +19,7 @@
 */
 #ifndef __TGL_LAYOUT_H__
 #define __TGL_LAYOUT_H__
-
+/*
 #define FLAG_MESSAGE_EMPTY 1
 #define FLAG_DELETED 2
 #define FLAG_FORBIDDEN 4
@@ -36,7 +36,7 @@
 #define FLAG_CHAT_IN_CHAT 128
 
 #define FLAG_ENCRYPTED 4096
-#define FLAG_PENDING 8192
+#define FLAG_PENDING 8192*/
 
 
 #define FLAG_DOCUMENT_IMAGE 1
@@ -44,6 +44,43 @@
 #define FLAG_DOCUMENT_ANIMATED 4
 #define FLAG_DOCUMENT_AUDIO 8
 #define FLAG_DOCUMENT_VIDEO 16
+
+#define TGLMF_UNREAD 1
+#define TGLMF_OUT 2
+#define TGLMF_CREATED (1 << 8)
+#define TGLMF_PENDING (1 << 9)
+#define TGLMF_DELETED (1 << 10)
+#define TGLMF_ENCRYPTED (1 << 11)
+#define TGLMF_EMPTY (1 << 12)
+#define TGLMF_SERVICE (1 << 13)
+#define TGLMF_CREATE 0x10000
+
+#define TGLPF_CREATED (1 << 8)
+#define TGLPF_CREATE (1 << 16)
+#define TGLPF_HAS_PHOTO (1 << 11)
+#define TGLPF_DELETED (1 << 10)
+
+#define TGLUF_CONTACT 1
+#define TGLUF_BLOCKED 4
+#define TGLUF_SELF 8
+#define TGLUF_CREATED TGLPF_CREATED
+#define TGLUF_DELETED TGLPF_DELETED
+#define TGLUF_HAS_PHOTO TGLPF_HAS_PHOTO
+#define TGLUF_CREATE TGLPF_CREATE
+
+#define TGLCF_CREATED TGLPF_CREATED
+#define TGLCF_CREATE TGLPF_CREATE
+#define TGLCF_HAS_PHOTO TGLPF_HAS_PHOTO
+
+#define TGLECF_CREATED TGLPF_CREATED
+#define TGLECF_CREATE TGLPF_CREATE
+#define TGLECF_HAS_PHOTO TGLPF_HAS_PHOTO
+#define TGLECF_DELETED TGLPF_DELETED
+
+#define TGL_FLAGS_UNCHANGED 0xffff
+
+#define TGLDCF_AUTHORIZED 1
+#define TGLDCF_LOGGED_IN 4
 
 #pragma pack(push,4)
 
@@ -267,6 +304,8 @@ struct tgl_user {
   int structure_version;
   struct tgl_file_location photo_big;
   struct tgl_file_location photo_small;
+  int last_read_in;
+  int last_read_out;
   long long photo_id;
   struct tgl_photo photo;
   char *first_name;
@@ -294,6 +333,8 @@ struct tgl_chat {
   int structure_version;
   struct tgl_file_location photo_big;
   struct tgl_file_location photo_small;
+  int last_read_in;
+  int last_read_out;
   struct tgl_photo photo;
   char *title;
   int users_num;
@@ -317,7 +358,9 @@ enum tgl_secret_chat_exchange_state {
   tgl_sce_none,
   tgl_sce_requested,
   tgl_sce_accepted,
-  tgl_sce_committed
+  tgl_sce_committed,
+  tgl_sce_confirmed,
+  tgl_sce_aborted
 };
 
 struct tgl_secret_chat {
@@ -339,7 +382,6 @@ struct tgl_secret_chat {
   int last_in_seq_no;
   long long access_hash;
   unsigned char *g_key;
-  unsigned char *nonce;
 
   enum tgl_secret_chat_state state;
   int key[64];
