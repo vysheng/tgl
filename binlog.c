@@ -320,10 +320,12 @@ static int fetch_comb_binlog_user_new (struct tgl_state *TLS, struct tl_ds_binlo
  
   if (DS_U->last_read_in) {
     U->last_read_in = DS_LVAL (DS_U->last_read_in);
+    tgls_messages_mark_read (U->last, 0, U->last_read_in);
   }
  
   if (DS_U->last_read_out) {
     U->last_read_out = DS_LVAL (DS_U->last_read_out);
+    tgls_messages_mark_read (U->last, TGLMF_OUT, U->last_read_out);
   }
 
   if (TLS->callback.user_update && updates) {
@@ -530,10 +532,12 @@ static int fetch_comb_binlog_chat_new (struct tgl_state *TLS, struct tl_ds_binlo
  
   if (DS_U->last_read_in) {
     C->last_read_in = DS_LVAL (DS_U->last_read_in);
+    tgls_messages_mark_read (C->last, 0, C->last_read_in);
   }
  
   if (DS_U->last_read_out) {
     C->last_read_out = DS_LVAL (DS_U->last_read_out);
+    tgls_messages_mark_read (C->last, TGLMF_OUT, C->last_read_out);
   }
 
       
@@ -670,6 +674,10 @@ static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_bi
 
   if (flags & 0x10000) {
     tglm_message_insert (TLS, M);
+  }
+
+  if (!(M->flags & TGLMF_UNREAD)) {
+    tgls_messages_mark_read (M, M->flags & TGLMF_OUT, M->id);
   }
   return 0;
 }
@@ -1076,7 +1084,7 @@ static void add_log_event (struct tgl_state *TLS, const int *data, int len) {
   in_end = end;
 }
 
-void bl_do_dc_option (struct tgl_state *TLS, int id, int l1, const char *name, int l2, const char *ip, int port) {
+void bl_do_dc_option (struct tgl_state *TLS, int id, const char *name, int l1, const char *ip, int l2, int port) {
   struct tgl_dc *DC = TLS->DC_list[id];
   if (DC && !strncmp (ip, DC->ip, l2)) { return; }
   
@@ -1154,7 +1162,7 @@ void bl_do_set_date (struct tgl_state *TLS, int date) {
 
 void bl_do_set_seq (struct tgl_state *TLS, int seq) {
   if (TLS->locks & TGL_LOCK_DIFF) { return; }
-  if (seq == TLS->seq) { return; }
+  if (seq <= TLS->seq) { return; }
   int *ev = alloc_log_event (8);
   ev[0] = CODE_binlog_set_seq;
   ev[1] = seq;
@@ -1309,7 +1317,6 @@ void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int *fr
     store_ds_type_encrypted_file (file, TYPE_TO_PARAM (encrypted_file));
   }
 
-  
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 
@@ -1454,7 +1461,7 @@ void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, cons
     }
   }
   
-  if ((*flags_p) & 0xfffe0000) {
+  if (((*flags_p) & 0xffff0000) || !P || (P->flags & 0xffff) != flags) {
     add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
   }
 }
@@ -1541,7 +1548,7 @@ void bl_do_chat_new (struct tgl_state *TLS, int id, const char *title, int title
     }
   }
   
-  if ((*flags_p) & 0xfffe0000) {
+  if (((*flags_p) & 0xffff0000) || !P || (P->flags & 0xffff) != flags)   {
     add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
   }
 }
@@ -1645,7 +1652,7 @@ void bl_do_encr_chat_new (struct tgl_state *TLS, int id, long long *access_hash,
     }
   }
  
-  if ((*flags_p) & 0xfffe0000) {
+  if (((*flags_p) & 0xffff0000) || !P || (P->flags & 0xffff) != flags)   {
     add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
   }
 }

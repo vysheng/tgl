@@ -34,13 +34,14 @@
 static void fetch_dc_option_new (struct tgl_state *TLS, struct tl_ds_dc_option *DS_DO) {
   vlogprintf (E_DEBUG, "id = %d, name = %.*s ip = %.*s port = %d\n", DS_LVAL (DS_DO->id), DS_RSTR (DS_DO->hostname), DS_RSTR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
 
-  bl_do_dc_option (TLS, DS_LVAL (DS_DO->id), DS_RSTR (DS_DO->hostname), DS_RSTR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
+  bl_do_dc_option (TLS, DS_LVAL (DS_DO->id), DS_STR (DS_DO->hostname), DS_STR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
 }
 
 int tgl_check_pts_diff (struct tgl_state *TLS, int pts, int pts_count) {
+  vlogprintf (E_ERROR, "pts = %d, pts_count = %d\n", pts, pts_count);
   if (!pts_count) { return 0; }
   if (TLS->pts) {
-    if (pts <= TLS->pts) {
+    if (pts < TLS->pts + pts_count) {
       vlogprintf (E_NOTICE, "Duplicate message with pts=%d\n", pts);
       return -1;
     }
@@ -54,7 +55,7 @@ int tgl_check_pts_diff (struct tgl_state *TLS, int pts, int pts_count) {
       return -1;
     }
     vlogprintf (E_DEBUG, "Ok update. pts = %d\n", pts);
-    return 0;
+    return 1;
   } else {
     return -1;
   }
@@ -87,6 +88,7 @@ void tglu_work_update_new (struct tgl_state *TLS, struct tl_ds_update *DS_U) {
       struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->random_id));
       if (M) {
         bl_do_set_msg_id (TLS, M, DS_LVAL (DS_U->id));
+        bl_do_msg_update (TLS, M->id);
       }
     }
     break;
@@ -382,7 +384,7 @@ void tglu_work_update_new (struct tgl_state *TLS, struct tl_ds_update *DS_U) {
   if (DS_U->pts) {
     assert (DS_U->pts_count);
 
-    bl_do_set_pts (TLS, DS_LVAL (DS_U->pts) + DS_LVAL (DS_U->pts_count));
+    bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
   }
 }
   

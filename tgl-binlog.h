@@ -24,7 +24,7 @@
 #include "tgl.h"
 #include "auto/auto-types.h"
 
-void bl_do_dc_option (struct tgl_state *TLS, int id, int l1, const char *name, int l2, const char *ip, int port);
+void bl_do_dc_option (struct tgl_state *TLS, int id, const char *name, int l1, const char *ip, int l2, int port);
 void bl_do_set_working_dc (struct tgl_state *TLS, int num);
 void bl_do_dc_signed (struct tgl_state *TLS, int id);
 void bl_do_set_our_id (struct tgl_state *TLS, int id);

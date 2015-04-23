@@ -1848,3 +1848,25 @@ void tglf_fetch_int_tuple (int *dst, int **src, int len) {
     dst[i] = *src[i];
   }
 }
+
+
+void tgls_messages_mark_read (struct tgl_message *M, int out, int seq) {
+  while (M && M->id > seq) { 
+    if ((M->flags & TGLMF_OUT) == out) {
+      if (!(M->flags & TGLMF_UNREAD)) {
+        return;
+      }
+    }
+    M = M->next; 
+  }
+  while (M) {
+    if ((M->flags & TGLMF_OUT) == out) {
+      if (M->flags & TGLMF_UNREAD) {
+        M->flags &= ~TGLMF_UNREAD;
+      } else {
+        return;
+      }
+    }
+    M = M->next; 
+  }
+}

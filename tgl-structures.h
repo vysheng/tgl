@@ -53,5 +53,6 @@ void tglp_insert_encrypted_chat (struct tgl_state *TLS, tgl_peer_t *P);
 void tglp_insert_user (struct tgl_state *TLS, tgl_peer_t *P);
 void tglp_insert_chat (struct tgl_state *TLS, tgl_peer_t *P);
 enum tgl_typing_status tglf_fetch_typing (void);
+void tgls_messages_mark_read (struct tgl_message *M, int out, int seq);
 
 #endif

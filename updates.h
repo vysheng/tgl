@@ -42,4 +42,5 @@ void tgl_remove_status_expire (struct tgl_state *TLS, struct tgl_user *U);
 int tgl_check_pts_diff (struct tgl_state *TLS, int pts, int pts_count);
 void tglu_work_updates_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U);
 void tglu_work_any_updates (struct tgl_state *TLS);
+void tglu_work_any_updates_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U);
 #endif
