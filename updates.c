@@ -59,7 +59,6 @@ int tgl_check_pts_diff (struct tgl_state *TLS, int pts, int pts_count) {
 
 int tgl_check_qts_diff (struct tgl_state *TLS, int qts, int qts_count) {
   vlogprintf (E_ERROR, "qts = %d, qts_count = %d\n", qts, qts_count);
-  assert (TLS->qts);
   if (qts < TLS->qts + qts_count) {
     vlogprintf (E_NOTICE, "Duplicate message with qts=%d\n", qts);
     return -1;
@@ -118,7 +117,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
     }
   }
   
-  if (DS_U->pts) {
+  if (DS_U->qts) {
     if (!check_only && tgl_check_qts_diff (TLS, DS_LVAL (DS_U->qts), 1) <= 0) {
       return;
     }
