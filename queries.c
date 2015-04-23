@@ -440,16 +440,16 @@ void tgl_do_insert_header (struct tgl_state *TLS) {
     uname (&st);
     out_string (st.machine);
     static char buf[4096];
-    tsnprintf (buf, sizeof (buf) - 1, "%.999s %.999s %.999s\n", st.sysname, st.release, st.version);
+    tsnprintf (buf, sizeof (buf) - 1, "%.999s %.999s %.999s", st.sysname, st.release, st.version);
     out_string (buf);
-    tsnprintf (buf, sizeof (buf) - 1, "%s (TGL %s)\n", TLS->app_version, TGL_VERSION);
+    tsnprintf (buf, sizeof (buf) - 1, "%s (TGL %s)", TLS->app_version, TGL_VERSION);
     out_string (buf);
     out_string ("En");
   } else { 
     out_string ("x86");
     out_string ("Linux");
     static char buf[4096];
-    tsnprintf (buf, sizeof (buf) - 1, "%s (TGL %s)\n", TLS->app_version, TGL_VERSION);
+    tsnprintf (buf, sizeof (buf) - 1, "%s (TGL %s)", TLS->app_version, TGL_VERSION);
     out_string (buf);
     out_string ("en");
   }
@@ -823,6 +823,12 @@ void tgl_do_send_text (struct tgl_state *TLS, tgl_peer_id_t id, char *file_name,
 /* }}} */
 
 /* {{{ Mark read */
+
+struct mark_read_extra {
+  tgl_peer_id_t id;
+  int max_id;
+};
+
 void tgl_do_messages_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, int max_id, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int), void *callback_extra);
 static int mark_read_on_receive (struct tgl_state *TLS, struct query *q, void *D) {
   struct tl_ds_messages_affected_history *DS_MAH = D;
@@ -834,27 +840,28 @@ static int mark_read_on_receive (struct tgl_state *TLS, struct query *q, void *D
   }
 
   int offset = DS_LVAL (DS_MAH->offset);
-  int *t = q->extra;
+
+  struct mark_read_extra *E = q->extra;
   if (offset > 0) {
-    tgl_do_messages_mark_read (TLS, tgl_set_peer_id (t[0], t[1]), t[2], offset, q->callback, q->callback_extra);
+    tgl_do_messages_mark_read (TLS, E->id, E->max_id, offset, q->callback, q->callback_extra);
   } else {
-    if (t[0] == TGL_PEER_USER) {
-      bl_do_user_new (TLS, t[1], NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, &t[2], NULL, TGL_FLAGS_UNCHANGED);
+    if (tgl_get_peer_type (E->id) == TGL_PEER_USER) {
+      bl_do_user_new (TLS, tgl_get_peer_id (E->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, &E->max_id, NULL, TGL_FLAGS_UNCHANGED);
     } else {
-      assert (t[0] == TGL_PEER_CHAT);
-      bl_do_chat_new (TLS, t[1], NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &t[2], NULL, TGL_FLAGS_UNCHANGED);
+      assert (tgl_get_peer_type (E->id) == TGL_PEER_CHAT);
+      bl_do_chat_new (TLS, tgl_get_peer_id (E->id), NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &E->max_id, NULL, TGL_FLAGS_UNCHANGED);
     }
     if (q->callback) {
       ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 1);
     }
   }
-  tfree (t, 12);
+  tfree (E, sizeof (*E));
   return 0;
 }
 
 static int mark_read_on_error (struct tgl_state *TLS, struct query *q, int error_code, int len, char *error) {
-  int *t = q->extra;
-  tfree (t, 12);
+  struct mark_read_extra *E = q->extra;
+  tfree (E, sizeof (*E));
   if (q->callback) {
     ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 0);
   }
@@ -873,11 +880,12 @@ void tgl_do_messages_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, int max
   out_peer_id (TLS, id);
   out_int (max_id);
   out_int (offset);
-  int *t = talloc (12);
-  t[0] = tgl_get_peer_type (id);
-  t[1] = tgl_get_peer_id (id);
-  t[2] = max_id;
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &mark_read_methods, t, callback, callback_extra);
+
+  struct mark_read_extra *E = talloc (sizeof (*E));
+  E->id = id;
+  E->max_id = max_id;
+  
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &mark_read_methods, E, callback, callback_extra);
 }
 
 void tgl_do_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -901,46 +909,50 @@ void tgl_do_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)
 /* }}} */
 
 /* {{{ Get history */
-void _tgl_do_get_history (struct tgl_state *TLS, tgl_peer_id_t id, int limit, int offset, int max_id, int list_offset, int list_size, struct tgl_message *ML[], void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
+struct get_history_extra {
+  struct tgl_message **ML;
+  int list_offset;
+  int list_size;
+  tgl_peer_id_t id;
+  int limit;
+  int offset;
+  int max_id;
+};
+
+void _tgl_do_get_history (struct tgl_state *TLS, struct get_history_extra *E, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
+
 
 static int get_history_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   struct tl_ds_messages_messages *DS_MM = D;
 
-  void **T = q->extra;
-  struct tgl_message **ML = T[0];
-  int list_offset = (long)T[1];
-  int list_size = (long)T[2];
-  tgl_peer_id_t id = tgl_set_peer_id ((long)T[4], (long)T[3]);
-  int limit = (long)T[5];
-  int offset = (long)T[6];
-  tfree (T, sizeof (void *) * 7);
+  struct get_history_extra *E = q->extra;
   
   int n = DS_LVAL (DS_MM->messages->cnt);
 
-  if (list_size - list_offset < n) {
-    int new_list_size = 2 * list_size;
-    if (new_list_size - list_offset < n) {
-      new_list_size = n + list_offset;
+  if (E->list_size - E->list_offset < n) {
+    int new_list_size = 2 * E->list_size;
+    if (new_list_size - E->list_offset < n) {
+      new_list_size = n + E->list_offset;
     }
-    ML = trealloc (ML, list_size * sizeof (void *), new_list_size * sizeof (void *));
-    assert (ML);
-    list_size = new_list_size;
+    E->ML = trealloc (E->ML, E->list_size * sizeof (void *), new_list_size * sizeof (void *));
+    assert (E->ML);
+    E->list_size = new_list_size;
   }
   
   int i;
   for (i = 0; i < n; i++) {
-    ML[i + list_offset] = tglf_fetch_alloc_message_new (TLS, DS_MM->messages->data[i]);
+    E->ML[i + E->list_offset] = tglf_fetch_alloc_message_new (TLS, DS_MM->messages->data[i]);
   }
-  list_offset += n;
-  offset += n;
-  limit -= n;
+  E->list_offset += n;
+  E->offset += n;
+  E->limit -= n;
 
   int count = DS_LVAL (DS_MM->count);
-  if (count >= 0 && limit + offset >= count) {
-    limit = count - offset;
-    if (limit < 0) { limit = 0; }
+  if (count >= 0 && E->limit + E->offset >= count) {
+    E->limit = count - E->offset;
+    if (E->limit < 0) { E->limit = 0; }
   }
-  assert (limit >= 0);
+  assert (E->limit >= 0);
   
   for (i = 0; i < DS_LVAL (DS_MM->chats->cnt); i++) {
     tglf_fetch_alloc_chat_new (TLS, DS_MM->chats->data[i]);
@@ -951,27 +963,28 @@ static int get_history_on_answer (struct tgl_state *TLS, struct query *q, void *
   }
 
  
-  if (limit <= 0 || DS_MM->magic == CODE_messages_messages) {
+  if (E->limit <= 0 || DS_MM->magic == CODE_messages_messages) {
     if (q->callback) {
-      ((void (*)(struct tgl_state *TLS, void *, int, int, struct tgl_message **))q->callback) (TLS, q->callback_extra, 1, list_offset, ML);
+      ((void (*)(struct tgl_state *TLS, void *, int, int, struct tgl_message **))q->callback) (TLS, q->callback_extra, 1, E->list_offset, E->ML);
     }
-    if (list_offset > 0) {
-      tgl_do_messages_mark_read (TLS, id, ML[0]->id, 0, 0, 0);
+    if (E->list_offset > 0) {
+      tgl_do_messages_mark_read (TLS, E->id, E->ML[0]->id, 0, 0, 0);
     }
   
-    tfree (ML, sizeof (void *) * list_size);
+    tfree (E->ML, sizeof (void *) * E->list_size);
+    tfree (E, sizeof (*E));
   } else {
-    _tgl_do_get_history (TLS, id, limit, 0, ML[list_offset - 1]->id, list_offset, list_size, ML, q->callback, q->callback_extra);
+    E->offset = 0;
+    E->max_id = E->ML[E->list_offset - 1]->id;
+    _tgl_do_get_history (TLS, E, q->callback, q->callback_extra);
   }
   return 0;
 }
 
 static int get_history_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
-  void **T = q->extra;
-  struct tgl_message **ML = T[0];
-  int list_size = (long)T[2];
-  tfree (T, sizeof (void *) * 7);
-  tfree (ML, sizeof (void *) * list_size);
+  struct get_history_extra *E = q->extra;
+  tfree (E->ML, sizeof (void *) * E->list_size);
+  tfree (E, sizeof (*E));
 
   if (q->callback) {
     ((void (*)(struct tgl_state *TLS, void *, int, int, struct tgl_message **))q->callback) (TLS, q->callback_extra, 0, 0, NULL);
@@ -1056,23 +1069,14 @@ void tgl_do_get_local_history_ext (struct tgl_state *TLS, tgl_peer_id_t id, int 
 
 
 
-void _tgl_do_get_history (struct tgl_state *TLS, tgl_peer_id_t id, int limit, int offset, int max_id, int list_offset, int list_size, struct tgl_message *ML[], void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
-  void **T = talloc (sizeof (void *) * 7);
-  T[0] = ML;
-  T[1] = (void *)(long)list_offset;
-  T[2] = (void *)(long)list_size;
-  T[3] = (void *)(long)tgl_get_peer_id (id);
-  T[4] = (void *)(long)tgl_get_peer_type (id);
-  T[5] = (void *)(long)limit;
-  T[6] = (void *)(long)offset;
-
+void _tgl_do_get_history (struct tgl_state *TLS, struct get_history_extra *E, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
   clear_packet ();
   out_int (CODE_messages_get_history);
-  out_peer_id (TLS, id);
-  out_int (offset);
-  out_int (max_id);
-  out_int (limit);
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_history_methods, T, callback, callback_extra);
+  out_peer_id (TLS, E->id);
+  out_int (E->offset);
+  out_int (E->max_id);
+  out_int (E->limit);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_history_methods, E, callback, callback_extra);
 }
 
 void tgl_do_get_history (struct tgl_state *TLS, tgl_peer_id_t id, int limit, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
@@ -1081,7 +1085,10 @@ void tgl_do_get_history (struct tgl_state *TLS, tgl_peer_id_t id, int limit, int
     tgl_do_mark_read (TLS, id, 0, 0);
     return;
   }
-  _tgl_do_get_history (TLS, id, limit, 0, 0, 0, 0, 0, callback, callback_extra);
+  struct get_history_extra *E = talloc0 (sizeof (*E));
+  E->id = id;
+  E->limit = limit;
+  _tgl_do_get_history (TLS, E, callback, callback_extra);
 }
 
 void tgl_do_get_history_ext (struct tgl_state *TLS, tgl_peer_id_t id, int offset, int limit, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
@@ -1090,28 +1097,64 @@ void tgl_do_get_history_ext (struct tgl_state *TLS, tgl_peer_id_t id, int offset
     tgl_do_mark_read (TLS, id, 0, 0);
     return;
   }
-  _tgl_do_get_history (TLS, id, limit, offset, 0, 0, 0, 0, callback, callback_extra);
+  struct get_history_extra *E = talloc0 (sizeof (*E));
+  E->id = id;
+  E->limit = limit;
+  E->offset = offset;
+  _tgl_do_get_history (TLS, E, callback, callback_extra);
 }
 /* }}} */
 
 /* {{{ Get dialogs */
+struct get_dialogs_extra {
+  tgl_peer_id_t *PL;
+  int *UC;
+  int *LM;
+  int *LRM;
+  
+  int list_offset;
+  int list_size;
+  int limit;
+  int offset;
+  int max_id;
+};
+
+void _tgl_do_get_dialog_list (struct tgl_state *TLS, struct get_dialogs_extra *E, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, tgl_peer_id_t peers[], int last_msg_id[], int unread_count[]), void *callback_extra);
+
 static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   struct tl_ds_messages_dialogs *DS_MD = D;
 
+  struct get_dialogs_extra *E = q->extra;
+
   int dl_size = DS_LVAL (DS_MD->dialogs->cnt);
 
-  tgl_peer_id_t *PL = talloc0 (sizeof (tgl_peer_id_t) * dl_size);
-  int *UC = talloc0 (4 * dl_size);
-  int *LM = talloc0 (4 * dl_size);
-  int *LRM = talloc0 (4 * dl_size);
+  if (E->list_offset + dl_size > E->list_size) {
+    int new_list_size = E->list_size * 2;
+    if (new_list_size < E->list_offset + dl_size) {
+      new_list_size = E->list_offset + dl_size;
+    }
+    
+    E->PL = trealloc (E->PL, E->list_size * sizeof (tgl_peer_id_t), new_list_size * sizeof (tgl_peer_id_t));
+    assert (E->PL);
+    E->UC = trealloc (E->UC, E->list_size * sizeof (int), new_list_size * sizeof (int));
+    assert (E->UC);
+    E->LM = trealloc (E->LM, E->list_size * sizeof (int), new_list_size * sizeof (int));
+    assert (E->LM);
+    E->LRM = trealloc (E->LRM, E->list_size * sizeof (int), new_list_size * sizeof (int));
+    assert (E->LRM);
+    
+    E->list_size = new_list_size;
+  }
+
   int i;
   for (i = 0; i < dl_size; i++) {
     struct tl_ds_dialog *DS_D = DS_MD->dialogs->data[i];
-    PL[i] = tglf_fetch_peer_id_new (TLS, DS_D->peer);
-    LM[i] = DS_LVAL (DS_D->top_message);
-    UC[i] = DS_LVAL (DS_D->unread_count);    
-    LRM[i] = DS_LVAL (DS_D->read_inbox_max_id);
+    E->PL[E->list_offset + i] = tglf_fetch_peer_id_new (TLS, DS_D->peer);
+    E->LM[E->list_offset + i] = DS_LVAL (DS_D->top_message);
+    E->UC[E->list_offset + i] = DS_LVAL (DS_D->unread_count);    
+    E->LRM[E->list_offset + i] = DS_LVAL (DS_D->read_inbox_max_id);
   }
+  E->list_offset += dl_size;
 
   for (i = 0; i < DS_LVAL (DS_MD->messages->cnt); i++) {
     tglf_fetch_alloc_message_new (TLS, DS_MD->messages->data[i]);
@@ -1125,18 +1168,31 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q, void *
     tglf_fetch_alloc_user_new (TLS, DS_MD->users->data[i]);
   }
 
-  if (q->callback) {
-    ((void (*)(struct tgl_state *TLS, void *, int, int, tgl_peer_id_t *, int *, int *))q->callback) (TLS, q->callback_extra, 1, dl_size, PL, LM, UC);
+  vlogprintf (E_ERROR, "dl_size = %d, total = %d\n", dl_size, E->list_offset);
+  if (dl_size && E->list_offset < E->limit && DS_MD->magic == CODE_messages_dialogs_slice && E->list_offset < DS_LVAL (DS_MD->count)) {
+    E->offset += dl_size;
+    _tgl_do_get_dialog_list (TLS, E, q->callback, q->callback_extra);
+  } else {
+    if (q->callback) {
+      ((void (*)(struct tgl_state *TLS, void *, int, int, tgl_peer_id_t *, int *, int *))q->callback) (TLS, q->callback_extra, 1, E->list_offset, E->PL, E->LM, E->UC);
+    }
+    tfree (E->PL, sizeof (tgl_peer_id_t) * E->list_size);
+    tfree (E->UC, 4 * E->list_size);
+    tfree (E->LM, 4 * E->list_size);
+    tfree (E->LRM, 4 * E->list_size);
+    tfree (E, sizeof (*E));
   }
-  tfree (PL, sizeof (tgl_peer_id_t) * dl_size);
-  tfree (UC, 4 * dl_size);
-  tfree (LM, 4 * dl_size);
-  tfree (LRM, 4 * dl_size);
   
   return 0;
 }
 
 static int get_dialogs_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+  struct get_dialogs_extra *E = q->extra;
+  tfree (E->PL, sizeof (tgl_peer_id_t) * E->list_size);
+  tfree (E->UC, 4 * E->list_size);
+  tfree (E->LM, 4 * E->list_size);
+  tfree (E->LRM, 4 * E->list_size);
+  tfree (E, sizeof (*E));
   if (q->callback) {
     ((void (*)(struct tgl_state *TLS, void *, int, int, tgl_peer_id_t *, int *, int *))q->callback) (TLS, q->callback_extra, 0, 0, NULL, NULL, NULL);
   }
@@ -1149,14 +1205,21 @@ static struct query_methods get_dialogs_methods = {
   .type = TYPE_TO_PARAM(messages_dialogs)
 };
 
-
-void tgl_do_get_dialog_list (struct tgl_state *TLS, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, tgl_peer_id_t peers[], int last_msg_id[], int unread_count[]), void *callback_extra) {
+void _tgl_do_get_dialog_list (struct tgl_state *TLS, struct get_dialogs_extra *E,  void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, tgl_peer_id_t peers[], int last_msg_id[], int unread_count[]), void *callback_extra) {
   clear_packet ();
   out_int (CODE_messages_get_dialogs);
+  out_int (E->offset);
   out_int (0);
-  out_int (0);
-  out_int (1000);
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_dialogs_methods, 0, callback, callback_extra);
+  out_int (E->limit - E->list_offset);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_dialogs_methods, E, callback, callback_extra);
+}
+
+void tgl_do_get_dialog_list (struct tgl_state *TLS, int limit, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, tgl_peer_id_t peers[], int last_msg_id[], int unread_count[]), void *callback_extra) {
+  struct get_dialogs_extra *E = talloc0 (sizeof (*E));
+  E->limit = limit;
+  E->offset = offset;
+  _tgl_do_get_dialog_list (TLS, E, callback, callback_extra);
 }
 /* }}} */
 
@@ -1320,7 +1383,7 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
         out_int (f->h);
         out_int (CODE_document_attribute_animated);
       } else {
-        out_int (2);
+        out_int (1);
         out_int (CODE_document_attribute_image_size);
         out_int (f->w);
         out_int (f->h);
