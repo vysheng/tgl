@@ -535,6 +535,7 @@ struct tgl_message {
   int flags;
   tgl_peer_id_t fwd_from_id;
   int fwd_date;
+  int reply_id;
   tgl_peer_id_t from_id;
   tgl_peer_id_t to_id;
   int date;

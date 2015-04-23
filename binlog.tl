@@ -77,6 +77,7 @@ binlog.messageNew#427cfcdb flags:# lid:long
   message:flags.20?string 
   media:flags.21?MessageMedia 
   action:flags.22?MessageAction 
+  reply_id:flags.23?int
     = binlog.Update;
 
 binlog.messageEncrNew#6cf7cabc flags:# lid:long 

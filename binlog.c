@@ -672,6 +672,10 @@ static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_bi
     assert (!(M->flags & TGLMF_SERVICE));
   }
 
+  if (DS_U->reply_id) {
+    M->reply_id = DS_LVAL (DS_U->reply_id);
+  }
+
   if (flags & 0x10000) {
     tglm_message_insert (TLS, M);
   }
@@ -1217,7 +1221,7 @@ void bl_do_chat_del_user (struct tgl_state *TLS, struct tgl_chat *C, int version
   add_log_event (TLS, ev, 16);
 }
 
-void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, void *reply, int flags) {
+void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, int flags) {
   clear_packet ();
   assert (!(flags & 0xfffe0000));
 
@@ -1270,7 +1274,11 @@ void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id
     }
   }
 
-  assert (!reply);
+  if (reply_id) {
+    (*flags_p) |= (1 << 23);
+    out_int (*reply_id);
+  }
+
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 

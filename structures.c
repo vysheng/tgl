@@ -661,7 +661,7 @@ void tglf_fetch_message_short_new (struct tgl_state *TLS, struct tgl_message *M,
     DS_STR (DS_U->message),
     &A,
     NULL,
-    NULL,
+    DS_U->reply_to_msg_id,
     flags
   );
 }
@@ -700,7 +700,7 @@ void tglf_fetch_message_short_chat_new (struct tgl_state *TLS, struct tgl_messag
     DS_STR (DS_U->message),
     &A,
     NULL,
-    NULL,
+    DS_U->reply_to_msg_id,
     flags
   );
 }
@@ -942,7 +942,7 @@ void tglf_fetch_message_new (struct tgl_state *TLS, struct tgl_message *M, struc
       DS_STR (DS_M->message),
       DS_M->media,
       DS_M->action,
-      NULL,
+      DS_M->reply_to_msg_id,
       flags | TGLMF_CREATE | TGLMF_CREATED
     );
   }

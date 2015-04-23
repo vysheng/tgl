@@ -43,7 +43,7 @@ void bl_do_encr_chat_delete (struct tgl_state *TLS, struct tgl_secret_chat *U);
 void bl_do_chat_add_user (struct tgl_state *TLS, struct tgl_chat *C, int version, int user, int inviter, int date);
 void bl_do_chat_del_user (struct tgl_state *TLS, struct tgl_chat *C, int version, int user);
 
-void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, void *reply, int flags);
+void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, int flags);
 
 void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *date, const char *message, int message_len, struct tl_ds_decrypted_message_media *media, struct tl_ds_decrypted_message_action *action, struct tl_ds_encrypted_file *file, int flags);
 void bl_do_message_delete (struct tgl_state *TLS, struct tgl_message *M);

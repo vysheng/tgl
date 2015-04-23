@@ -695,7 +695,7 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q, void *D) 
   if (M && M->id != DS_LVAL (DS_MSM->id)) {
     assert (M->flags & TGLMF_PENDING);
     bl_do_create_message_new (TLS, M->id, NULL, NULL, NULL, NULL, NULL, 
-      DS_MSM->date, NULL, 0, NULL, NULL, NULL, M->flags & 0xffff);
+      DS_MSM->date, NULL, 0, DS_MSM->media, NULL, NULL, M->flags & 0xffff);
   }
  
   struct tl_ds_update *UPD = talloc0 (sizeof (*UPD));
