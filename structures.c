@@ -585,7 +585,6 @@ void tglf_fetch_message_action_new (struct tgl_state *TLS, struct tgl_message_ac
     {
       M->type = tgl_message_action_geo_chat_create;
       assert (0);
-      //vlogprintf (E_ERROR, "Message action: Created geochat %.*s in address %.*s. You are in magic land now, since nobody ever tested geochats in this app\n", DS_STR (DS_MA->title), DS_STR (DS_MA->address));
     }
     break;
   case CODE_message_action_geo_chat_checkin:

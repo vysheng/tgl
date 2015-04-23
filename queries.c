@@ -709,7 +709,8 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q, void *D) 
   UPD->pts = talloc (4);
   *UPD->pts = DS_LVAL (DS_MSM->pts);
 
-  tglu_work_update_new (TLS, UPD);
+  tglu_work_update_new (TLS, 1, UPD);
+  tglu_work_update_new (TLS, 0, UPD);
   free_ds_type_update (UPD, TYPE_TO_PARAM (update));
 
   M = tgl_message_get (TLS, y);
@@ -1193,7 +1194,8 @@ static int send_file_part_on_answer (struct tgl_state *TLS, struct query *q, voi
 }
 
 static int send_file_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
-  tglu_work_any_updates_new (TLS, D);
+  tglu_work_any_updates_new (TLS, 1, D);
+  tglu_work_any_updates_new (TLS, 0, D);
 
   if (q->callback) {
     ((void (*)(struct tgl_state *, void *, int, struct tgl_message *))q->callback)(TLS, q->callback_extra, 1, NULL);
@@ -1604,7 +1606,8 @@ void tgl_do_contact_search (struct tgl_state *TLS, char *name, int limit, void (
 
 /* {{{ Forward */
 static int fwd_msg_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
-  tglu_work_any_updates_new (TLS, D);
+  tglu_work_any_updates_new (TLS, 1, D);
+  tglu_work_any_updates_new (TLS, 0, D);
   
   if (q->callback) {
     ((void (*)(struct tgl_state *, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 1, q->extra);
@@ -1788,7 +1791,8 @@ void tgl_do_send_location (struct tgl_state *TLS, tgl_peer_id_t id, double latit
 
 /* {{{ Rename chat */
 static int rename_chat_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
-  tglu_work_any_updates_new (TLS, D);
+  tglu_work_any_updates_new (TLS, 1, D);
+  tglu_work_any_updates_new (TLS, 0, D);
   
   if (q->callback) {
     ((void (*)(struct tgl_state *, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 1, NULL);
@@ -2848,7 +2852,11 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, voi
     }
     
     for (i = 0; i < DS_LVAL (DS_UD->other_updates->cnt); i++) {
-      tglu_work_update_new (TLS, DS_UD->other_updates->data[i]);
+      tglu_work_update_new (TLS, 1, DS_UD->other_updates->data[i]);
+    }
+    
+    for (i = 0; i < DS_LVAL (DS_UD->other_updates->cnt); i++) {
+      tglu_work_update_new (TLS, -1, DS_UD->other_updates->data[i]);
     }
     
     for (i = 0; i < ml_pos; i++) {
@@ -3591,7 +3599,8 @@ void tgl_do_check_password (struct tgl_state *TLS, void (*callback)(struct tgl_s
 }
 
 static int send_broadcast_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
-  tglu_work_any_updates_new (TLS, D);
+  tglu_work_any_updates_new (TLS, 1, D);
+  tglu_work_any_updates_new (TLS, 0, D);
   
   if (q->callback) {
     ((void (*)(struct tgl_state *, void *, int, int, struct tgl_message **))q->callback)(TLS, q->callback_extra, 1, 0, q->extra);

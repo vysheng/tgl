@@ -39,29 +39,72 @@ static void fetch_dc_option_new (struct tgl_state *TLS, struct tl_ds_dc_option *
 
 int tgl_check_pts_diff (struct tgl_state *TLS, int pts, int pts_count) {
   vlogprintf (E_ERROR, "pts = %d, pts_count = %d\n", pts, pts_count);
-  if (!pts_count) { return 0; }
-  if (TLS->pts) {
-    if (pts < TLS->pts + pts_count) {
-      vlogprintf (E_NOTICE, "Duplicate message with pts=%d\n", pts);
+  assert (TLS->pts);
+  if (pts < TLS->pts + pts_count) {
+    vlogprintf (E_NOTICE, "Duplicate message with pts=%d\n", pts);
+    return -1;
+  }
+  if (pts > TLS->pts + pts_count) {
+    vlogprintf (E_NOTICE, "Hole in pts (pts = %d, count = %d, cur_pts = %d)\n", pts, pts_count, TLS->pts);
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    return -1;
+  }
+  if (TLS->locks & TGL_LOCK_DIFF) {
+    vlogprintf (E_DEBUG, "Update during get_difference. pts = %d\n", pts);
+    return -1;
+  }
+  vlogprintf (E_DEBUG, "Ok update. pts = %d\n", pts);
+  return 1;
+}
+
+int tgl_check_qts_diff (struct tgl_state *TLS, int qts, int qts_count) {
+  vlogprintf (E_ERROR, "qts = %d, qts_count = %d\n", qts, qts_count);
+  assert (TLS->qts);
+  if (qts < TLS->qts + qts_count) {
+    vlogprintf (E_NOTICE, "Duplicate message with qts=%d\n", qts);
+    return -1;
+  }
+  if (qts > TLS->qts + qts_count) {
+    vlogprintf (E_NOTICE, "Hole in qts (qts = %d, count = %d, cur_qts = %d)\n", qts, qts_count, TLS->qts);
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    return -1;
+  }
+  if (TLS->locks & TGL_LOCK_DIFF) {
+    vlogprintf (E_DEBUG, "Update during get_difference. qts = %d\n", qts);
+    return -1;
+  }
+  vlogprintf (E_DEBUG, "Ok update. qts = %d\n", qts);
+  return 1;
+}
+  
+static int do_skip_seq (struct tgl_state *TLS, int seq) {
+  if (!seq) {
+    vlogprintf (E_DEBUG, "Ok update. seq = %d\n", seq);
+    return 0;
+  }
+  if (TLS->seq) {
+    if (seq <= TLS->seq) {
+      vlogprintf (E_NOTICE, "Duplicate message with seq=%d\n", seq);
       return -1;
     }
-    if (pts > TLS->pts + pts_count) {
-      vlogprintf (E_NOTICE, "Hole in pts (pts = %d, count = %d, cur_pts = %d)\n", pts, pts_count, TLS->pts);
+    if (seq > TLS->seq + 1) {
+      vlogprintf (E_NOTICE, "Hole in seq (seq = %d, cur_seq = %d)\n", seq, TLS->seq);
+      //vlogprintf (E_NOTICE, "lock_diff = %s\n", (TLS->locks & TGL_LOCK_DIFF) ? "true" : "false");
       tgl_do_get_difference (TLS, 0, 0, 0);
       return -1;
     }
     if (TLS->locks & TGL_LOCK_DIFF) {
-      vlogprintf (E_DEBUG, "Update during get_difference. pts = %d\n", pts);
+      vlogprintf (E_DEBUG, "Update during get_difference. seq = %d\n", seq);
       return -1;
     }
-    vlogprintf (E_DEBUG, "Ok update. pts = %d\n", pts);
-    return 1;
+    vlogprintf (E_DEBUG, "Ok update. seq = %d\n", seq);
+    return 0;
   } else {
     return -1;
   }
 }
 
-void tglu_work_update_new (struct tgl_state *TLS, struct tl_ds_update *DS_U) {
+void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_update *DS_U) {
   if (TLS->locks & TGL_LOCK_DIFF) {
     vlogprintf (E_DEBUG, "Update during get_difference. DROP\n");
     return;
@@ -70,11 +113,18 @@ void tglu_work_update_new (struct tgl_state *TLS, struct tl_ds_update *DS_U) {
   if (DS_U->pts) {
     assert (DS_U->pts_count);
 
-    if (tgl_check_pts_diff (TLS, DS_LVAL (DS_U->pts), DS_LVAL (DS_U->pts_count)) <= 0) {
+    if (!check_only && tgl_check_pts_diff (TLS, DS_LVAL (DS_U->pts), DS_LVAL (DS_U->pts_count)) <= 0) {
+      return;
+    }
+  }
+  
+  if (DS_U->pts) {
+    if (!check_only && tgl_check_qts_diff (TLS, DS_LVAL (DS_U->qts), 1) <= 0) {
       return;
     }
   }
 
+  if (check_only > 0 && DS_U->magic != CODE_update_message_i_d) { return; }
   switch (DS_U->magic) {
   case CODE_update_new_message:
     {
@@ -381,42 +431,21 @@ void tglu_work_update_new (struct tgl_state *TLS, struct tl_ds_update *DS_U) {
     assert (0);
   }
   
+  if (check_only) { return; }
+
   if (DS_U->pts) {
     assert (DS_U->pts_count);
 
     bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
   }
 }
-  
-static int do_skip_seq (struct tgl_state *TLS, int seq) {
-  if (TLS->seq) {
-    if (!seq) {
-      vlogprintf (E_DEBUG, "Ok update. seq = %d\n", seq);
-      return 0;
-    }
-    if (seq <= TLS->seq) {
-      vlogprintf (E_NOTICE, "Duplicate message with seq=%d\n", seq);
-      return -1;
-    }
-    if (seq > TLS->seq + 1) {
-      vlogprintf (E_NOTICE, "Hole in seq (seq = %d, cur_seq = %d)\n", seq, TLS->seq);
-      //vlogprintf (E_NOTICE, "lock_diff = %s\n", (TLS->locks & TGL_LOCK_DIFF) ? "true" : "false");
-      tgl_do_get_difference (TLS, 0, 0, 0);
-      return -1;
-    }
-    if (TLS->locks & TGL_LOCK_DIFF) {
-      vlogprintf (E_DEBUG, "Update during get_difference. seq = %d\n", seq);
-      return -1;
-    }
-    vlogprintf (E_DEBUG, "Ok update. seq = %d\n", seq);
-    return 0;
-  } else {
-    return -1;
-  }
-}
 
-void tglu_work_updates_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  if (do_skip_seq (TLS, DS_LVAL (DS_U->seq)) < 0) {
+void tglu_work_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+  if (TLS->locks & TGL_LOCK_DIFF) {
+    return;
+  }
+
+  if (!check_only && do_skip_seq (TLS, DS_LVAL (DS_U->seq)) < 0) {
     return;
   }
   int i;
@@ -427,14 +456,20 @@ void tglu_work_updates_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
     tglf_fetch_alloc_chat_new (TLS, DS_U->chats->data[i]);
   }
   for (i = 0; i < DS_LVAL (DS_U->updates->cnt); i++) {
-    tglu_work_update_new (TLS, DS_U->updates->data[i]);
+    tglu_work_update_new (TLS, check_only, DS_U->updates->data[i]);
   }
+
+  if (check_only) { return; }
   bl_do_set_date (TLS, DS_LVAL (DS_U->date));
   bl_do_set_seq (TLS, DS_LVAL (DS_U->seq));
 }
 
-void tglu_work_updates_combined_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  if (do_skip_seq (TLS, DS_LVAL (DS_U->seq_start)) < 0) {
+void tglu_work_updates_combined_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+  if (TLS->locks & TGL_LOCK_DIFF) {
+    return;
+  }
+
+  if (!check_only && do_skip_seq (TLS, DS_LVAL (DS_U->seq_start)) < 0) {
     return;
   }
   
@@ -446,65 +481,92 @@ void tglu_work_updates_combined_new (struct tgl_state *TLS, struct tl_ds_updates
     tglf_fetch_alloc_chat_new (TLS, DS_U->chats->data[i]);
   }
   for (i = 0; i < DS_LVAL (DS_U->updates->cnt); i++) {
-    tglu_work_update_new (TLS, DS_U->updates->data[i]);
+    tglu_work_update_new (TLS, check_only, DS_U->updates->data[i]);
   }
+
+  if (check_only) { return; }
   bl_do_set_date (TLS, DS_LVAL (DS_U->date));
   bl_do_set_seq (TLS, DS_LVAL (DS_U->seq));
 }
 
-void tglu_work_update_short_message_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  if (tgl_check_pts_diff (TLS, DS_LVAL (DS_U->pts), DS_LVAL (DS_U->pts_count)) <= 0) {
+void tglu_work_update_short_message_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+  if (TLS->locks & TGL_LOCK_DIFF) {
     return;
   }
+
+  if (!check_only && tgl_check_pts_diff (TLS, DS_LVAL (DS_U->pts), DS_LVAL (DS_U->pts_count)) <= 0) {
+    return;
+  }
+  
+  if (check_only > 0) { return; }
   
   struct tgl_message *M = tglf_fetch_alloc_message_short_new (TLS, DS_U);
   assert (M);
 
   bl_do_msg_update (TLS, M->id);
+  
+  if (check_only) { return; }
+  bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
 }
 
-void tglu_work_update_short_chat_message_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  if (tgl_check_pts_diff (TLS, DS_LVAL (DS_U->pts), DS_LVAL (DS_U->pts_count)) <= 0) {
+void tglu_work_update_short_chat_message_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+  if (TLS->locks & TGL_LOCK_DIFF) {
     return;
   }
+
+  if (!check_only && tgl_check_pts_diff (TLS, DS_LVAL (DS_U->pts), DS_LVAL (DS_U->pts_count)) <= 0) {
+    return;
+  }
+  
+  if (check_only > 0) { return; }
   
   struct tgl_message *M = tglf_fetch_alloc_message_short_chat_new (TLS, DS_U);
   assert (M);
 
   bl_do_msg_update (TLS, M->id);
+
+  if (check_only) { return; }
+  bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
 }
 
-void tglu_work_updates_to_long_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
+void tglu_work_updates_to_long_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+  if (TLS->locks & TGL_LOCK_DIFF) {
+    return;
+  }
   vlogprintf (E_NOTICE, "updates too long... Getting difference\n");
+  if (check_only) { return; }
   tgl_do_get_difference (TLS, 0, 0, 0);
 }
 
-void tglu_work_update_short_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  tglu_work_update_new (TLS, DS_U->update);
-  if (!(TLS->locks & TGL_LOCK_DIFF)) {
-    bl_do_set_date (TLS, DS_LVAL (DS_U->date));
+void tglu_work_update_short_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+  if (TLS->locks & TGL_LOCK_DIFF) {
+    return;
   }
+  tglu_work_update_new (TLS, check_only, DS_U->update);
 }
 
-void tglu_work_any_updates_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
+void tglu_work_any_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+  if (TLS->locks & TGL_LOCK_DIFF) {
+    return;
+  }
   switch (DS_U->magic) {
   case CODE_updates_too_long:
-    tglu_work_updates_to_long_new (TLS, DS_U);
+    tglu_work_updates_to_long_new (TLS, check_only, DS_U);
     return;
   case CODE_update_short_message:
-    tglu_work_update_short_message_new (TLS, DS_U);
+    tglu_work_update_short_message_new (TLS, check_only, DS_U);
     return;
   case CODE_update_short_chat_message:
-    tglu_work_update_short_chat_message_new (TLS, DS_U);
+    tglu_work_update_short_chat_message_new (TLS, check_only, DS_U);
     return;
   case CODE_update_short:
-    tglu_work_update_short_new (TLS, DS_U);
+    tglu_work_update_short_new (TLS, check_only, DS_U);
     return;
   case CODE_updates_combined:
-    tglu_work_updates_combined_new (TLS, DS_U);
+    tglu_work_updates_combined_new (TLS, check_only, DS_U);
     return;
   case CODE_updates:
-    tglu_work_updates_new (TLS, DS_U);    
+    tglu_work_updates_new (TLS, check_only, DS_U);    
     return;
   default:
     assert (0);
@@ -514,7 +576,8 @@ void tglu_work_any_updates_new (struct tgl_state *TLS, struct tl_ds_updates *DS_
 void tglu_work_any_updates (struct tgl_state *TLS) {
   struct tl_ds_updates *DS_U = fetch_ds_type_updates (TYPE_TO_PARAM (updates));
   assert (DS_U);
-  tglu_work_any_updates_new (TLS, DS_U);
+  tglu_work_any_updates_new (TLS, 1, DS_U);
+  tglu_work_any_updates_new (TLS, 0, DS_U);
   free_ds_type_updates (DS_U, TYPE_TO_PARAM (updates)); 
 }
 
