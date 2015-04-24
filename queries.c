@@ -757,8 +757,11 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   }
   clear_packet ();
   out_int (CODE_messages_send_message);
-  out_int (0);
+  out_int (M->reply_id ? 1 : 0);
   out_peer_id (TLS, M->to_id);
+  if (M->reply_id) {
+    out_int (M->reply_id);
+  }
   out_cstring (M->message, M->message_len);
   out_long (M->id);
   long long *x = talloc (8);
@@ -798,6 +801,37 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *m
   bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, msg, len, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED);
 
   struct tgl_message *M = tgl_message_get (TLS, t);
+  assert (M);
+  tgl_do_send_msg (TLS, M, callback, callback_extra);
+}
+
+void tgl_do_send_message_reply (struct tgl_state *TLS, int reply_id, const char *msg, int len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  struct tgl_message *M = tgl_message_get (TLS, reply_id);
+  if (!M || !(M->flags & TGLMF_CREATED) || (M->flags & TGLMF_ENCRYPTED)) {
+    vlogprintf (E_WARNING, "Bad reply id\n");
+    if (callback) {
+      callback (TLS, callback_extra, 0, 0);
+    }
+    return;
+  }
+  long long t;
+  tglt_secure_random (&t, 8);
+  vlogprintf (E_DEBUG, "t = %lld, len = %d\n", t, len);
+
+  struct tl_ds_message_media TDSM;
+  TDSM.magic = CODE_message_media_empty;
+
+  tgl_peer_id_t id = M->to_id;
+  if (tgl_get_peer_type (id) == TGL_PEER_USER && tgl_get_peer_id (id) == TLS->our_id) {
+    id = M->from_id;
+  }
+  int peer_type = tgl_get_peer_type (id);
+  int peer_id = tgl_get_peer_id (id);
+  int date = time (0);
+
+  bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, msg, len, &TDSM, NULL, &reply_id, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED);
+
+  M = tgl_message_get (TLS, t);
   assert (M);
   tgl_do_send_msg (TLS, M, callback, callback_extra);
 }

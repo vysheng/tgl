@@ -131,7 +131,8 @@ enum tgl_message_media_type {
   //tgl_message_media_video_encr,
   //tgl_message_media_audio_encr,
   tgl_message_media_document_encr,
-  tgl_message_media_webpage
+  tgl_message_media_webpage,
+  tgl_message_media_venue
 };
 
 enum tgl_message_action_type {
@@ -463,6 +464,7 @@ struct tgl_message_action {
   };
 };
 
+
 struct tgl_webpage {
   long long id;
   char *url;
@@ -506,6 +508,13 @@ struct tgl_message_media {
       void *data;
       int data_size;
     };
+    struct {
+      struct tgl_geo geo;
+      char *title;
+      char *address;
+      char *provider;
+      char *venue_id;
+    } venue;
   };
 };
 

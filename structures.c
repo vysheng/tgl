@@ -777,6 +777,14 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     M->webpage.duration = DS_LVAL (DS_MM->webpage->duration);
     M->webpage.author = DS_STR_DUP (DS_MM->webpage->author);
     break;
+  case CODE_message_media_venue:
+    M->type = tgl_message_media_venue;
+    tglf_fetch_geo_new (TLS, &M->venue.geo, DS_MM->geo);
+    M->venue.title = DS_STR_DUP (DS_MM->title);
+    M->venue.address = DS_STR_DUP (DS_MM->address);
+    M->venue.provider = DS_STR_DUP (DS_MM->provider);
+    M->venue.venue_id = DS_STR_DUP (DS_MM->venue_id);   
+    break;
   default:
     assert (0);
   }
@@ -1445,6 +1453,12 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
     if (M->webpage.embed_url) { tfree_str (M->webpage.embed_url); }
     if (M->webpage.embed_type) { tfree_str (M->webpage.embed_type); }
     if (M->webpage.author) { tfree_str (M->webpage.author); }
+    return;
+  case tgl_message_media_venue:
+    if (M->venue.title) { tfree_str (M->venue.title); }
+    if (M->venue.address) { tfree_str (M->venue.address); }
+    if (M->venue.provider) { tfree_str (M->venue.provider); }
+    if (M->venue.venue_id) { tfree_str (M->venue.venue_id); }
     return;
   default:
     vlogprintf (E_ERROR, "type = 0x%08x\n", M->type);
