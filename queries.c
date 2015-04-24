@@ -244,6 +244,20 @@ void tglq_query_delete (struct tgl_state *TLS, long long id) {
 
 static void resend_query_cb (struct tgl_state *TLS, void *_q, int success);
 
+void tglq_free_query (struct query *q, void *extra) {
+  struct tgl_state *TLS = extra;
+  if (!(q->flags & QUERY_ACK_RECEIVED)) {
+    TLS->timer_methods->remove (q->ev);
+  }
+  tfree (q->data, q->data_len * 4);
+  TLS->timer_methods->free (q->ev);
+}
+
+void tglq_query_free_all (struct tgl_state *TLS) {
+  tree_act_ex_query (TLS->queries_tree, tglq_free_query, TLS);
+  TLS->queries_tree = tree_clear_query (TLS->queries_tree);
+}
+
 int tglq_query_error (struct tgl_state *TLS, long long id) {
   assert (fetch_int () == CODE_rpc_error);
   int error_code = fetch_int ();
@@ -1428,20 +1442,26 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
         out_int (f->h);
       }
     } else if (f->flags & FLAG_DOCUMENT_AUDIO) {
-      out_int (1);
+      out_int (2);
       out_int (CODE_document_attribute_audio);
       out_int (f->duration);
+      out_int (CODE_document_attribute_filename);
+      out_string (s + 1);
     } else if (f->flags & FLAG_DOCUMENT_VIDEO) {
-      out_int (1);
+      out_int (2);
       out_int (CODE_document_attribute_video);
       out_int (f->duration);
       out_int (f->w);
       out_int (f->h);
+      out_int (CODE_document_attribute_filename);
+      out_string (s + 1);
     } else if (f->flags & FLAG_DOCUMENT_STICKER) {
       out_int (1);
       out_int (CODE_document_attribute_sticker);
     } else {
-      out_int (0);
+      out_int (1);
+      out_int (CODE_document_attribute_filename);
+      out_string (s + 1);
     }
 
     if (f->thumb_id > 0) {
