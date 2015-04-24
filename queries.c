@@ -119,7 +119,7 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
   
   TLS->timer_methods->insert (q->ev, QUERY_TIMEOUT); 
 
-  if (q->session->session_id == q->session_id && q->session_id) {
+  if (q->session && q->session_id && q->DC && q->DC->sessions[0] == q->session && q->session->session_id == q->session_id) {
     clear_packet ();
     out_int (CODE_msg_container);
     out_int (1);
@@ -150,8 +150,12 @@ void tglq_regen_query (struct tgl_state *TLS, long long id) {
   if (!q) { return; }
   q->flags &= ~QUERY_ACK_RECEIVED;
   
-  if (!(q->session->dc->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
+  if (!(q->session && q->session_id && q->DC && q->DC->sessions[0] == q->session && q->session->session_id == q->session_id)) {
     q->session_id = 0;
+  } else {
+    if (!(q->session->dc->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
+      q->session_id = 0;
+    }
   }
   vlogprintf (E_NOTICE, "regen query %lld\n", id);
   TLS->timer_methods->insert (q->ev, 0.001);
@@ -1950,10 +1954,6 @@ void tgl_do_send_location (struct tgl_state *TLS, tgl_peer_id_t id, double latit
   if (tgl_get_peer_type (id) == TGL_PEER_ENCR_CHAT) {
     tgl_do_send_location_encr (TLS, id, latitude, longitude, callback, callback_extra);
   } else {
-    long long t;
-    tglt_secure_random (&t, 8);
-    vlogprintf (E_DEBUG, "t = %lld\n", t);
-
     clear_packet ();
     out_int (CODE_messages_send_media);
     out_int (0);
@@ -2500,7 +2500,7 @@ void tgl_do_del_contact (struct tgl_state *TLS, tgl_peer_id_t id, void (*callbac
   }
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &del_contact_methods, 0, callback, callback_extra);
 }
- /* }}} */
+/* }}} */
 
 /* {{{ Msg search */
 
@@ -2807,35 +2807,6 @@ void tgl_do_get_difference (struct tgl_state *TLS, int sync_from_start, void (*c
 /* }}} */
 
 /* {{{ Visualize key */
-/*char *colors[4] = {COLOR_GREY, COLOR_CYAN, COLOR_BLUE, COLOR_GREEN};
-
-void tgl_do_visualize_key (tgl_peer_id_t id) {
-  assert (tgl_get_peer_type (id) == TGL_PEER_ENCR_CHAT);
-  tgl_peer_t *P = tgl_peer_get (TLS, id);
-  assert (P);
-  if (P->encr_chat.state != sc_ok) {
-    rprintf ("Chat is not initialized yet\n");
-    return;
-  }
-  unsigned char buf[20];
-  SHA1 ((void *)P->encr_chat.key, 256, buf);
-  print_start ();
-  int i;
-  for (i = 0; i < 16; i++) {
-    int x = buf[i];
-    int j;
-    for (j = 0; j < 4; j ++) {    
-      push_color (colors[x & 3]);
-      push_color (COLOR_INVERSE);
-      printf ("  ");
-      pop_color ();
-      pop_color ();
-      x = x >> 2;
-    }
-    if (i & 1) { printf ("\n"); }
-  }
-  print_end ();
-}*/
 
 void tgl_do_visualize_key (struct tgl_state *TLS, tgl_peer_id_t id, unsigned char buf[16]) {
   assert (tgl_get_peer_type (id) == TGL_PEER_ENCR_CHAT);
@@ -2845,9 +2816,6 @@ void tgl_do_visualize_key (struct tgl_state *TLS, tgl_peer_id_t id, unsigned cha
     vlogprintf (E_WARNING, "Chat is not initialized yet\n");
     return;
   }
-  //unsigned char res[20];
-  //SHA1 ((void *)P->encr_chat.key, 256, res);
-  //memcpy (buf, res, 16);
   memcpy (buf, P->encr_chat.first_key_sha, 16);
 }
 /* }}} */
@@ -2891,10 +2859,10 @@ void tgl_do_del_user_from_chat (struct tgl_state *TLS, tgl_peer_id_t chat_id, tg
   }
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
 }
+
 /* }}} */
 
 /* {{{ Create secret chat */
-//char *create_print_name (tgl_peer_id_t id, const char *a1, const char *a2, const char *a3, const char *a4);
 
 void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra) {
   assert (tgl_get_peer_type (id) == TGL_PEER_USER);
@@ -2909,32 +2877,6 @@ void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_peer_id_t id, void (*
 /* }}} */
 
 /* {{{ Create group chat */
-
-void tgl_do_create_group_chat (struct tgl_state *TLS, tgl_peer_id_t id, char *chat_topic, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
-  assert (tgl_get_peer_type (id) == TGL_PEER_USER);
-  tgl_peer_t *U = tgl_peer_get (TLS, id);
-  if (!U) { 
-    vlogprintf (E_WARNING, "Can not create chat with unknown user\n");
-    if (callback) {
-      callback (TLS, callback_extra, 0);
-    }
-    return;
-  }
-  clear_packet ();
-  out_int (CODE_messages_create_chat);
-  out_int (CODE_vector);
-  out_int (1); // Number of users, currently we support only 1 user.
-  if (U && U->user.access_hash) {
-    out_int (CODE_input_user_foreign);
-    out_int (tgl_get_peer_id (id));
-    out_long (U->user.access_hash);
-  } else {
-    out_int (CODE_input_user_contact);
-    out_int (tgl_get_peer_id (id));
-  }
-  out_string (chat_topic);
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
-}
 
 void tgl_do_create_group_chat_ex (struct tgl_state *TLS, int users_num, tgl_peer_id_t ids[], char *chat_topic, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
   clear_packet ();
@@ -2963,6 +2905,10 @@ void tgl_do_create_group_chat_ex (struct tgl_state *TLS, int users_num, tgl_peer
   }
   out_string (chat_topic);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+
+void tgl_do_create_group_chat (struct tgl_state *TLS, tgl_peer_id_t id, char *chat_topic, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  tgl_do_create_group_chat_ex (TLS, 1, &id, chat_topic, callback, callback_extra); 
 }
 /* }}} */
 

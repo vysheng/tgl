@@ -118,6 +118,7 @@ void tgl_free_debug (void *ptr, int size __attribute__ ((unused))) {
 }
 
 void tgl_free_release (void *ptr, int size) {
+  memset (ptr, 0, size);
   free (ptr);
 }
 

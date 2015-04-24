@@ -548,6 +548,11 @@ static struct tgl_session *get_session (struct connection *c) {
 
 static void tgln_free (struct connection *c) {
   if (c->ip) { tfree_str (c->ip); }
+  if (c->ping_ev) { event_free (c->ping_ev); }
+  if (c->fail_ev) { event_free (c->fail_ev); }
+  if (c->read_ev) { event_free (c->read_ev); }
+  if (c->write_ev) { event_free (c->write_ev); }
+
   struct connection_buffer *b = c->out_head;
   while (b) {
     struct connection_buffer *d = b;
@@ -560,11 +565,6 @@ static void tgln_free (struct connection *c) {
     b = b->next;
     delete_connection_buffer (d);
   }
-
-  if (c->ping_ev) { event_free (c->ping_ev); }
-  if (c->fail_ev) { event_free (c->fail_ev); }
-  if (c->read_ev) { event_free (c->read_ev); }
-  if (c->write_ev) { event_free (c->write_ev); }
 
   if (c->fd >= 0) { Connections[c->fd] = 0; close (c->fd); }
   tfree (c, sizeof (*c));

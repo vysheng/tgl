@@ -237,11 +237,12 @@ int tglf_fetch_user_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds
     return 0;
   }
   
+  int flags = U->flags & 0xffff;
   if (DS_U->magic == CODE_user_self) {
     bl_do_set_our_id (TLS, tgl_get_peer_id (U->id));
+    flags |= TGLUF_SELF;
   }
 
-  int flags = U->flags & 0xffff;
   if (!(flags & TGLUF_CREATED)) {
     flags |= TGLUF_CREATE | TGLUF_CREATED;
   }
