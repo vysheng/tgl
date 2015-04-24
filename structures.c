@@ -1821,6 +1821,7 @@ void tgl_free_all (struct tgl_state *TLS) {
   TLS->message_tree = tree_clear_message (TLS->message_tree);
   tree_act_ex_message (TLS->message_unsent_tree, tgls_free_message_gw, TLS);
   TLS->message_unsent_tree = tree_clear_message (TLS->message_unsent_tree);
+  tglq_query_free_all (TLS);
 
   if (TLS->encr_prime) { tfree (TLS->encr_prime, 256); }
 
@@ -1839,6 +1840,9 @@ void tgl_free_all (struct tgl_state *TLS) {
   }
   BN_CTX_free (TLS->BN_ctx);
   tgls_free_pubkey (TLS);
+
+  if (TLS->ev_login) { TLS->timer_methods->free (TLS->ev_login); }
+  if (TLS->online_updates_timer) { TLS->timer_methods->free (TLS->online_updates_timer); }
 }
 
 int tgl_print_stat (struct tgl_state *TLS, char *s, int len) {
