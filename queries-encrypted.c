@@ -420,3 +420,52 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   tfree_str (f->file_name);
   tfree (f, sizeof (*f));
 }
+
+void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t id, double latitude, double longitude, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_messages_send_encrypted);
+  out_int (CODE_input_encrypted_chat);
+  out_int (tgl_get_peer_id (id));
+  tgl_peer_t *P = tgl_peer_get (TLS, id);
+  assert (P);
+  out_long (P->encr_chat.access_hash);
+
+  long long r;
+  tglt_secure_random (&r, 8);
+  out_long (r);
+  encr_start ();
+  out_int (CODE_decrypted_message_layer);
+  out_random (15 + 4 * (lrand48 () % 3));
+  out_int (TGL_ENCRYPTED_LAYER);
+  out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != TLS->our_id));
+  out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == TLS->our_id));
+  out_int (CODE_decrypted_message);
+  out_long (r);
+  if (P->encr_chat.layer < 17) {
+    out_random (15 + 4 * (lrand48 () % 3));
+  } else {
+    out_int (P->encr_chat.ttl);
+  }
+  out_string ("");
+  out_int (CODE_decrypted_message_media_geo_point);
+  out_double (latitude);
+  out_double (longitude);
+
+  static struct tl_ds_decrypted_message_media DS_DMM;
+  DS_DMM.magic = CODE_decrypted_message_media_geo_point;
+  DS_DMM.longitude = &longitude;
+  DS_DMM.latitude = &latitude;
+
+  int peer_id = tgl_get_peer_id (id);
+  int peer_type = tgl_get_peer_type (id);
+  int date = time (0);
+
+  bl_do_create_message_encr_new (TLS, r, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, &DS_DMM, NULL, NULL, TGLMF_OUT | TGLMF_UNREAD);
+
+  encr_finish (&P->encr_chat);
+
+  struct tgl_message *M = tgl_message_get (TLS, r);
+  assert (M);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &msg_send_encr_methods, M, callback, callback_extra);
+}

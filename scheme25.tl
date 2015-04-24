@@ -368,10 +368,13 @@ auth.sentAppCode#e325edcf phone_registered:Bool phone_code_hash:string send_call
 sendMessageTypingAction#16bf744e = SendMessageAction;
 sendMessageCancelAction#fd5ec8f5 = SendMessageAction;
 sendMessageRecordVideoAction#a187d66f = SendMessageAction;
+sendMessageUploadVideoActionL27#92042ff7 = SendMessageAction;
 sendMessageUploadVideoAction#e9763aec progress:int = SendMessageAction;
 sendMessageRecordAudioAction#d52f73f7 = SendMessageAction;
+sendMessageUploadAudioActionL27#e6ac8a6f = SendMessageAction;
 sendMessageUploadAudioAction#f351d7ab progress:int = SendMessageAction;
 sendMessageUploadPhotoAction#990a3c1a = SendMessageAction;
+sendMessageUploadDocumentActionL27#8faee98e = SendMessageAction;
 sendMessageUploadDocumentAction#aa0cd9e4 progress:int = SendMessageAction;
 sendMessageGeoLocationAction#176f8ba1 = SendMessageAction;
 sendMessageChooseContactAction#628cbc6f = SendMessageAction;
