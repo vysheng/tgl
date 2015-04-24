@@ -320,12 +320,12 @@ static int fetch_comb_binlog_user_new (struct tgl_state *TLS, struct tl_ds_binlo
  
   if (DS_U->last_read_in) {
     U->last_read_in = DS_LVAL (DS_U->last_read_in);
-    tgls_messages_mark_read (U->last, 0, U->last_read_in);
+    tgls_messages_mark_read (TLS, U->last, 0, U->last_read_in);
   }
  
   if (DS_U->last_read_out) {
     U->last_read_out = DS_LVAL (DS_U->last_read_out);
-    tgls_messages_mark_read (U->last, TGLMF_OUT, U->last_read_out);
+    tgls_messages_mark_read (TLS, U->last, TGLMF_OUT, U->last_read_out);
   }
 
   if (TLS->callback.user_update && updates) {
@@ -532,12 +532,12 @@ static int fetch_comb_binlog_chat_new (struct tgl_state *TLS, struct tl_ds_binlo
  
   if (DS_U->last_read_in) {
     C->last_read_in = DS_LVAL (DS_U->last_read_in);
-    tgls_messages_mark_read (C->last, 0, C->last_read_in);
+    tgls_messages_mark_read (TLS, C->last, 0, C->last_read_in);
   }
  
   if (DS_U->last_read_out) {
     C->last_read_out = DS_LVAL (DS_U->last_read_out);
-    tgls_messages_mark_read (C->last, TGLMF_OUT, C->last_read_out);
+    tgls_messages_mark_read (TLS, C->last, TGLMF_OUT, C->last_read_out);
   }
 
       
@@ -637,7 +637,11 @@ static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_bi
     tglm_message_insert_unsent (TLS, M);
   }
 
-  M->flags = flags & 0xffff;
+  if ((M->flags & TGLMF_UNREAD) && !(flags & TGLMF_UNREAD)) {
+    M->flags = (flags & 0xffff) | TGLMF_UNREAD;
+  } else {
+    M->flags = (flags & 0xffff);
+  }
  
   if (DS_U->from_id) {
     M->from_id = TGL_MK_USER (DS_LVAL (DS_U->from_id));
@@ -680,8 +684,8 @@ static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_bi
     tglm_message_insert (TLS, M);
   }
 
-  if (!(M->flags & TGLMF_UNREAD)) {
-    tgls_messages_mark_read (M, M->flags & TGLMF_OUT, M->id);
+  if (!(flags & TGLMF_UNREAD) && (M->flags & TGLMF_UNREAD)) {
+    tgls_messages_mark_read (TLS, M, M->flags & TGLMF_OUT, M->id);
   }
   return 0;
 }
@@ -772,6 +776,7 @@ static int fetch_comb_binlog_set_msg_id (struct tgl_state *TLS, struct tl_ds_bin
   
   M->id = DS_LVAL (DS_U->new_id);
   if (tgl_message_get (TLS, M->id)) {
+    tglm_message_del_use (TLS, M);
     tgls_free_message (TLS, M);
   } else {
     tglm_message_insert_tree (TLS, M);
@@ -1266,12 +1271,7 @@ void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id
   if (action) {
     (*flags_p) |= (1 << 22);
 
-    int *p = packet_ptr;
     store_ds_type_message_action (action, TYPE_TO_PARAM (message_action));
-    while (p != packet_ptr) {
-      vlogprintf (E_ERROR, "0x%08x\n", *p);
-      p ++;
-    }
   }
 
   if (reply_id) {

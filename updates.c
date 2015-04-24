@@ -104,7 +104,7 @@ static int do_skip_seq (struct tgl_state *TLS, int seq) {
 }
 
 void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_update *DS_U) {
-  if (TLS->locks & TGL_LOCK_DIFF) {
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     vlogprintf (E_DEBUG, "Update during get_difference. DROP\n");
     return;
   }
@@ -127,17 +127,21 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
   switch (DS_U->magic) {
   case CODE_update_new_message:
     {
+      struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
+      int new = (!N || !(N->flags & TGLMF_CREATED));
       struct tgl_message *M = tglf_fetch_alloc_message_new (TLS, DS_U->message);
       assert (M);
-      bl_do_msg_update (TLS, M->id);
+      if (new) {
+        bl_do_msg_update (TLS, M->id);
+      }
       break;
     };
   case CODE_update_message_i_d:
     {
       struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->random_id));
       if (M) {
+        tgls_insert_random2local (TLS, DS_LVAL (DS_U->random_id), DS_LVAL (DS_U->id));
         bl_do_set_msg_id (TLS, M, DS_LVAL (DS_U->id));
-        bl_do_msg_update (TLS, M->id);
       }
     }
     break;
@@ -426,6 +430,14 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
     {
     }
     break;
+  case CODE_update_msg_update:
+    {
+      struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->id));
+      if (M) {
+        bl_do_msg_update (TLS, M->id);
+      }
+    }
+    break;
   default:
     assert (0);
   }
@@ -440,7 +452,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
 }
 
 void tglu_work_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
-  if (TLS->locks & TGL_LOCK_DIFF) {
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
 
@@ -464,7 +476,7 @@ void tglu_work_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_
 }
 
 void tglu_work_updates_combined_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
-  if (TLS->locks & TGL_LOCK_DIFF) {
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
 
@@ -489,7 +501,7 @@ void tglu_work_updates_combined_new (struct tgl_state *TLS, int check_only, stru
 }
 
 void tglu_work_update_short_message_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
-  if (TLS->locks & TGL_LOCK_DIFF) {
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
 
@@ -499,17 +511,22 @@ void tglu_work_update_short_message_new (struct tgl_state *TLS, int check_only, 
   
   if (check_only > 0) { return; }
   
+  struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
+  int new = (!N || !(N->flags & TGLMF_CREATED));
+  
   struct tgl_message *M = tglf_fetch_alloc_message_short_new (TLS, DS_U);
   assert (M);
 
-  bl_do_msg_update (TLS, M->id);
+  if (new) {
+    bl_do_msg_update (TLS, M->id);
+  }
   
   if (check_only) { return; }
   bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
 }
 
 void tglu_work_update_short_chat_message_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
-  if (TLS->locks & TGL_LOCK_DIFF) {
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
 
@@ -519,17 +536,22 @@ void tglu_work_update_short_chat_message_new (struct tgl_state *TLS, int check_o
   
   if (check_only > 0) { return; }
   
+  struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
+  int new = (!N || !(N->flags & TGLMF_CREATED));
+  
   struct tgl_message *M = tglf_fetch_alloc_message_short_chat_new (TLS, DS_U);
   assert (M);
 
-  bl_do_msg_update (TLS, M->id);
+  if (new) {
+    bl_do_msg_update (TLS, M->id);
+  }
 
   if (check_only) { return; }
   bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
 }
 
 void tglu_work_updates_to_long_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
-  if (TLS->locks & TGL_LOCK_DIFF) {
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
   vlogprintf (E_NOTICE, "updates too long... Getting difference\n");
@@ -538,14 +560,14 @@ void tglu_work_updates_to_long_new (struct tgl_state *TLS, int check_only, struc
 }
 
 void tglu_work_update_short_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
-  if (TLS->locks & TGL_LOCK_DIFF) {
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
   tglu_work_update_new (TLS, check_only, DS_U->update);
 }
 
 void tglu_work_any_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
-  if (TLS->locks & TGL_LOCK_DIFF) {
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
   switch (DS_U->magic) {

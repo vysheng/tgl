@@ -46,12 +46,25 @@
 
 #define sha1 SHA1
 
+struct random2local {
+  long long random_id;
+  int local_id;
+};
+
 static int id_cmp (struct tgl_message *M1, struct tgl_message *M2);
 #define peer_cmp(a,b) (tgl_cmp_peer_id (a->id, b->id))
 #define peer_cmp_name(a,b) (strcmp (a->print_name, b->print_name))
+
+static int random_id_cmp (struct random2local *L, struct random2local *R) {
+  if (L->random_id < R->random_id) { return -1; }
+  if (L->random_id > R->random_id) { return 1; }
+  return 0;
+}
+
 DEFINE_TREE(peer,tgl_peer_t *,peer_cmp,0)
 DEFINE_TREE(peer_by_name,tgl_peer_t *,peer_cmp_name,0)
 DEFINE_TREE(message,struct tgl_message *,id_cmp,0)
+DEFINE_TREE(random_id,struct random2local *, random_id_cmp,0)
 
 
 char *tgls_default_create_print_name (struct tgl_state *TLS, tgl_peer_id_t id, const char *a1, const char *a2, const char *a3, const char *a4) {
@@ -1591,7 +1604,9 @@ void tglm_message_add_peer (struct tgl_state *TLS, struct tgl_message *M) {
         NP = N;
         N = N->next;
       }
-      if (N) { assert (N->id < M->id); }
+      if (N) {
+        assert (N->id < M->id); 
+      }
       M->next = N;
       M->prev = NP;
       if (N) { N->prev = M; }
@@ -1634,12 +1649,6 @@ struct tgl_message *tglm_message_alloc (struct tgl_state *TLS, long long id) {
   tglm_message_insert_tree (TLS, M);
   TLS->messages_allocated ++;
   return M;
-}
-
-void tglm_update_message_id (struct tgl_state *TLS, struct tgl_message *M, long long id) {
-  TLS->message_tree = tree_delete_message (TLS->message_tree, M);
-  M->id = id;
-  TLS->message_tree = tree_insert_message (TLS->message_tree, M, lrand48 ());
 }
 
 void tglm_message_insert_tree (struct tgl_state *TLS, struct tgl_message *M) {
@@ -1849,7 +1858,7 @@ void tglf_fetch_int_tuple (int *dst, int **src, int len) {
 }
 
 
-void tgls_messages_mark_read (struct tgl_message *M, int out, int seq) {
+void tgls_messages_mark_read (struct tgl_state *TLS, struct tgl_message *M, int out, int seq) {
   while (M && M->id > seq) { 
     if ((M->flags & TGLMF_OUT) == out) {
       if (!(M->flags & TGLMF_UNREAD)) {
@@ -1862,10 +1871,36 @@ void tgls_messages_mark_read (struct tgl_message *M, int out, int seq) {
     if ((M->flags & TGLMF_OUT) == out) {
       if (M->flags & TGLMF_UNREAD) {
         M->flags &= ~TGLMF_UNREAD;
+        TLS->callback.marked_read (TLS, 1, &M);
       } else {
         return;
       }
     }
     M = M->next; 
+  }
+}
+  
+void tgls_insert_random2local (struct tgl_state *TLS, long long random_id, int local_id) {
+  struct random2local *X = talloc (sizeof (*X));
+  X->random_id = random_id;
+  X->local_id = local_id;
+
+  struct random2local *R = tree_lookup_random_id (TLS->random_id_tree, X);
+  assert (!R);
+  
+  TLS->random_id_tree = tree_insert_random_id (TLS->random_id_tree, X, lrand48 ());
+}
+
+int tgls_get_local_by_random (struct tgl_state *TLS, long long random_id) {
+  struct random2local X;
+  X.random_id = random_id;
+  struct random2local *Y = tree_lookup_random_id (TLS->random_id_tree, &X);
+  if (Y) { 
+    TLS->random_id_tree = tree_delete_random_id (TLS->random_id_tree, Y);
+    int y = Y->local_id;
+    tfree (Y, sizeof (*Y));
+    return y;
+  } else {
+    return 0;
   }
 }
