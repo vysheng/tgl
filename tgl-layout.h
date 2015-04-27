@@ -28,6 +28,7 @@
 
 #define TGLMF_UNREAD 1
 #define TGLMF_OUT 2
+#define TGLMF_MENTION 16
 #define TGLMF_CREATED (1 << 8)
 #define TGLMF_PENDING (1 << 9)
 #define TGLMF_DELETED (1 << 10)

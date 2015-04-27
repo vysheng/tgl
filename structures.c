@@ -661,6 +661,9 @@ void tglf_fetch_message_short_new (struct tgl_state *TLS, struct tgl_message *M,
   if (f & 2) {
     flags |= TGLMF_OUT;
   }
+  if (f & 16) {
+    flags |= TGLMF_MENTION;
+  }
 
   struct tl_ds_message_media A;
   A.magic = CODE_message_media_empty;
@@ -699,6 +702,9 @@ void tglf_fetch_message_short_chat_new (struct tgl_state *TLS, struct tgl_messag
   }
   if (f & 2) {
     flags |= TGLMF_OUT;
+  }
+  if (f & 16) {
+    flags |= TGLMF_MENTION;
   }
 
   struct tl_ds_message_media A;
@@ -954,6 +960,9 @@ void tglf_fetch_message_new (struct tgl_state *TLS, struct tgl_message *M, struc
     }
     if (DS_LVAL (DS_M->flags) & 2) {
       flags |= TGLMF_OUT;
+    }
+    if (DS_LVAL (DS_M->flags) & 16) {
+      flags |= TGLMF_MENTION;
     }
 
     bl_do_create_message_new (TLS, DS_LVAL (DS_M->id),

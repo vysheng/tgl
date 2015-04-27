@@ -91,6 +91,7 @@ struct send_file {
   char *file_name;
   int encr;
   int avatar;
+  int reply;
   unsigned char *iv;
   unsigned char *init_iv;
   unsigned char *key;
@@ -1403,8 +1404,11 @@ static void send_avatar_end (struct tgl_state *TLS, struct send_file *f, void *c
 
 static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
   out_int (CODE_messages_send_media);
-  out_int (0);
+  out_int ((f->reply ? 1 : 0));
   out_peer_id (TLS, f->to_id);
+  if (f->reply) {
+    out_int (f->reply);
+  }
   if (f->flags == -1) {
     out_int (CODE_input_media_uploaded_photo);
   } else {
@@ -1454,6 +1458,7 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
       out_int (CODE_document_attribute_filename);
       out_string (s + 1);
     } else if (f->flags & FLAG_DOCUMENT_VIDEO) {
+      vlogprintf (E_ERROR, "Sending video!!!!!\n");
       out_int (2);
       out_int (CODE_document_attribute_video);
       out_int (f->duration);
@@ -1565,7 +1570,7 @@ static void send_file_thumb (struct tgl_state *TLS, struct send_file *f, const v
 }
 
 
-static void _tgl_do_send_photo (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, int avatar, int w, int h, int duration, const void *thumb_data, int thumb_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+static void _tgl_do_send_photo (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, int reply, int avatar, int w, int h, int duration, const void *thumb_data, int thumb_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   int fd = open (file_name, O_RDONLY);
   if (fd < 0) {
     vlogprintf (E_WARNING, "No such file '%s'\n", file_name);
@@ -1603,6 +1608,7 @@ static void _tgl_do_send_photo (struct tgl_state *TLS, int flags, tgl_peer_id_t 
   f->offset = 0;
   f->part_num = 0;
   f->avatar = avatar;
+  f->reply = reply;
   int tmp = ((size + 2999) / 3000);
   f->part_size = (1 << 14);
   while (f->part_size < tmp) {
@@ -1651,11 +1657,11 @@ static void _tgl_do_send_photo (struct tgl_state *TLS, int flags, tgl_peer_id_t 
   }
 }
 
-void tgl_do_send_document_ex (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, int w, int h, int duration, const void *thumb, int thumb_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
-  _tgl_do_send_photo (TLS, flags, to_id, file_name, 0, w, h, duration, thumb, thumb_len, callback, callback_extra);
+void tgl_do_send_document_ex (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, int reply, int w, int h, int duration, const void *thumb, int thumb_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  _tgl_do_send_photo (TLS, flags, to_id, file_name, reply, 0, w, h, duration, thumb, thumb_len, callback, callback_extra);
 }
 
-void tgl_do_send_document (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+void tgl_do_send_document (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id, char *file_name, int reply, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   if (flags == -2) {
     char *mime_type = tg_mime_by_filename (file_name);
     if (!memcmp (mime_type, "image/", 6)) {
@@ -1668,16 +1674,44 @@ void tgl_do_send_document (struct tgl_state *TLS, int flags, tgl_peer_id_t to_id
       flags = 0;
     }
   }
-  _tgl_do_send_photo (TLS, flags, to_id, file_name, 0, 100, 100, 100, 0, 0, callback, callback_extra);
+  _tgl_do_send_photo (TLS, flags, to_id, file_name, reply, 0, 100, 100, 100, 0, 0, callback, callback_extra);
+}
+
+void tgl_do_reply_document (struct tgl_state *TLS, int flags, long long reply_id, char *file_name, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  struct tgl_message *M = tgl_message_get (TLS, reply_id);
+  if (!M || !(M->flags & TGLMF_CREATED) || (M->flags & TGLMF_ENCRYPTED)) {
+    vlogprintf (E_WARNING, "Bad reply id\n");
+    if (callback) {
+      callback (TLS, callback_extra, 0, 0);
+    }
+    return;
+  }
+  if (flags == -2) {
+    char *mime_type = tg_mime_by_filename (file_name);
+    if (!memcmp (mime_type, "image/", 6)) {
+      flags = -1;
+    } else if (!memcmp (mime_type, "video/", 6)) {
+      flags = FLAG_DOCUMENT_VIDEO;
+    } else if (!memcmp (mime_type, "audio/", 6)) {
+      flags = FLAG_DOCUMENT_AUDIO;
+    } else {
+      flags = 0;
+    }
+  }
+  tgl_peer_id_t id = M->to_id;
+  if (tgl_get_peer_type (id) == TGL_PEER_USER && tgl_get_peer_id (id) == TLS->our_id) {
+    id = M->from_id;
+  }
+  _tgl_do_send_photo (TLS, flags, id, file_name, reply_id, 0, 100, 100, 100, 0, 0, callback, callback_extra);
 }
 
 void tgl_do_set_chat_photo (struct tgl_state *TLS, tgl_peer_id_t chat_id, char *file_name, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success), void *callback_extra) {
   assert (tgl_get_peer_type (chat_id) == TGL_PEER_CHAT);
-  _tgl_do_send_photo (TLS, -1, chat_id, file_name, tgl_get_peer_id (chat_id), 0, 0, 0, 0, 0, (void *)callback, callback_extra);
+  _tgl_do_send_photo (TLS, -1, chat_id, file_name, 0, tgl_get_peer_id (chat_id), 0, 0, 0, 0, 0, (void *)callback, callback_extra);
 }
 
 void tgl_do_set_profile_photo (struct tgl_state *TLS, char *file_name, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
-  _tgl_do_send_photo (TLS, -1, TGL_MK_USER(TLS->our_id), file_name, -1, 0, 0, 0, 0, 0, (void *)callback, callback_extra);
+  _tgl_do_send_photo (TLS, -1, TGL_MK_USER(TLS->our_id), file_name, 0, -1, 0, 0, 0, 0, 0, (void *)callback, callback_extra);
 }
 /* }}} */
 
@@ -1892,6 +1926,38 @@ void tgl_do_send_contact (struct tgl_state *TLS, tgl_peer_id_t id, const char *p
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, E, callback, callback_extra);
 }
 
+
+void tgl_do_reply_contact (struct tgl_state *TLS, int reply_id, const char *phone, int phone_len, const char *first_name, int first_name_len, const char *last_name, int last_name_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  struct tgl_message *M = tgl_message_get (TLS, reply_id);
+  if (!M || !(M->flags & TGLMF_CREATED) || (M->flags & TGLMF_ENCRYPTED)) {
+    vlogprintf (E_WARNING, "Bad reply id\n");
+    if (callback) {
+      callback (TLS, callback_extra, 0, 0);
+    }
+    return;
+  }
+  
+  tgl_peer_id_t id = M->to_id;
+  if (tgl_get_peer_type (id) == TGL_PEER_USER && tgl_get_peer_id (id) == TLS->our_id) {
+    id = M->from_id;
+  }
+  
+  clear_packet ();
+  out_int (CODE_messages_send_media);
+  out_int (1);
+  out_peer_id (TLS, id);
+  out_int (reply_id);
+
+  out_int (CODE_input_media_contact);
+  out_cstring (phone, phone_len);
+  out_cstring (first_name, first_name_len);
+  out_cstring (last_name, last_name_len);
+  struct messages_send_extra *E = talloc0 (sizeof (*E));
+  tglt_secure_random (&E->id, 8);
+  out_long (E->id);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, E, callback, callback_extra);
+}
 void tgl_do_forward_media (struct tgl_state *TLS, tgl_peer_id_t id, int n, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   if (tgl_get_peer_type (id) == TGL_PEER_ENCR_CHAT) {
     vlogprintf (E_WARNING, "Can not forward messages from secret chat\n");
@@ -1971,6 +2037,38 @@ void tgl_do_send_location (struct tgl_state *TLS, tgl_peer_id_t id, double latit
 
     tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, E, callback, callback_extra);
   }
+}
+
+void tgl_do_reply_location (struct tgl_state *TLS, int reply_id, double latitude, double longitude, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  struct tgl_message *M = tgl_message_get (TLS, reply_id);
+  if (!M || !(M->flags & TGLMF_CREATED) || (M->flags & TGLMF_ENCRYPTED)) {
+    vlogprintf (E_WARNING, "Bad reply id\n");
+    if (callback) {
+      callback (TLS, callback_extra, 0, 0);
+    }
+    return;
+  }
+  
+  tgl_peer_id_t id = M->to_id;
+  if (tgl_get_peer_type (id) == TGL_PEER_USER && tgl_get_peer_id (id) == TLS->our_id) {
+    id = M->from_id;
+  }
+  
+  clear_packet ();
+  out_int (CODE_messages_send_media);
+  out_int (1);
+  out_peer_id (TLS, id);
+  out_int (reply_id);
+  out_int (CODE_input_media_geo_point);
+  out_int (CODE_input_geo_point);
+  out_double (latitude);
+  out_double (longitude);
+
+  struct messages_send_extra *E = talloc0 (sizeof (*E));
+  tglt_secure_random (&E->id, 8);
+  out_long (E->id);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, E, callback, callback_extra);
 }
 /* }}} */
 
