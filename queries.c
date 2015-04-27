@@ -815,6 +815,8 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *m
   }
   long long t;
   tglt_secure_random (&t, 8);
+
+  
   vlogprintf (E_DEBUG, "t = %lld, len = %d\n", t, len);
 
   struct tl_ds_message_media TDSM;
@@ -3107,6 +3109,71 @@ void tgl_do_send_extf (struct tgl_state *TLS, char *data, int data_len, void (*c
   }
 }
 #endif
+/* }}} */
+
+/* {{{ get messages */
+
+static int get_messages_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
+  struct tl_ds_messages_messages *DS_MM = D;
+
+  int i;
+  for (i = 0; i < DS_LVAL (DS_MM->users->cnt); i++) {
+    tglf_fetch_alloc_user_new (TLS, DS_MM->users->data[i]);
+  }
+  for (i = 0; i < DS_LVAL (DS_MM->chats->cnt); i++) {
+    tglf_fetch_alloc_chat_new (TLS, DS_MM->chats->data[i]);
+  }
+
+  struct tgl_message **ML;
+  if (q->extra) {
+    ML = talloc0 (sizeof (void *) * DS_LVAL (DS_MM->messages->cnt));
+  } else {
+    static struct tgl_message *M;
+    M = NULL;
+    ML = &M;
+    assert (DS_LVAL (DS_MM->messages->cnt) <= 1);
+  }
+  for (i = 0; i < DS_LVAL (DS_MM->messages->cnt); i++) {
+    ML[i] = tglf_fetch_alloc_message_new (TLS, DS_MM->messages->data[i]);
+  }
+  if (q->callback) {
+    if (q->extra) {
+      ((void (*)(struct tgl_state *, void *, int, int, struct tgl_message **))q->callback)(TLS, q->callback_extra, 1, DS_LVAL (DS_MM->messages->cnt), ML);
+    } else {
+      ((void (*)(struct tgl_state *, void *, int, struct tgl_message *))q->callback)(TLS, q->callback_extra, 1, *ML);
+    }
+  }
+  if (q->extra) {
+    tfree (ML, sizeof (void *) * DS_LVAL (DS_MM->messages->cnt));
+  }
+  return 0;
+}
+
+static struct query_methods get_messages_methods = {
+  .on_answer = get_messages_on_answer,
+  .on_error = q_ptr_on_error,
+  .type = TYPE_TO_PARAM (messages_messages)
+};
+
+void tgl_do_get_message (struct tgl_state *TLS, long long id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+  struct tgl_message *M = tgl_message_get (TLS, id);
+  if (M) {
+    if (callback) {
+      callback (TLS, callback_extra, 1, M);
+    }
+    return;
+  }
+
+  clear_packet ();
+
+  out_int (CODE_messages_get_messages);
+  out_int (CODE_vector);
+  out_int (1);
+  out_int (id);
+
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_messages_methods, 0, callback, callback_extra);
+}
 /* }}} */
 
 static int set_password_on_answer (struct tgl_state *TLS, struct query *q, void *D) {

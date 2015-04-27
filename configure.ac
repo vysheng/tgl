@@ -47,6 +47,15 @@ AC_ARG_ENABLE(libevent,[include libevent-based net and timers],
   fi
   ],[
   ])
+
+AC_ARG_ENABLE(valgrind,[fixes for correct valgrind work],
+  [ 
+  if test "x$enableval" = "xyes" ; then
+    AC_CHECK_HEADER(valgrind/memcheck.h, [AC_DEFINE([VALGRIND_FIXES], [1], [fixed for correct valgrind work])], [
+    ])
+  fi
+  ],[
+  ])
     
 # Checks for header files.
 AC_CHECK_HEADERS([execinfo.h fcntl.h malloc.h netdb.h stdlib.h string.h unistd.h arpa/inet.h mach/mach.h netinet/in.h sys/file.h sys/socket.h termios.h])

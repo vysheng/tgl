@@ -47,6 +47,10 @@
 #define CLOCK_MONOTONIC 1
 #endif
 
+#ifdef VALGRIND_FIXES
+#include "valgrind/memcheck.h"
+#endif
+
 #define RES_PRE 8
 #define RES_AFTER 8
 #define MAX_BLOCKS 1000000
@@ -273,6 +277,11 @@ void tglt_secure_random (void *s, int l) {
     } else {*/
       assert (0 && "End of random. If you want, you can start with -w");
     //}
+  } else {
+    #ifdef VALGRIND_FIXES
+      VALGRIND_MAKE_MEM_DEFINED (s, l);
+      VALGRIND_CHECK_MEM_IS_DEFINED (s, l);
+    #endif
   }
 }
 
