@@ -700,7 +700,7 @@ static int fetch_comb_binlog_message_encr_new (struct tgl_state *TLS, struct tl_
     } else {
       assert (!(M->flags & TGLMF_CREATED));
     }
-    assert (M->flags & TGLMF_CREATED);
+    assert (!(M->flags & TGLMF_CREATED));
   } else {
     assert (M->flags & TGLMF_CREATED);
   }
@@ -721,7 +721,7 @@ static int fetch_comb_binlog_message_encr_new (struct tgl_state *TLS, struct tl_
     M->from_id = TGL_MK_USER (DS_LVAL (DS_U->from_id));
   }
   if (DS_U->to_type) {  
-    assert (M->flags & 0x10000);
+    assert (flags & 0x10000);
     M->to_id = tgl_set_peer_id (DS_LVAL (DS_U->to_type), DS_LVAL (DS_U->to_id));
   }
 
@@ -893,7 +893,10 @@ static void replay_log_event (struct tgl_state *TLS) {
 
   in_ptr = rptr;
   in_end = wptr;
-  assert (skip_type_any (TYPE_TO_PARAM(binlog_update)) >= 0);
+  if (skip_type_any (TYPE_TO_PARAM(binlog_update)) < 0) {
+    vlogprintf (E_ERROR, "Can not replay at %lld (magic = 0x%08x)\n", binlog_pos, *rptr);
+    assert (0);
+  }
   in_end = in_ptr;
   in_ptr = rptr;
   struct tl_ds_binlog_update *DS_U = fetch_ds_type_binlog_update (TYPE_TO_PARAM (binlog_update));
@@ -1290,6 +1293,8 @@ void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int *fr
   int *flags_p = packet_ptr;
   out_int (flags);
   assert (*flags_p == flags);
+
+  out_long (id);
   
   if (from_id) {
     assert (to_id);
@@ -1563,7 +1568,7 @@ void bl_do_chat_new (struct tgl_state *TLS, int id, const char *title, int title
 
 void bl_do_encr_chat_new (struct tgl_state *TLS, int id, long long *access_hash, int *date, int *admin, int *user_id, void *key, void *g_key, void *first_key_id, int *state, int *ttl, int *layer, int *in_seq_no, int *last_in_seq_no, int *out_seq_no, long long *key_fingerprint, int flags) {
   tgl_peer_t *PP = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (id));
-  struct tgl_secret_chat *P = &PP->encr_chat;
+  struct tgl_secret_chat *P = PP ? &PP->encr_chat : NULL;
 
   if (flags == TGL_FLAGS_UNCHANGED) {
     flags = P->flags & 0xffff;

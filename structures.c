@@ -372,7 +372,7 @@ void tglf_fetch_encrypted_chat_new (struct tgl_state *TLS, struct tgl_secret_cha
         NULL,
         &r, 
         NULL, NULL, NULL, NULL, NULL, NULL, 
-        TGLECF_CREATE | TGLECF_CREATED
+        TGL_FLAGS_UNCHANGED 
       );
       return; // We needed only access hash from here
     }
@@ -387,11 +387,11 @@ void tglf_fetch_encrypted_chat_new (struct tgl_state *TLS, struct tgl_secret_cha
       NULL,
       NULL,
       NULL, 
-      NULL,
+      g_key,
       NULL,
       &r, 
       NULL, NULL, NULL, NULL, NULL, NULL,
-      TGLECF_CREATE | TGLECF_CREATED
+      TGL_FLAGS_UNCHANGED 
     );
   }
 }

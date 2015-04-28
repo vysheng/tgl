@@ -1913,6 +1913,7 @@ void tgl_do_send_contact (struct tgl_state *TLS, tgl_peer_id_t id, const char *p
 
   clear_packet ();
   out_int (CODE_messages_send_media);
+  out_int (0);
   out_peer_id (TLS, id);
   out_int (CODE_input_media_contact);
   out_cstring (phone, phone_len);

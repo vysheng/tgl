@@ -87,7 +87,7 @@ void tgl_do_send_encr_action (struct tgl_state *TLS, struct tgl_secret_chat *E, 
   int peer_type = TGL_PEER_ENCR_CHAT;
   int date = time (0);
   
-  bl_do_create_message_encr_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, NULL, A, NULL, TGLMF_PENDING | TGLMF_OUT | TGLMF_UNREAD | TGLMF_CREATE);
+  bl_do_create_message_encr_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, NULL, A, NULL, TGLMF_PENDING | TGLMF_OUT | TGLMF_UNREAD | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
 
   struct tgl_message *M = tgl_message_get (TLS, t);
   assert (M);
@@ -117,7 +117,7 @@ static int msg_send_encr_on_answer (struct tgl_state *TLS, struct query *q, void
   struct tgl_message *M = q->extra;
   
   if (M->flags & TGLMF_PENDING) {
-    bl_do_create_message_new (TLS, M->id, NULL, NULL, NULL, NULL, NULL, 
+    bl_do_create_message_encr_new (TLS, M->id, NULL, NULL, NULL, 
       &M->date,
       NULL, 0, NULL, NULL, NULL, M->flags ^ TGLMF_PENDING);
     
@@ -663,7 +663,7 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   //bl_do_encr_chat_init (TLS, t, user_id, (void *)random, (void *)g_a);
   
   int state = sc_waiting;
-  bl_do_encr_chat_new (TLS, t, NULL, NULL, &TLS->our_id, &user_id, NULL, NULL, g_a, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGL_FLAGS_UNCHANGED);
+  bl_do_encr_chat_new (TLS, t, NULL, NULL, &TLS->our_id, &user_id, NULL, NULL, g_a, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED);
 
   
   tgl_peer_t *_E = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t));
@@ -702,10 +702,10 @@ static int get_dh_config_on_answer (struct tgl_state *TLS, struct query *q, void
   } else {
     assert (TLS->encr_param_version);
   }
-  int l = prefetch_strlen ();
-  assert (l == 256);
   unsigned char *random = talloc (256);
-  memcpy (random, fetch_str (256), 256);
+  assert (DS_MDC->random->len == 256);
+  memcpy (random, DS_MDC->random->data, 256);
+  
   if (q->extra) {
     void **x = q->extra;
     ((void (*)(struct tgl_state *, void *, void *, void *, void *))(*x))(TLS, x[1], random, q->callback, q->callback_extra);
