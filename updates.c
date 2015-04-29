@@ -449,6 +449,9 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
 
     bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
   }
+  if (DS_U->qts) {
+    bl_do_set_qts (TLS, DS_LVAL (DS_U->qts));
+  }
 }
 
 void tglu_work_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {

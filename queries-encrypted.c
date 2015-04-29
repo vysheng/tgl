@@ -115,6 +115,7 @@ void tgl_do_set_encr_chat_ttl (struct tgl_state *TLS, struct tgl_secret_chat *E,
 /* {{{ Seng msg (plain text, encrypted) */
 static int msg_send_encr_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   struct tgl_message *M = q->extra;
+  assert (M->flags & TGLMF_ENCRYPTED);
   
   if (M->flags & TGLMF_PENDING) {
     bl_do_create_message_encr_new (TLS, M->id, NULL, NULL, NULL, 
@@ -163,7 +164,8 @@ void tgl_do_send_encr_msg_action (struct tgl_state *TLS, struct tgl_message *M, 
     }
     return;
   }
-  
+ 
+  assert (M->flags & TGLMF_ENCRYPTED);
   clear_packet ();
   out_int (CODE_messages_send_encrypted_service);
   out_int (CODE_input_encrypted_chat);
@@ -233,6 +235,8 @@ void tgl_do_send_encr_msg (struct tgl_state *TLS, struct tgl_message *M, void (*
     return;
   }
   
+  assert (M->flags & TGLMF_ENCRYPTED);
+
   clear_packet ();
   out_int (CODE_messages_send_encrypted);
   out_int (CODE_input_encrypted_chat);
@@ -249,7 +253,18 @@ void tgl_do_send_encr_msg (struct tgl_state *TLS, struct tgl_message *M, void (*
   out_long (M->id);
   out_int (P->encr_chat.ttl);
   out_cstring ((void *)M->message, M->message_len);
-  out_int (CODE_decrypted_message_media_empty);
+  switch (M->media.type) {
+  case tgl_message_media_none:
+    out_int (CODE_decrypted_message_media_empty);
+    break;
+  case tgl_message_media_geo:
+    out_int (CODE_decrypted_message_media_geo_point);
+    out_double (M->media.geo.latitude);
+    out_double (M->media.geo.longitude);
+    break;
+  default:
+    assert (0);
+  }
   encr_finish (&P->encr_chat);
   
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &msg_send_encr_methods, M, callback, callback_extra);
@@ -362,6 +377,10 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
     out_string (tg_mime_by_filename (f->file_name));
     // document
   }
+  
+  out_int (f->size);
+  out_cstring ((void *)f->key, 32);
+  out_cstring ((void *)f->init_iv, 32);
  
   int *save_in_ptr = in_ptr;
   int *save_in_end = in_end;
@@ -379,18 +398,11 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   in_end = save_in_ptr;
   in_ptr = save_in_end;
 
-  out_int (f->size);
-  out_cstring ((void *)f->key, 32);
-  out_cstring ((void *)f->init_iv, 32);
 
   int peer_type = tgl_get_peer_type (f->to_id);
   int peer_id = tgl_get_peer_id (f->to_id);
   int date = time (NULL);
 
-
-  bl_do_create_message_encr_new (TLS, r, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, DS_DMM, NULL, NULL, TGLMF_OUT | TGLMF_UNREAD);
-
-  free_ds_type_decrypted_message_media (DS_DMM, TYPE_TO_PARAM (decrypted_message_media));
 
   encr_finish (&P->encr_chat);
   if (f->size < (16 << 20)) {
@@ -412,6 +424,10 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   out_int ((*(int *)md5) ^ (*(int *)(md5 + 4)));
 
   tfree_secure (f->iv, 32);
+  
+  bl_do_create_message_encr_new (TLS, r, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, DS_DMM, NULL, NULL, TGLMF_OUT | TGLMF_UNREAD | TGLMF_ENCRYPTED | TGLMF_CREATE | TGLMF_CREATED);
+
+  free_ds_type_decrypted_message_media (DS_DMM, TYPE_TO_PARAM (decrypted_message_media));
   struct tgl_message *M = tgl_message_get (TLS, r);
   assert (M);
       
@@ -419,55 +435,32 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   
   tfree_str (f->file_name);
   tfree (f, sizeof (*f));
+
 }
 
 void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t id, double latitude, double longitude, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
-  clear_packet ();
-  out_int (CODE_messages_send_encrypted);
-  out_int (CODE_input_encrypted_chat);
-  out_int (tgl_get_peer_id (id));
-  tgl_peer_t *P = tgl_peer_get (TLS, id);
-  assert (P);
-  out_long (P->encr_chat.access_hash);
-
-  long long r;
-  tglt_secure_random (&r, 8);
-  out_long (r);
-  encr_start ();
-  out_int (CODE_decrypted_message_layer);
-  out_random (15 + 4 * (lrand48 () % 3));
-  out_int (TGL_ENCRYPTED_LAYER);
-  out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != TLS->our_id));
-  out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == TLS->our_id));
-  out_int (CODE_decrypted_message);
-  out_long (r);
-  if (P->encr_chat.layer < 17) {
-    out_random (15 + 4 * (lrand48 () % 3));
-  } else {
-    out_int (P->encr_chat.ttl);
-  }
-  out_string ("");
-  out_int (CODE_decrypted_message_media_geo_point);
-  out_double (latitude);
-  out_double (longitude);
-
-  static struct tl_ds_decrypted_message_media DS_DMM;
-  DS_DMM.magic = CODE_decrypted_message_media_geo_point;
-  DS_DMM.longitude = &longitude;
-  DS_DMM.latitude = &latitude;
-
-  int peer_id = tgl_get_peer_id (id);
+  struct tl_ds_decrypted_message_media TDSM;
+  TDSM.magic = CODE_decrypted_message_media_geo_point;
+  TDSM.latitude = talloc (sizeof (double));
+  *TDSM.latitude = latitude;
+  TDSM.longitude = talloc (sizeof (double));
+  *TDSM.longitude = longitude;
+  
   int peer_type = tgl_get_peer_type (id);
+  int peer_id = tgl_get_peer_id (id);
   int date = time (0);
 
-  bl_do_create_message_encr_new (TLS, r, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, &DS_DMM, NULL, NULL, TGLMF_OUT | TGLMF_UNREAD);
+  long long t;
+  tglt_secure_random (&t, 8);
 
-  encr_finish (&P->encr_chat);
+  bl_do_create_message_encr_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
 
-  struct tgl_message *M = tgl_message_get (TLS, r);
-  assert (M);
+  tfree (TDSM.latitude, sizeof (double));
+  tfree (TDSM.longitude, sizeof (double));
 
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &msg_send_encr_methods, M, callback, callback_extra);
+  struct tgl_message *M = tgl_message_get (TLS, t);
+
+  tgl_do_send_encr_msg (TLS, M, callback, callback_extra);
 }
 
 /* {{{ Encr accept */
@@ -563,10 +556,20 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
   static unsigned char sha_buffer[20];
   sha1 (kk, 256, sha_buffer);
 
+  long long fingerprint = *(long long *)(sha_buffer + 12);
+
   //bl_do_encr_chat_set_key (TLS, E, kk, *(long long *)(sha_buffer + 12));
   //bl_do_encr_chat_set_sha (TLS, E, sha_buffer);
 
-  bl_do_encr_chat_new (TLS, tgl_get_peer_id (E->id), NULL, NULL, NULL, NULL, kk, NULL, sha_buffer, NULL, NULL, NULL, NULL, NULL, NULL, NULL, TGL_FLAGS_UNCHANGED);
+  int state = sc_ok;
+
+  bl_do_encr_chat_new (TLS, tgl_get_peer_id (E->id), 
+    NULL, NULL, NULL, NULL, 
+    kk, NULL, sha_buffer, &state, 
+    NULL, NULL, NULL, NULL, NULL, 
+    &fingerprint, 
+    TGL_FLAGS_UNCHANGED
+  );
 
   clear_packet ();
   out_int (CODE_messages_accept_encryption);
@@ -663,7 +666,7 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   //bl_do_encr_chat_init (TLS, t, user_id, (void *)random, (void *)g_a);
   
   int state = sc_waiting;
-  bl_do_encr_chat_new (TLS, t, NULL, NULL, &TLS->our_id, &user_id, NULL, NULL, g_a, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED);
+  bl_do_encr_chat_new (TLS, t, NULL, NULL, &TLS->our_id, &user_id, random, NULL, NULL, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED);
 
   
   tgl_peer_t *_E = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t));

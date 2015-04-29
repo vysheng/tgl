@@ -356,7 +356,8 @@ void tglf_fetch_encrypted_chat_new (struct tgl_state *TLS, struct tgl_secret_cha
       (void *)g_key,
       NULL,
       &r, 
-      NULL, NULL, NULL, NULL, NULL, NULL, 
+      NULL, NULL, NULL, NULL, NULL, 
+      NULL, 
       TGLECF_CREATE | TGLECF_CREATED
     );
   } else {
@@ -371,7 +372,8 @@ void tglf_fetch_encrypted_chat_new (struct tgl_state *TLS, struct tgl_secret_cha
         NULL,
         NULL,
         &r, 
-        NULL, NULL, NULL, NULL, NULL, NULL, 
+        NULL, NULL, NULL, NULL, NULL, 
+        NULL, 
         TGL_FLAGS_UNCHANGED 
       );
       return; // We needed only access hash from here
@@ -390,7 +392,8 @@ void tglf_fetch_encrypted_chat_new (struct tgl_state *TLS, struct tgl_secret_cha
       g_key,
       NULL,
       &r, 
-      NULL, NULL, NULL, NULL, NULL, NULL,
+      NULL, NULL, NULL, NULL, NULL, 
+      DS_EC->key_fingerprint,
       TGL_FLAGS_UNCHANGED 
     );
   }
@@ -1042,7 +1045,7 @@ static int decrypt_encrypted_message (struct tgl_secret_chat *E) {
 }
 
 void tglf_fetch_encrypted_message_new (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_encrypted_message *DS_EM) {
-  if (DS_EM) { return; }
+  if (!DS_EM) { return; }
 
   int new = !(M->flags & TGLMF_CREATED);
   if (!new) {
@@ -1072,6 +1075,7 @@ void tglf_fetch_encrypted_message_new (struct tgl_state *TLS, struct tgl_message
   decr_ptr += 2;
 
   if (decrypt_encrypted_message (&P->encr_chat) < 0) {
+    vlogprintf (E_WARNING, "can not decrypt message\n");
     return;
   }
   
@@ -1079,15 +1083,19 @@ void tglf_fetch_encrypted_message_new (struct tgl_state *TLS, struct tgl_message
   int *save_in_end = in_end;
     
   in_ptr = decr_ptr;
-  int ll = fetch_int ();
-  in_end = in_ptr + ll; 
+  int ll = *in_ptr;
+  in_end = in_ptr + ll / 4 + 1;  
+  assert (fetch_int () == ll);
 
   if (skip_type_decrypted_message_layer (TYPE_TO_PARAM (decrypted_message_layer)) < 0 || in_ptr != in_end) {
     vlogprintf (E_WARNING, "can not fetch message\n");
+    in_ptr = save_in_ptr;
+    in_end = save_in_end;
     return;
   }
 
   in_ptr = decr_ptr;
+  assert (fetch_int () == ll);
 
   struct tl_ds_decrypted_message_layer *DS_DML = fetch_ds_type_decrypted_message_layer (TYPE_TO_PARAM (decrypted_message_layer));
   assert (DS_DML);
@@ -1096,14 +1104,22 @@ void tglf_fetch_encrypted_message_new (struct tgl_state *TLS, struct tgl_message
   in_end = save_in_end;
 
   //bl_do_encr_chat_set_layer (TLS, (void *)P, DS_LVAL (DS_DML->layer));
+  bl_do_encr_chat_new (TLS, tgl_get_peer_id (P->id),
+    NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, NULL,
+    NULL, DS_DML->layer, NULL, NULL, NULL, NULL,
+    TGL_FLAGS_UNCHANGED
+  );
 
-  int in_seq_no = DS_LVAL (DS_DML->in_seq_no);
-  int out_seq_no = DS_LVAL (DS_DML->out_seq_no);
+  int in_seq_no = DS_LVAL (DS_DML->out_seq_no);
+  int out_seq_no = DS_LVAL (DS_DML->in_seq_no);
+
   if (in_seq_no / 2 != P->encr_chat.in_seq_no) {
     vlogprintf (E_WARNING, "Hole in seq in secret chat. in_seq_no = %d, expect_seq_no = %d\n", in_seq_no / 2, P->encr_chat.in_seq_no);
     free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
     return;
   }
+  
   if ((in_seq_no & 1)  != 1 - (P->encr_chat.admin_id == TLS->our_id) || 
       (out_seq_no & 1) != (P->encr_chat.admin_id == TLS->our_id)) {
     vlogprintf (E_WARNING, "Bad msg admin\n");
@@ -1128,11 +1144,22 @@ void tglf_fetch_encrypted_message_new (struct tgl_state *TLS, struct tgl_message
     return;
   }
   
-  //bl_do_create_message_encr_new (TLS, M->id, P->encr_chat.user_id, TGL_PEER_ENCR_CHAT, tgl_get_peer_id (P->id), DS_LVAL (DS_EM->date), DS_STR (DS_DM->message), DS_DM->media, DS_DM->action, DS_EM->file, 0);
+  int peer_type = TGL_PEER_ENCR_CHAT;
+  int peer_id = tgl_get_peer_id (P->id);
+
+  bl_do_create_message_encr_new (TLS, M->id, &P->encr_chat.user_id, &peer_type, &peer_id, DS_EM->date, DS_STR (DS_DM->message), DS_DM->media, DS_DM->action, DS_EM->file, TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
 
   if (in_seq_no >= 0 && out_seq_no >= 0) {
     //bl_do_encr_chat_update_seq (TLS, (void *)P, in_seq_no / 2 + 1, out_seq_no / 2);
-    assert (P->encr_chat.in_seq_no == in_seq_no / 2 + 1);
+    in_seq_no = in_seq_no / 2 + 1;
+    out_seq_no = out_seq_no / 2;
+    bl_do_encr_chat_new (TLS, tgl_get_peer_id (P->id),
+      NULL, NULL, NULL, NULL,
+      NULL, NULL, NULL, NULL,
+      NULL, NULL, &in_seq_no, &out_seq_no, NULL, NULL,
+      TGL_FLAGS_UNCHANGED
+    );
+    assert (P->encr_chat.in_seq_no == in_seq_no);
   }
   
   free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
@@ -1273,10 +1300,21 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message_new (struct tgl_state *TL
       }
     }
     if (M->action.type == tgl_message_action_notify_layer) {
-      //bl_do_encr_chat_set_layer (TLS, E, M->action.layer);      
+      bl_do_encr_chat_new (TLS, tgl_get_peer_id (E->id),
+        NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL,
+        NULL, &M->action.layer, NULL, NULL, NULL, NULL,
+        TGL_FLAGS_UNCHANGED
+      );
     }
     if (M->action.type == tgl_message_action_set_message_ttl) {
       //bl_do_encr_chat_set_ttl (TLS, E, M->action.ttl);      
+      bl_do_encr_chat_new (TLS, tgl_get_peer_id (E->id),
+        NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL,
+        &M->action.ttl, NULL, NULL, NULL, NULL, NULL,
+        TGL_FLAGS_UNCHANGED
+      );
     }
   }
   return M;

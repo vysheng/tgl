@@ -820,14 +820,22 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *m
   
   vlogprintf (E_DEBUG, "t = %lld, len = %d\n", t, len);
 
-  struct tl_ds_message_media TDSM;
-  TDSM.magic = CODE_message_media_empty;
 
   int peer_type = tgl_get_peer_type (id);
   int peer_id = tgl_get_peer_id (id);
   int date = time (0);
 
-  bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, msg, len, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED);
+  if (tgl_get_peer_type (id) != TGL_PEER_ENCR_CHAT) {
+    struct tl_ds_message_media TDSM;
+    TDSM.magic = CODE_message_media_empty;
+
+    bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, msg, len, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED);
+  } else {
+    struct tl_ds_decrypted_message_media TDSM;
+    TDSM.magic = CODE_decrypted_message_media_empty;
+
+    bl_do_create_message_encr_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, &date, msg, len, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
+  }
 
   struct tgl_message *M = tgl_message_get (TLS, t);
   assert (M);
