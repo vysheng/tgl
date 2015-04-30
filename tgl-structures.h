@@ -57,4 +57,10 @@ void tgls_messages_mark_read (struct tgl_state *TLS, struct tgl_message *M, int 
 
 void tgls_insert_random2local (struct tgl_state *TLS, long long random_id, int local_id);
 int tgls_get_local_by_random (struct tgl_state *TLS, long long random_id);
+
+
+void tgl_photo_insert (struct tgl_state *TLS, struct tgl_photo *P);
+struct tgl_photo *tgl_photo_get (struct tgl_state *TLS, long long id);
+struct tgl_document *tgl_document_get (struct tgl_state *TLS, long long id);
+void tgl_document_insert (struct tgl_state *TLS, struct tgl_document *P);
 #endif

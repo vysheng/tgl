@@ -61,10 +61,31 @@ static int random_id_cmp (struct random2local *L, struct random2local *R) {
   return 0;
 }
 
+static int photo_id_cmp (struct tgl_photo *L, struct tgl_photo *R) {
+  if (L->id < R->id) { return -1; }
+  if (L->id > R->id) { return 1; }
+  return 0;
+}
+
+static int document_id_cmp (struct tgl_document *L, struct tgl_document *R) {
+  if (L->id < R->id) { return -1; }
+  if (L->id > R->id) { return 1; }
+  return 0;
+}
+
+static int webpage_id_cmp (struct tgl_webpage *L, struct tgl_webpage *R) {
+  if (L->id < R->id) { return -1; }
+  if (L->id > R->id) { return 1; }
+  return 0;
+}
+
 DEFINE_TREE(peer,tgl_peer_t *,peer_cmp,0)
 DEFINE_TREE(peer_by_name,tgl_peer_t *,peer_cmp_name,0)
 DEFINE_TREE(message,struct tgl_message *,id_cmp,0)
 DEFINE_TREE(random_id,struct random2local *, random_id_cmp,0)
+DEFINE_TREE(photo,struct tgl_photo *,photo_id_cmp,0)
+DEFINE_TREE(document,struct tgl_document *,document_id_cmp,0)
+DEFINE_TREE(webpage,struct tgl_webpage *,webpage_id_cmp,0)
 
 
 char *tgls_default_create_print_name (struct tgl_state *TLS, tgl_peer_id_t id, const char *a1, const char *a2, const char *a3, const char *a4) {
@@ -479,11 +500,23 @@ void tglf_fetch_geo_new (struct tgl_state *TLS, struct tgl_geo *G, struct tl_ds_
   G->latitude = DS_LVAL (DS_GP->latitude);
 }
 
-void tglf_fetch_photo_new (struct tgl_state *TLS, struct tgl_photo *P, struct tl_ds_photo *DS_P) {
-  if (!DS_P) { return; }
-  memset (P, 0, sizeof (*P));
+struct tgl_photo *tglf_fetch_alloc_photo_new (struct tgl_state *TLS, struct tl_ds_photo *DS_P) {
+  if (!DS_P) { return NULL; }
+  if (DS_P->magic == CODE_photo_empty) { return NULL; }
+  
+  struct tgl_photo *P = tgl_photo_get (TLS, DS_LVAL (DS_P->id));
+  if (P) {
+    P->refcnt ++;
+    return P;
+  }
+
+
+  P = talloc0 (sizeof (*P));
   P->id = DS_LVAL (DS_P->id);
-  if (DS_P->magic == CODE_photo_empty) { return; }
+  P->refcnt = 1;
+  
+  tgl_photo_insert (TLS, P);
+
   P->access_hash = DS_LVAL (DS_P->access_hash);
   P->user_id = DS_LVAL (DS_P->user_id);
   P->date = DS_LVAL (DS_P->date);
@@ -496,43 +529,72 @@ void tglf_fetch_photo_new (struct tgl_state *TLS, struct tgl_photo *P, struct tl
   for (i = 0; i < P->sizes_num; i++) {
     tglf_fetch_photo_size_new (TLS, &P->sizes[i], DS_P->sizes->data[i]);
   }
+
+  return P;
 }
 
-void tglf_fetch_video_new (struct tgl_state *TLS, struct tgl_document *V, struct tl_ds_video *DS_V) {
-  if (!DS_V) { return; }
+struct tgl_document *tglf_fetch_alloc_video_new (struct tgl_state *TLS, struct tl_ds_video *DS_V) {
+  if (!DS_V) { return NULL; }
+  
+  if (DS_V->magic == CODE_video_empty) { return NULL; }
+  
+  struct tgl_document *D = tgl_document_get (TLS, DS_LVAL (DS_V->id));
+  if (D) {
+    D->refcnt ++;
+    return D;
+  }
 
-  memset (V, 0, sizeof (*V));
-  V->flags = FLAG_DOCUMENT_VIDEO;
-  V->id = DS_LVAL (DS_V->id);
-  if (DS_V->magic == CODE_video_empty) { return; }
 
-  V->access_hash = DS_LVAL (DS_V->access_hash);
-  V->user_id = DS_LVAL (DS_V->user_id);
-  V->date = DS_LVAL (DS_V->date);
-  V->caption = DS_STR_DUP (DS_V->caption);
-  V->duration = DS_LVAL (DS_V->duration);
-  V->mime_type = DS_STR_DUP (DS_V->mime_type);
-  V->size = DS_LVAL (DS_V->size);
-  tglf_fetch_photo_size_new (TLS, &V->thumb, DS_V->thumb);
+  D = talloc0 (sizeof (*D));
+  D->id = DS_LVAL (DS_V->id);
+  D->refcnt = 1;
+  
+  tgl_document_insert (TLS, D);
 
-  V->dc_id = DS_LVAL (DS_V->dc_id);
-  V->w = DS_LVAL (DS_V->w);
-  V->h = DS_LVAL (DS_V->h);
+  D->access_hash = DS_LVAL (DS_V->access_hash);
+  D->user_id = DS_LVAL (DS_V->user_id);
+  D->date = DS_LVAL (DS_V->date);
+  D->caption = DS_STR_DUP (DS_V->caption);
+  D->duration = DS_LVAL (DS_V->duration);
+  D->mime_type = DS_STR_DUP (DS_V->mime_type);
+  D->size = DS_LVAL (DS_V->size);
+  tglf_fetch_photo_size_new (TLS, &D->thumb, DS_V->thumb);
+
+  D->dc_id = DS_LVAL (DS_V->dc_id);
+  D->w = DS_LVAL (DS_V->w);
+  D->h = DS_LVAL (DS_V->h);
+  return D;
 }
 
-void tglf_fetch_audio_new (struct tgl_state *TLS, struct tgl_document *A, struct tl_ds_audio *DS_A) {
-  if (!DS_A) { return; }
-  memset (A, 0, sizeof (*A));
-  A->flags = FLAG_DOCUMENT_AUDIO;
-  A->id = DS_LVAL (DS_A->id);
-  if (DS_A->magic == CODE_audio_empty) { return; }
-  A->access_hash = DS_LVAL (DS_A->access_hash);
-  A->user_id = DS_LVAL (DS_A->user_id);
-  A->date = DS_LVAL (DS_A->date);
-  A->duration = DS_LVAL (DS_A->duration);
-  A->mime_type = DS_STR_DUP (DS_A->mime_type);
-  A->size = DS_LVAL (DS_A->size);
-  A->dc_id = DS_LVAL (DS_A->dc_id);
+struct tgl_document *tglf_fetch_alloc_audio_new (struct tgl_state *TLS, struct tl_ds_audio *DS_A) {
+  if (!DS_A) { return NULL; }
+  
+  if (DS_A->magic == CODE_audio_empty) { return NULL; }
+  
+  struct tgl_document *D = tgl_document_get (TLS, DS_LVAL (DS_A->id));
+  if (D) {
+    D->refcnt ++;
+    return D;
+  }
+
+
+  D = talloc0 (sizeof (*D));
+  D->id = DS_LVAL (DS_A->id);
+  D->refcnt = 1;
+  
+  tgl_document_insert (TLS, D);
+  
+  D->flags = FLAG_DOCUMENT_AUDIO;
+  
+  D->access_hash = DS_LVAL (DS_A->access_hash);
+  D->user_id = DS_LVAL (DS_A->user_id);
+  D->date = DS_LVAL (DS_A->date);
+  D->duration = DS_LVAL (DS_A->duration);
+  D->mime_type = DS_STR_DUP (DS_A->mime_type);
+  D->size = DS_LVAL (DS_A->size);
+  D->dc_id = DS_LVAL (DS_A->dc_id);
+
+  return D;
 }
 
 void tglf_fetch_document_attribute_new (struct tgl_state *TLS, struct tgl_document *D, struct tl_ds_document_attribute *DS_DA) {
@@ -566,11 +628,23 @@ void tglf_fetch_document_attribute_new (struct tgl_state *TLS, struct tgl_docume
   }
 }
 
-void tglf_fetch_document_new (struct tgl_state *TLS, struct tgl_document *D, struct tl_ds_document *DS_D) {
-  if (!DS_D) { return; }
-  memset (D, 0, sizeof (*D));
+struct tgl_document *tglf_fetch_alloc_document_new (struct tgl_state *TLS, struct tl_ds_document *DS_D) {
+  if (!DS_D) { return NULL; }
+  
+  if (DS_D->magic == CODE_document_empty) { return NULL; }
+  
+  struct tgl_document *D = tgl_document_get (TLS, DS_LVAL (DS_D->id));
+  if (D) {
+    D->refcnt ++;
+    return D;
+  }
+
+
+  D = talloc0 (sizeof (*D));
   D->id = DS_LVAL (DS_D->id);
-  if (DS_D->magic == CODE_document_empty) { return; }
+  D->refcnt = 1;
+  
+  tgl_document_insert (TLS, D);
 
   D->access_hash = DS_LVAL (DS_D->access_hash);
   D->user_id = DS_LVAL (DS_D->user_id);
@@ -588,6 +662,7 @@ void tglf_fetch_document_new (struct tgl_state *TLS, struct tgl_document *D, str
       tglf_fetch_document_attribute_new (TLS, D, DS_D->attributes->data[i]);
     }
   }
+  return D;
 }
 
 void tglf_fetch_message_action_new (struct tgl_state *TLS, struct tgl_message_action *M, struct tl_ds_message_action *DS_MA) {
@@ -626,7 +701,7 @@ void tglf_fetch_message_action_new (struct tgl_state *TLS, struct tgl_message_ac
     break;
   case CODE_message_action_chat_edit_photo:
     M->type = tgl_message_action_chat_edit_photo;
-    tglf_fetch_photo_new (TLS, &M->photo, DS_MA->photo);
+    M->photo = tglf_fetch_alloc_photo_new (TLS, DS_MA->photo);
     break;
   case CODE_message_action_chat_delete_photo:
     M->type = tgl_message_action_chat_delete_photo;
@@ -738,19 +813,19 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     break;
   case CODE_message_media_photo:
     M->type = tgl_message_media_photo;
-    tglf_fetch_photo_new (TLS, &M->photo, DS_MM->photo);
+    M->photo = tglf_fetch_alloc_photo_new (TLS, DS_MM->photo);
     break;
   case CODE_message_media_video:
     M->type = tgl_message_media_document;
-    tglf_fetch_video_new (TLS, &M->document, DS_MM->video);
+    M->document = tglf_fetch_alloc_video_new (TLS, DS_MM->video);
     break;
   case CODE_message_media_audio:
     M->type = tgl_message_media_document;
-    tglf_fetch_audio_new (TLS, &M->document, DS_MM->audio);
+    M->document = tglf_fetch_alloc_audio_new (TLS, DS_MM->audio);
     break;
   case CODE_message_media_document:
     M->type = tgl_message_media_document;
-    tglf_fetch_document_new (TLS, &M->document, DS_MM->document);
+    M->document = tglf_fetch_alloc_document_new (TLS, DS_MM->document);
     break;
   case CODE_message_media_geo:
     M->type = tgl_message_media_geo;
@@ -776,8 +851,7 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     M->webpage.site_name = DS_STR_DUP (DS_MM->webpage->site_name);
     M->webpage.title = DS_STR_DUP (DS_MM->webpage->title);
     if (DS_MM->webpage->photo) {
-      M->webpage.photo = talloc0 (sizeof (struct tgl_photo));
-      tglf_fetch_photo_new (TLS, M->webpage.photo, DS_MM->webpage->photo);
+      M->webpage.photo = tglf_fetch_alloc_photo_new (TLS, DS_MM->webpage->photo);
     }
     M->webpage.description = DS_STR_DUP (DS_MM->webpage->description);
     M->webpage.embed_url = DS_STR_DUP (DS_MM->webpage->embed_url);
@@ -1427,6 +1501,10 @@ void tgls_free_photo_size (struct tgl_state *TLS, struct tgl_photo_size *S) {
 }
 
 void tgls_free_photo (struct tgl_state *TLS, struct tgl_photo *P) {
+  if (--P->refcnt) {
+    assert (P->refcnt > 0);
+    return;
+  }
   if (P->caption) { tfree_str (P->caption); }
   if (P->sizes) {
     int i;
@@ -1435,24 +1513,22 @@ void tgls_free_photo (struct tgl_state *TLS, struct tgl_photo *P) {
     }
     tfree (P->sizes, sizeof (struct tgl_photo_size) * P->sizes_num);
   }
+  TLS->photo_tree = tree_delete_photo (TLS->photo_tree, P);
+  tfree (P, sizeof (*P));
 }
-/*
-void tgls_free_video (struct tgl_state *TLS, struct tgl_video *V) {
-  tfree_str (V->mime_type);
-  if (!V->access_hash) { return; }
-  tfree_str (V->caption);
-  tgls_free_photo_size (TLS, &V->thumb);
-}*/
-
-//void tgls_free_audio (struct tgl_state *TLS, struct tgl_audio *A) {
-//  tfree_str (A->mime_type);
-//}
 
 void tgls_free_document (struct tgl_state *TLS, struct tgl_document *D) {
+  if (--D->refcnt) {
+    assert (D->refcnt);
+    return;
+  }
   if (!D->access_hash) { return; }
   if (D->mime_type) { tfree_str (D->mime_type);}
   if (D->caption) {tfree_str (D->caption);}
   tgls_free_photo_size (TLS, &D->thumb);
+  
+  TLS->document_tree = tree_delete_document (TLS->document_tree, D);
+  tfree (D, sizeof (*D));
 }
 
 void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M) {
@@ -1460,29 +1536,22 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
   case tgl_message_media_none:
   case tgl_message_media_geo:
     return;
-  //case tgl_message_media_audio:
-  //  tgls_free_audio (TLS, &M->audio);
-  //  return;
   case tgl_message_media_photo:
-    tgls_free_photo (TLS, &M->photo);
+    tgls_free_photo (TLS, M->photo);
+    M->photo = NULL;
     return;
-  //case tgl_message_media_video:
-  //  tgls_free_video (TLS, &M->video);
-  //  return;
   case tgl_message_media_contact:
     tfree_str (M->phone);
     tfree_str (M->first_name);
     tfree_str (M->last_name);
     return;
   case tgl_message_media_document:
-    tgls_free_document (TLS, &M->document);
+    tgls_free_document (TLS, M->document);
     return;
   case tgl_message_media_unsupported:
     tfree (M->data, M->data_size);
     return;
   case tgl_message_media_photo_encr:
-  //case tgl_message_media_video_encr:
-  //case tgl_message_media_audio_encr:
   case tgl_message_media_document_encr:
     tfree_secure (M->encr_photo.key, 32);
     tfree_secure (M->encr_photo.iv, 32);
@@ -1494,10 +1563,7 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
     if (M->webpage.site_name) { tfree_str (M->webpage.site_name); }
     if (M->webpage.type) { tfree_str (M->webpage.type); }
     if (M->webpage.description) { tfree_str (M->webpage.description); }
-    if (M->webpage.photo) {
-      tgls_free_photo (TLS, M->webpage.photo);
-      tfree (M->webpage.photo, sizeof (*M->webpage.photo));
-    }
+    if (M->webpage.photo) { tgls_free_photo (TLS, M->webpage.photo); }
     if (M->webpage.embed_url) { tfree_str (M->webpage.embed_url); }
     if (M->webpage.embed_type) { tfree_str (M->webpage.embed_type); }
     if (M->webpage.author) { tfree_str (M->webpage.author); }
@@ -1526,7 +1592,8 @@ void tgls_free_message_action (struct tgl_state *TLS, struct tgl_message_action 
     tfree_str (M->new_title);
     return;
   case tgl_message_action_chat_edit_photo:
-    tgls_free_photo (TLS, &M->photo);
+    tgls_free_photo (TLS, M->photo);
+    M->photo = NULL;
     return;
   case tgl_message_action_chat_delete_photo:
   case tgl_message_action_chat_add_user:
@@ -1577,7 +1644,7 @@ void tgls_free_chat (struct tgl_state *TLS, struct tgl_chat *U) {
   if (U->user_list) {
     tfree (U->user_list, U->user_list_size * 12);
   }
-  tgls_free_photo (TLS, &U->photo);
+  tgls_free_photo (TLS, U->photo);
   tfree (U, sizeof (*U));
 }
 
@@ -1589,7 +1656,7 @@ void tgls_free_user (struct tgl_state *TLS, struct tgl_user *U) {
   if (U->real_first_name) { tfree_str (U->real_first_name); }
   if (U->real_last_name) { tfree_str (U->real_last_name); }
   if (U->status.ev) { tgl_remove_status_expire (TLS, U); }
-  tgls_free_photo (TLS, &U->photo);
+  tgls_free_photo (TLS, U->photo);
   tfree (U, sizeof (*U));
 }
 
@@ -1753,6 +1820,26 @@ void tglm_send_all_unsent (struct tgl_state *TLS) {
   tree_act_ex_message (TLS->message_unsent_tree, __send_msg, TLS);
 }
 /* }}} */
+
+struct tgl_photo *tgl_photo_get (struct tgl_state *TLS, long long id) {
+  struct tgl_photo P;
+  P.id = id;
+  return tree_lookup_photo (TLS->photo_tree, &P);
+}
+
+void tgl_photo_insert (struct tgl_state *TLS, struct tgl_photo *P) {
+  TLS->photo_tree = tree_insert_photo (TLS->photo_tree, P, lrand48 ());
+}
+
+struct tgl_document *tgl_document_get (struct tgl_state *TLS, long long id) {
+  struct tgl_document P;
+  P.id = id;
+  return tree_lookup_document (TLS->document_tree, &P);
+}
+
+void tgl_document_insert (struct tgl_state *TLS, struct tgl_document *P) {
+  TLS->document_tree = tree_insert_document (TLS->document_tree, P, lrand48 ());
+}
 
 void tglp_peer_insert_name (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->peer_by_name_tree = tree_insert_peer_by_name (TLS->peer_by_name_tree, P, lrand48 ());

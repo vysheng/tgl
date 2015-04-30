@@ -199,6 +199,7 @@ struct tgl_geo {
 struct tgl_photo {
   long long id;
   long long access_hash;
+  int refcnt;
   int user_id;
   int date;
   char *caption;
@@ -290,7 +291,7 @@ struct tgl_user {
   int last_read_in;
   int last_read_out;
   long long photo_id;
-  struct tgl_photo photo;
+  struct tgl_photo *photo;
   char *first_name;
   char *last_name;
   char *phone;
@@ -318,7 +319,7 @@ struct tgl_chat {
   struct tgl_file_location photo_small;
   int last_read_in;
   int last_read_out;
-  struct tgl_photo photo;
+  struct tgl_photo *photo;
   char *title;
   int users_num;
   int user_list_size;
@@ -354,7 +355,7 @@ struct tgl_secret_chat {
   int structure_version;
   struct tgl_file_location photo_big;
   struct tgl_file_location photo_small;
-  struct tgl_photo photo;
+  struct tgl_photo *photo;
   int user_id;
   int admin_id;
   int date;
@@ -386,7 +387,7 @@ typedef union tgl_peer {
     int structure_version;
     struct tgl_file_location photo_big;
     struct tgl_file_location photo_small;
-    struct tgl_photo photo;
+    struct tgl_photo *photo;
   };
   struct tgl_user user;
   struct tgl_chat chat;
@@ -422,6 +423,7 @@ struct tgl_audio {
 struct tgl_document {
   long long id;
   long long access_hash;
+  int refcnt;
   int user_id;
   int date;
   int size;
@@ -445,7 +447,7 @@ struct tgl_message_action {
       int *users;
     };
     char *new_title;
-    struct tgl_photo photo;
+    struct tgl_photo *photo;
     int user;
     int ttl;
     int layer;
@@ -468,6 +470,7 @@ struct tgl_message_action {
 
 struct tgl_webpage {
   long long id;
+  int refcnt;
   char *url;
   char *display_url;
   char *type;
@@ -486,10 +489,10 @@ struct tgl_webpage {
 struct tgl_message_media {
   enum tgl_message_media_type type;
   union {
-    struct tgl_photo photo;
+    struct tgl_photo *photo;
     //struct tgl_video video;
     //struct tgl_audio audio;
-    struct tgl_document document;
+    struct tgl_document *document;
     struct tgl_encr_document encr_document;
     struct tgl_webpage webpage;
 

@@ -202,6 +202,8 @@ struct tgl_state {
   struct tree_peer_by_name *peer_by_name_tree;
   struct tree_message *message_tree;
   struct tree_message *message_unsent_tree;
+  struct tree_photo *photo_tree;
+  struct tree_document *document_tree;
 
   int users_allocated;
   int chats_allocated;
@@ -369,6 +371,7 @@ void tgl_do_send_typing (struct tgl_state *TLS, tgl_peer_id_t id, enum tgl_typin
 void tgl_do_send_broadcast (struct tgl_state *TLS, int num, tgl_peer_id_t id[], const char *text, int text_len, void (*callback)(struct tgl_state *TLS, void *extra, int success, int num, struct tgl_message *ML[]), void *callback_extra);
 void tgl_do_send_message_reply (struct tgl_state *TLS, int reply_id, const char *msg, int len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
 void tgl_do_get_message (struct tgl_state *TLS, long long id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
+void tgl_do_load_file_location (struct tgl_state *TLS, struct tgl_file_location *P, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra);
 
 
 void tgl_do_visualize_key (struct tgl_state *TLS, tgl_peer_id_t id, unsigned char buf[16]);

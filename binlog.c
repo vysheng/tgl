@@ -290,10 +290,10 @@ static int fetch_comb_binlog_user_new (struct tgl_state *TLS, struct tl_ds_binlo
   }
 
   if (DS_U->photo) {
-    if (U->flags & TGLUF_HAS_PHOTO) {
-      tgls_free_photo (TLS, &U->photo);
+    if (U->photo) {
+      tgls_free_photo (TLS, U->photo);
     }
-    tglf_fetch_photo_new (TLS, &U->photo, DS_U->photo);
+    U->photo = tglf_fetch_alloc_photo_new (TLS, DS_U->photo);
     U->flags |= TGLUF_HAS_PHOTO;
     //updates |= TGL_UPDATE_PHOTO;
   }
@@ -501,9 +501,9 @@ static int fetch_comb_binlog_chat_new (struct tgl_state *TLS, struct tl_ds_binlo
 
   if (DS_U->photo) {
     if (C->flags & TGLPF_HAS_PHOTO) {
-      tgls_free_photo (TLS, &C->photo);
+      tgls_free_photo (TLS, C->photo);
     }
-    tglf_fetch_photo_new (TLS, &C->photo, DS_U->photo);
+    C->photo = tglf_fetch_alloc_photo_new (TLS, DS_U->photo);
     C->flags |= TGLPF_HAS_PHOTO;
     updates |= TGL_UPDATE_PHOTO;
   }
@@ -1454,7 +1454,7 @@ void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, cons
   }
 
   if (photo) {
-    if (!P || P->photo.id != DS_LVAL (photo->id)) {
+    if (!P || !P->photo || P->photo->id != DS_LVAL (photo->id)) {
       store_ds_type_photo (photo, TYPE_TO_PARAM (photo));
       (*flags_p) |= (1 << 21);
     }
@@ -1551,7 +1551,7 @@ void bl_do_chat_new (struct tgl_state *TLS, int id, const char *title, int title
   }
 
   if (photo) {
-    if (!P || P->photo.id != DS_LVAL (photo->id)) {
+    if (!P || !P->photo || P->photo->id != DS_LVAL (photo->id)) {
       store_ds_type_photo (photo, TYPE_TO_PARAM (photo));
       (*flags_p) |= (1 << 22);
     }

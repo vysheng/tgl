@@ -2002,16 +2002,18 @@ void tgl_do_forward_media (struct tgl_state *TLS, tgl_peer_id_t id, int n, void 
   out_peer_id (TLS, id);
   switch (M->media.type) {
   case tgl_message_media_photo:
+    assert (M->media.photo);
     out_int (CODE_input_media_photo);
     out_int (CODE_input_photo);
-    out_long (M->media.photo.id);
-    out_long (M->media.photo.access_hash);
+    out_long (M->media.photo->id);
+    out_long (M->media.photo->access_hash);
     break;
   case tgl_message_media_document:
+    assert (M->media.document);
     out_int (CODE_input_media_document);
     out_int (CODE_input_document);
-    out_long (M->media.document.id);
-    out_long (M->media.document.access_hash);
+    out_long (M->media.document->id);
+    out_long (M->media.document->access_hash);
     break;
   default:
     assert (0);
@@ -2375,7 +2377,7 @@ static void load_next_part (struct tgl_state *TLS, struct download *D, void *cal
     out_long (D->access_hash);
   }
   out_int (D->offset);
-  out_int (1 << 14);
+  out_int (D->size ? (1 << 14) : (1 << 19));
   tglq_send_query (TLS, TLS->DC_list[D->dc], packet_ptr - packet_buffer, packet_buffer, &download_methods, D, callback, callback_extra);
   //tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &download_methods, D);
 }
@@ -2398,6 +2400,29 @@ void tgl_do_load_photo_size (struct tgl_state *TLS, struct tgl_photo_size *P, vo
   D->dc = P->loc.dc;
   D->local_id = P->loc.local_id;
   D->secret = P->loc.secret;
+  D->name = 0;
+  D->fd = -1;
+  load_next_part (TLS, D, callback, callback_extra);
+}
+
+void tgl_do_load_file_location (struct tgl_state *TLS, struct tgl_file_location *P, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra) {
+  if (!P->dc) {
+    vlogprintf (E_WARNING, "Bad video thumb\n");
+    if (callback) {
+      callback (TLS, callback_extra, 0, 0);
+    }
+    return;
+  }
+  
+  assert (P);
+  struct download *D = talloc0 (sizeof (*D));
+  D->id = 0;
+  D->offset = 0;
+  D->size = 0;
+  D->volume = P->volume;
+  D->dc = P->dc;
+  D->local_id = P->local_id;
+  D->secret = P->secret;
   D->name = 0;
   D->fd = -1;
   load_next_part (TLS, D, callback, callback_extra);
