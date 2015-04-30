@@ -784,6 +784,11 @@ void tglf_fetch_message_action_new (struct tgl_state *TLS, struct tgl_message_ac
 }
 
 void tglf_fetch_message_short_new (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_updates *DS_U) {
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->user_id)));
+  if (!P || !(P->flags & TGLPF_CREATED)) {
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    return;
+  }
 
   int flags = M->flags & 0xffff;
   
@@ -826,6 +831,16 @@ void tglf_fetch_message_short_new (struct tgl_state *TLS, struct tgl_message *M,
 }
 
 void tglf_fetch_message_short_chat_new (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_updates *DS_U) {
+  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->from_id)));
+  if (!P || !(P->flags & TGLPF_CREATED)) {
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    return;
+  }
+  P = tgl_peer_get (TLS, TGL_MK_CHAT (DS_LVAL (DS_U->chat_id)));
+  if (!P || !(P->flags & TGLPF_CREATED)) {
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    return;
+  }
 
   int flags = M->flags & 0xffff;
   

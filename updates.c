@@ -519,6 +519,10 @@ void tglu_work_update_short_message_new (struct tgl_state *TLS, int check_only, 
   
   struct tgl_message *M = tglf_fetch_alloc_message_short_new (TLS, DS_U);
   assert (M);
+  
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
+    return;
+  }
 
   if (new) {
     bl_do_msg_update (TLS, M->id);
@@ -544,6 +548,10 @@ void tglu_work_update_short_chat_message_new (struct tgl_state *TLS, int check_o
   
   struct tgl_message *M = tglf_fetch_alloc_message_short_chat_new (TLS, DS_U);
   assert (M);
+  
+  if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
+    return;
+  }
 
   if (new) {
     bl_do_msg_update (TLS, M->id);
