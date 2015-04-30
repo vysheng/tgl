@@ -128,7 +128,7 @@ enum tgl_message_media_type {
   tgl_message_media_geo,
   tgl_message_media_contact,
   tgl_message_media_unsupported,
-  tgl_message_media_photo_encr,
+  //tgl_message_media_photo_encr,
   //tgl_message_media_video_encr,
   //tgl_message_media_audio_encr,
   tgl_message_media_document_encr,
@@ -208,51 +208,11 @@ struct tgl_photo {
   struct tgl_photo_size *sizes;
 };
 
-struct tgl_encr_photo {
-  long long id;
-  long long access_hash;
-  int dc_id;
-  int size;
-  int key_fingerprint;
-  int flags;
-
-  unsigned char *key;
-  unsigned char *iv;
-  int w;
-  int h;
-};
-
-/*struct tgl_encr_video {
-  long long id;
-  long long access_hash;
-  int dc_id;
-  int size;
-  int key_fingerprint;
-  
-  unsigned char *key;
-  unsigned char *iv;
-  int w;
-  int h;
-  int duration;
-  char *mime_type;
-};
-
-struct tgl_encr_audio {
-  long long id;
-  long long access_hash;
-  int dc_id;
-  int size;
-  int key_fingerprint;
-  
-  unsigned char *key;
-  unsigned char *iv;
-  int duration;
-  char *mime_type;
-};*/
-
 struct tgl_encr_document {
   long long id;
   long long access_hash;
+  int refcnt;
+
   int dc_id;
   int size;
   int key_fingerprint;
@@ -266,12 +226,6 @@ struct tgl_encr_document {
   char *mime_type;
   int duration;
 };
-
-//struct tgl_encr_file {
-//  char *filename;
-//  unsigned char *key;
-//  unsigned char *iv;
-//};
 
 
 struct tgl_user_status {
@@ -493,8 +447,8 @@ struct tgl_message_media {
     //struct tgl_video video;
     //struct tgl_audio audio;
     struct tgl_document *document;
-    struct tgl_encr_document encr_document;
-    struct tgl_webpage webpage;
+    struct tgl_encr_document *encr_document;
+    struct tgl_webpage *webpage;
 
     struct tgl_geo geo;
     struct {
@@ -503,11 +457,7 @@ struct tgl_message_media {
       char *last_name;
       int user_id;
     };
-    struct tgl_encr_photo encr_photo;
-    //struct tgl_encr_video encr_video;
-    //struct tgl_encr_audio encr_audio;
-    //struct tgl_encr_document encr_document;
-    //struct tgl_encr_file encr_file;
+    
     struct {
       void *data;
       int data_size;

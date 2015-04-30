@@ -63,4 +63,6 @@ void tgl_photo_insert (struct tgl_state *TLS, struct tgl_photo *P);
 struct tgl_photo *tgl_photo_get (struct tgl_state *TLS, long long id);
 struct tgl_document *tgl_document_get (struct tgl_state *TLS, long long id);
 void tgl_document_insert (struct tgl_state *TLS, struct tgl_document *P);
+struct tgl_webpage *tgl_webpage_get (struct tgl_state *TLS, long long id);
+void tgl_webpage_insert (struct tgl_state *TLS, struct tgl_webpage *P);
 #endif

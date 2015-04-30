@@ -665,6 +665,70 @@ struct tgl_document *tglf_fetch_alloc_document_new (struct tgl_state *TLS, struc
   return D;
 }
 
+struct tgl_webpage *tglf_fetch_alloc_webpage_new (struct tgl_state *TLS, struct tl_ds_web_page *DS_W) {
+  if (!DS_W) { return NULL; }
+  
+  if (DS_W->magic == CODE_web_page_empty) { return NULL; }
+  
+  struct tgl_webpage *W = tgl_webpage_get (TLS, DS_LVAL (DS_W->id));
+  if (W) {
+    W->refcnt ++;
+  } else {
+    W = talloc0 (sizeof (*W));
+    W->id = DS_LVAL (DS_W->id);
+    W->refcnt = 1;
+  
+    tgl_webpage_insert (TLS, W);
+  }
+
+  if (!W->url) {
+    W->url = DS_STR_DUP (DS_W->url);
+  }
+
+  if (!W->display_url) {
+    W->display_url = DS_STR_DUP (DS_W->display_url);
+  }
+
+  if (!W->type) { 
+    W->type = DS_STR_DUP (DS_W->type);
+  }
+
+  if (!W->site_name) {
+    W->site_name = DS_STR_DUP (DS_W->site_name);
+  }
+
+  if (!W->title) {
+    W->title = DS_STR_DUP (DS_W->title);
+  }
+
+  if (!W->photo) {
+    W->photo = tglf_fetch_alloc_photo_new (TLS, DS_W->photo);
+  }
+
+  if (!W->description) {
+    W->description = DS_STR_DUP (DS_W->description);
+  }
+
+  if (!W->embed_url) {
+    W->embed_url = DS_STR_DUP (DS_W->embed_url);
+  }
+
+  if (!W->embed_type) {
+    W->embed_type = DS_STR_DUP (DS_W->embed_type);
+  }
+
+  W->embed_width = DS_LVAL (DS_W->embed_width);
+
+  W->embed_height = DS_LVAL (DS_W->embed_height);
+
+  W->duration = DS_LVAL (DS_W->duration);
+
+  if (!W->author) {
+    W->author = DS_STR_DUP (DS_W->author);
+  }
+  return W;
+}
+
 void tglf_fetch_message_action_new (struct tgl_state *TLS, struct tgl_message_action *M, struct tl_ds_message_action *DS_MA) {
   if (!DS_MA) { return; }
   memset (M, 0, sizeof (*M));
@@ -844,22 +908,7 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     break;
   case CODE_message_media_web_page:
     M->type = tgl_message_media_webpage;
-    M->webpage.id = DS_LVAL (DS_MM->webpage->id);
-    M->webpage.url = DS_STR_DUP (DS_MM->webpage->url);
-    M->webpage.display_url = DS_STR_DUP (DS_MM->webpage->display_url);
-    M->webpage.type = DS_STR_DUP (DS_MM->webpage->type);
-    M->webpage.site_name = DS_STR_DUP (DS_MM->webpage->site_name);
-    M->webpage.title = DS_STR_DUP (DS_MM->webpage->title);
-    if (DS_MM->webpage->photo) {
-      M->webpage.photo = tglf_fetch_alloc_photo_new (TLS, DS_MM->webpage->photo);
-    }
-    M->webpage.description = DS_STR_DUP (DS_MM->webpage->description);
-    M->webpage.embed_url = DS_STR_DUP (DS_MM->webpage->embed_url);
-    M->webpage.embed_type = DS_STR_DUP (DS_MM->webpage->embed_type);
-    M->webpage.embed_width = DS_LVAL (DS_MM->webpage->embed_width);
-    M->webpage.embed_height = DS_LVAL (DS_MM->webpage->embed_height);
-    M->webpage.duration = DS_LVAL (DS_MM->webpage->duration);
-    M->webpage.author = DS_STR_DUP (DS_MM->webpage->author);
+    M->webpage = tglf_fetch_alloc_webpage_new (TLS, DS_MM->webpage);
     break;
   case CODE_message_media_venue:
     M->type = tgl_message_media_venue;
@@ -884,33 +933,41 @@ void tglf_fetch_message_media_encrypted_new (struct tgl_state *TLS, struct tgl_m
     //M->type = CODE_message_media_empty;
     break;
   case CODE_decrypted_message_media_photo:
-    M->type = tgl_message_media_photo_encr;
-    
-    M->encr_photo.w = DS_LVAL (DS_DMM->w);
-    M->encr_photo.h = DS_LVAL (DS_DMM->h);
-    M->encr_photo.size = DS_LVAL (DS_DMM->size);
-   
-    M->encr_photo.key = talloc (32);
-    str_to_32 (M->encr_photo.key, DS_STR (DS_DMM->key));
-    M->encr_photo.iv = talloc (32);
-    str_to_32 (M->encr_photo.iv, DS_STR (DS_DMM->iv));
-    break;
   case CODE_decrypted_message_media_video:
   case CODE_decrypted_message_media_video_l12:
+  case CODE_decrypted_message_media_document:
+  case CODE_decrypted_message_media_audio:
     //M->type = CODE_decrypted_message_media_video;
     M->type = tgl_message_media_document_encr;
-    M->encr_document.flags = FLAG_DOCUMENT_VIDEO;
     
-    M->encr_document.w = DS_LVAL (DS_DMM->w);
-    M->encr_document.h = DS_LVAL (DS_DMM->h);
-    M->encr_document.size = DS_LVAL (DS_DMM->size);
-    M->encr_document.duration = DS_LVAL (DS_DMM->duration);
-    M->encr_document.mime_type = DS_STR_DUP (DS_DMM->mime_type);
+    M->encr_document = talloc0 (sizeof (*M->encr_document));
+  
+    switch (DS_DMM->magic) {
+    case CODE_decrypted_message_media_photo:
+      M->encr_document->flags = FLAG_DOCUMENT_IMAGE;
+      break;
+    case CODE_decrypted_message_media_video:
+    case CODE_decrypted_message_media_video_l12:
+      M->encr_document->flags = FLAG_DOCUMENT_VIDEO;
+      break;
+    case CODE_decrypted_message_media_document:
+      //M->encr_document->flags = FLAG_DOCUMENT_DOCUMENT;
+      break;
+    case CODE_decrypted_message_media_audio:
+      M->encr_document->flags = FLAG_DOCUMENT_AUDIO;
+      break;
+    }
+    
+    M->encr_document->w = DS_LVAL (DS_DMM->w);
+    M->encr_document->h = DS_LVAL (DS_DMM->h);
+    M->encr_document->size = DS_LVAL (DS_DMM->size);
+    M->encr_document->duration = DS_LVAL (DS_DMM->duration);
+    M->encr_document->mime_type = DS_STR_DUP (DS_DMM->mime_type);
    
-    M->encr_document.key = talloc (32);
-    str_to_32 (M->encr_document.key, DS_STR (DS_DMM->key));
-    M->encr_document.iv = talloc (32);
-    str_to_32 (M->encr_document.iv, DS_STR (DS_DMM->iv));
+    M->encr_document->key = talloc (32);
+    str_to_32 (M->encr_document->key, DS_STR (DS_DMM->key));
+    M->encr_document->iv = talloc (32);
+    str_to_32 (M->encr_document->iv, DS_STR (DS_DMM->iv));
     break;
   case CODE_decrypted_message_media_geo_point:
     M->type = tgl_message_media_geo;
@@ -1241,17 +1298,18 @@ void tglf_fetch_encrypted_message_new (struct tgl_state *TLS, struct tgl_message
 
 void tglf_fetch_encrypted_message_file_new (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_encrypted_file *DS_EF) {
   if (DS_EF->magic == CODE_encrypted_file_empty) {
-    assert (M->type != tgl_message_media_photo_encr && M->type != tgl_message_media_document_encr);
+    assert (M->type != tgl_message_media_document_encr);
   } else {
-    assert (M->type == tgl_message_media_document_encr || M->type == tgl_message_media_photo_encr);
+    assert (M->type == tgl_message_media_document_encr);
+    assert (M->encr_document);
 
-    M->encr_photo.id = DS_LVAL (DS_EF->id);
-    M->encr_photo.access_hash = DS_LVAL (DS_EF->access_hash);
-    if (!M->encr_photo.size) {
-      M->encr_photo.size = DS_LVAL (DS_EF->size);
+    M->encr_document->id = DS_LVAL (DS_EF->id);
+    M->encr_document->access_hash = DS_LVAL (DS_EF->access_hash);
+    if (!M->encr_document->size) {
+      M->encr_document->size = DS_LVAL (DS_EF->size);
     }
-    M->encr_photo.dc_id = DS_LVAL (DS_EF->dc_id);
-    M->encr_photo.key_fingerprint = DS_LVAL (DS_EF->key_fingerprint);
+    M->encr_document->dc_id = DS_LVAL (DS_EF->dc_id);
+    M->encr_document->key_fingerprint = DS_LVAL (DS_EF->key_fingerprint);
   }
 }
 
@@ -1522,13 +1580,32 @@ void tgls_free_document (struct tgl_state *TLS, struct tgl_document *D) {
     assert (D->refcnt);
     return;
   }
-  if (!D->access_hash) { return; }
   if (D->mime_type) { tfree_str (D->mime_type);}
   if (D->caption) {tfree_str (D->caption);}
   tgls_free_photo_size (TLS, &D->thumb);
   
   TLS->document_tree = tree_delete_document (TLS->document_tree, D);
   tfree (D, sizeof (*D));
+}
+
+void tgls_free_webpage (struct tgl_state *TLS, struct tgl_webpage *W) {
+  if (--W->refcnt) {
+    assert (W->refcnt);
+    return;
+  }
+  if (W->url) { tfree_str (W->url); }
+  if (W->display_url) { tfree_str (W->display_url); }
+  if (W->title) { tfree_str (W->title); }
+  if (W->site_name) { tfree_str (W->site_name); }
+  if (W->type) { tfree_str (W->type); }
+  if (W->description) { tfree_str (W->description); }
+  if (W->photo) { tgls_free_photo (TLS, W->photo); }
+  if (W->embed_url) { tfree_str (W->embed_url); }
+  if (W->embed_type) { tfree_str (W->embed_type); }
+  if (W->author) { tfree_str (W->author); }
+  
+  TLS->webpage_tree = tree_delete_webpage (TLS->webpage_tree, W);
+  tfree (W, sizeof (*W));
 }
 
 void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M) {
@@ -1551,22 +1628,13 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
   case tgl_message_media_unsupported:
     tfree (M->data, M->data_size);
     return;
-  case tgl_message_media_photo_encr:
   case tgl_message_media_document_encr:
-    tfree_secure (M->encr_photo.key, 32);
-    tfree_secure (M->encr_photo.iv, 32);
+    tfree_secure (M->encr_document->key, 32);
+    tfree_secure (M->encr_document->iv, 32);
+    tfree (M->encr_document, sizeof (*M->encr_document));
     return;
   case tgl_message_media_webpage:
-    if (M->webpage.url) { tfree_str (M->webpage.url); }
-    if (M->webpage.display_url) { tfree_str (M->webpage.display_url); }
-    if (M->webpage.title) { tfree_str (M->webpage.title); }
-    if (M->webpage.site_name) { tfree_str (M->webpage.site_name); }
-    if (M->webpage.type) { tfree_str (M->webpage.type); }
-    if (M->webpage.description) { tfree_str (M->webpage.description); }
-    if (M->webpage.photo) { tgls_free_photo (TLS, M->webpage.photo); }
-    if (M->webpage.embed_url) { tfree_str (M->webpage.embed_url); }
-    if (M->webpage.embed_type) { tfree_str (M->webpage.embed_type); }
-    if (M->webpage.author) { tfree_str (M->webpage.author); }
+    tgls_free_webpage (TLS, M->webpage);
     return;
   case tgl_message_media_venue:
     if (M->venue.title) { tfree_str (M->venue.title); }
@@ -1839,6 +1907,16 @@ struct tgl_document *tgl_document_get (struct tgl_state *TLS, long long id) {
 
 void tgl_document_insert (struct tgl_state *TLS, struct tgl_document *P) {
   TLS->document_tree = tree_insert_document (TLS->document_tree, P, lrand48 ());
+}
+
+struct tgl_webpage *tgl_webpage_get (struct tgl_state *TLS, long long id) {
+  struct tgl_webpage P;
+  P.id = id;
+  return tree_lookup_webpage (TLS->webpage_tree, &P);
+}
+
+void tgl_webpage_insert (struct tgl_state *TLS, struct tgl_webpage *P) {
+  TLS->webpage_tree = tree_insert_webpage (TLS->webpage_tree, P, lrand48 ());
 }
 
 void tglp_peer_insert_name (struct tgl_state *TLS, tgl_peer_t *P) {

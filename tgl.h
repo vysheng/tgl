@@ -204,6 +204,8 @@ struct tgl_state {
   struct tree_message *message_unsent_tree;
   struct tree_photo *photo_tree;
   struct tree_document *document_tree;
+  struct tree_webpage *webpage_tree;
+  struct tree_encr_document *encr_document_tree;
 
   int users_allocated;
   int chats_allocated;
