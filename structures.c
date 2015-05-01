@@ -520,7 +520,7 @@ struct tgl_photo *tglf_fetch_alloc_photo_new (struct tgl_state *TLS, struct tl_d
   P->access_hash = DS_LVAL (DS_P->access_hash);
   P->user_id = DS_LVAL (DS_P->user_id);
   P->date = DS_LVAL (DS_P->date);
-  P->caption = DS_STR_DUP (DS_P->caption);
+  P->caption = NULL;//DS_STR_DUP (DS_P->caption);
   tglf_fetch_geo_new (TLS, &P->geo, DS_P->geo);
   
   P->sizes_num = DS_LVAL (DS_P->sizes->cnt);
@@ -554,9 +554,9 @@ struct tgl_document *tglf_fetch_alloc_video_new (struct tgl_state *TLS, struct t
   D->access_hash = DS_LVAL (DS_V->access_hash);
   D->user_id = DS_LVAL (DS_V->user_id);
   D->date = DS_LVAL (DS_V->date);
-  D->caption = DS_STR_DUP (DS_V->caption);
+  D->caption = NULL;//DS_STR_DUP (DS_V->caption);
   D->duration = DS_LVAL (DS_V->duration);
-  D->mime_type = DS_STR_DUP (DS_V->mime_type);
+  D->mime_type = tstrdup ("video/");//DS_STR_DUP (DS_V->mime_type);
   D->size = DS_LVAL (DS_V->size);
   tglf_fetch_photo_size_new (TLS, &D->thumb, DS_V->thumb);
 
@@ -776,6 +776,10 @@ void tglf_fetch_message_action_new (struct tgl_state *TLS, struct tgl_message_ac
     M->type = tgl_message_action_chat_delete_user;
     M->user = DS_LVAL (DS_MA->user_id);
     break;
+  case CODE_message_action_chat_joined_by_link:
+    M->type = tgl_message_action_chat_add_user_by_link;
+    M->user = DS_LVAL (DS_MA->inviter_id);
+    break;
   default:
     assert (0);
   }
@@ -889,10 +893,12 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     M->type = tgl_message_media_none;
     break;
   case CODE_message_media_photo:
+  case CODE_message_media_photo_l27:
     M->type = tgl_message_media_photo;
     M->photo = tglf_fetch_alloc_photo_new (TLS, DS_MM->photo);
     break;
   case CODE_message_media_video:
+  case CODE_message_media_video_l27:
     M->type = tgl_message_media_document;
     M->document = tglf_fetch_alloc_video_new (TLS, DS_MM->video);
     break;
@@ -915,10 +921,10 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     M->last_name = DS_STR_DUP (DS_MM->last_name);
     M->user_id = DS_LVAL (DS_MM->user_id);
     break;
-  case CODE_message_media_unsupported:
-  case CODE_message_media_unsupported_l22:
-    M->type = tgl_message_media_unsupported;
-    break;
+  //case CODE_message_media_unsupported:
+  //case CODE_message_media_unsupported_l22:
+  //  M->type = tgl_message_media_unsupported;
+  //  break;
   case CODE_message_media_web_page:
     M->type = tgl_message_media_webpage;
     M->webpage = tglf_fetch_alloc_webpage_new (TLS, DS_MM->webpage);
@@ -1678,6 +1684,7 @@ void tgls_free_message_action (struct tgl_state *TLS, struct tgl_message_action 
     return;
   case tgl_message_action_chat_delete_photo:
   case tgl_message_action_chat_add_user:
+  case tgl_message_action_chat_add_user_by_link:
   case tgl_message_action_chat_delete_user:
   case tgl_message_action_geo_chat_create:
   case tgl_message_action_geo_chat_checkin:

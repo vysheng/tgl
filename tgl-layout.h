@@ -145,6 +145,7 @@ enum tgl_message_action_type {
   tgl_message_action_chat_edit_photo,
   tgl_message_action_chat_delete_photo,
   tgl_message_action_chat_add_user,
+  tgl_message_action_chat_add_user_by_link,
   tgl_message_action_chat_delete_user,
   tgl_message_action_set_message_ttl,
   tgl_message_action_read_messages,

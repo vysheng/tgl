@@ -1466,7 +1466,6 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
       out_int (CODE_document_attribute_filename);
       out_string (s + 1);
     } else if (f->flags & FLAG_DOCUMENT_VIDEO) {
-      vlogprintf (E_ERROR, "Sending video!!!!!\n");
       out_int (2);
       out_int (CODE_document_attribute_video);
       out_int (f->duration);
@@ -1490,7 +1489,10 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
       out_string ("thumb.jpg");
       out_string ("");
     }
+  } else {
+    out_string ("");
   }
+
 
   struct messages_send_extra *E = talloc0 (sizeof (*E));
   tglt_secure_random (&E->id, 8);

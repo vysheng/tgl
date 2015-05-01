@@ -25,7 +25,7 @@ BEGIN {
     gsub (/[ABCDEFGHIJKLMNOPQRSTUVWXYZ]/, "_&", a[1]);
     gsub (/[.]/, "_", a[1]);
     if (a[2] in h) {
-      print "ERROR: Duplicate magic " a[2] " for define " a[1] " and " h[a[2]] >"/dev/stderr/"
+      print "ERROR: Duplicate magic " a[2] " for define " a[1] " and " h[a[2]] > "/dev/stderr"
       exit 1;
     }
     h[a[2]] = a[1];

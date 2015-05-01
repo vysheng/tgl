@@ -145,7 +145,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
       }
     }
     break;
-  case CODE_update_read_messages:
+/*  case CODE_update_read_messages:
     {
       int n = DS_LVAL (DS_U->messages->cnt);
       
@@ -180,7 +180,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
         }
       }
     }
-    break;
+    break;*/
   case CODE_update_user_typing:
     {
       tgl_peer_id_t id = TGL_MK_USER (DS_LVAL (DS_U->user_id));
@@ -437,6 +437,8 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
         bl_do_msg_update (TLS, M->id);
       }
     }
+    break;
+  case CODE_update_read_messages_contents:
     break;
   default:
     assert (0);
