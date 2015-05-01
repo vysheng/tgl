@@ -668,8 +668,6 @@ struct tgl_document *tglf_fetch_alloc_document_new (struct tgl_state *TLS, struc
 struct tgl_webpage *tglf_fetch_alloc_webpage_new (struct tgl_state *TLS, struct tl_ds_web_page *DS_W) {
   if (!DS_W) { return NULL; }
   
-  if (DS_W->magic == CODE_web_page_empty) { return NULL; }
-  
   struct tgl_webpage *W = tgl_webpage_get (TLS, DS_LVAL (DS_W->id));
   if (W) {
     W->refcnt ++;
@@ -818,7 +816,7 @@ void tglf_fetch_message_short_new (struct tgl_state *TLS, struct tgl_message *M,
 
   bl_do_create_message_new (TLS, DS_LVAL (DS_U->id), 
     (f & 2) ? &TLS->our_id : DS_U->user_id,
-    &type, (!(f & 2)) ? DS_U->user_id : &TLS->our_id,
+    &type, (f & 2) ? DS_U->user_id : &TLS->our_id,
     DS_U->fwd_from_id,
     DS_U->fwd_date,
     DS_U->date,
