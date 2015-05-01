@@ -3347,9 +3347,15 @@ void tgl_do_export_chat_link (struct tgl_state *TLS, tgl_peer_id_t id, void (*ca
 }
 
 void tgl_do_import_chat_link (struct tgl_state *TLS, const char *link, int len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  const char *l = link + len - 1;
+  while (l >= link && *l != '/') {
+    l --;
+  }
+  l ++;
+
   clear_packet ();
   out_int (CODE_messages_import_chat_invite);
-  out_cstring (link, len);
+  out_cstring (l, len - (l - link));
 
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
 }
