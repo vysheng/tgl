@@ -784,7 +784,8 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   }
   clear_packet ();
   out_int (CODE_messages_send_message);
-  out_int ((M->reply_id ? 1 : 0));
+  
+  out_int ((TLS->disable_link_preview ? 2 : 0) | (M->reply_id ? 1 : 0));
   out_peer_id (TLS, M->to_id);
   if (M->reply_id) {
     out_int (M->reply_id);

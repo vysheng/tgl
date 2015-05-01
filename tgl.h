@@ -167,6 +167,7 @@ struct tgl_state {
   int active_queries;
   int max_msg_id;
   int started;
+  int disable_link_preview;
 
   long long locks; 
   struct tgl_dc *DC_list[TGL_MAX_DC_NUM];
@@ -414,4 +415,6 @@ void tgl_login (struct tgl_state *TLS);
 void tgl_enable_ipv6 (struct tgl_state *TLS);
 
 struct tgl_state *tgl_state_alloc (void);
+
+void tgl_disable_link_preview (struct tgl_state *TLS);
 #endif
