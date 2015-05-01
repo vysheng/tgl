@@ -784,7 +784,7 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   }
   clear_packet ();
   out_int (CODE_messages_send_message);
-  out_int (M->reply_id ? 1 : 0);
+  out_int ((M->reply_id ? 1 : 0));
   out_peer_id (TLS, M->to_id);
   if (M->reply_id) {
     out_int (M->reply_id);
@@ -3309,6 +3309,49 @@ void tgl_do_get_message (struct tgl_state *TLS, long long id, void (*callback)(s
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_messages_methods, 0, callback, callback_extra);
 }
 /* }}} */
+
+static int export_chat_link_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
+  struct tl_ds_exported_chat_invite *DS_ECI = D;
+
+  char *s = DS_STR_DUP (DS_ECI->link);
+
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, const char *))q->callback)(TLS, q->callback_extra, s ? 1 : 0, s);
+  }
+  tfree_str (s);
+  return 0;
+}
+
+
+static struct query_methods export_chat_link_methods = {
+  .on_answer = export_chat_link_on_answer,
+  .on_error = q_ptr_on_error,
+  .type = TYPE_TO_PARAM(exported_chat_invite)
+};
+
+void tgl_do_export_chat_link (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *link), void *callback_extra) {
+  if (tgl_get_peer_type (id) != TGL_PEER_CHAT) {
+    vlogprintf (E_ERROR, "can only be chat\n");
+    if (callback) {
+      callback (TLS, callback_extra, 0, NULL);      
+    }
+    return;
+  }
+
+  clear_packet ();
+  out_int (CODE_messages_export_chat_invite);
+  out_int (tgl_get_peer_id (id));
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &export_chat_link_methods, 0, callback, callback_extra);
+}
+
+void tgl_do_import_chat_link (struct tgl_state *TLS, const char *link, int len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_messages_import_chat_invite);
+  out_cstring (link, len);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
 
 static int set_password_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   if (q->callback) {

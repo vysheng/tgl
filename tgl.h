@@ -374,6 +374,8 @@ void tgl_do_send_broadcast (struct tgl_state *TLS, int num, tgl_peer_id_t id[], 
 void tgl_do_send_message_reply (struct tgl_state *TLS, int reply_id, const char *msg, int len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
 void tgl_do_get_message (struct tgl_state *TLS, long long id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
 void tgl_do_load_file_location (struct tgl_state *TLS, struct tgl_file_location *P, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *filename), void *callback_extra);
+void tgl_do_export_chat_link (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *link), void *callback_extra);
+void tgl_do_import_chat_link (struct tgl_state *TLS, const char *link, int len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 
 
 void tgl_do_visualize_key (struct tgl_state *TLS, tgl_peer_id_t id, unsigned char buf[16]);
