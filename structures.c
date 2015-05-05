@@ -896,11 +896,13 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
   case CODE_message_media_photo_l27:
     M->type = tgl_message_media_photo;
     M->photo = tglf_fetch_alloc_photo_new (TLS, DS_MM->photo);
+    M->caption = DS_STR_DUP (DS_MM->caption);
     break;
   case CODE_message_media_video:
   case CODE_message_media_video_l27:
     M->type = tgl_message_media_document;
     M->document = tglf_fetch_alloc_video_new (TLS, DS_MM->video);
+    M->caption = DS_STR_DUP (DS_MM->caption);
     break;
   case CODE_message_media_audio:
     M->type = tgl_message_media_document;

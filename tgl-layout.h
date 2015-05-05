@@ -444,10 +444,14 @@ struct tgl_webpage {
 struct tgl_message_media {
   enum tgl_message_media_type type;
   union {
-    struct tgl_photo *photo;
-    //struct tgl_video video;
-    //struct tgl_audio audio;
-    struct tgl_document *document;
+    struct {
+      union {
+        struct tgl_photo *photo;
+        struct tgl_document *document;
+      };
+      char *caption;
+    };
+    
     struct tgl_encr_document *encr_document;
     struct tgl_webpage *webpage;
 
