@@ -500,7 +500,7 @@ static int fetch_comb_binlog_chat_new (struct tgl_state *TLS, struct tl_ds_binlo
   }
 
   if (DS_U->photo) {
-    if (C->flags & TGLPF_HAS_PHOTO) {
+    if (C->photo) {
       tgls_free_photo (TLS, C->photo);
     }
     C->photo = tglf_fetch_alloc_photo_new (TLS, DS_U->photo);
