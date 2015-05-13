@@ -36,7 +36,7 @@ AC_ARG_ENABLE(extf,[enables extended queries system],
   ],[
   ])
 
-AC_ARG_ENABLE(libevent,[include libevent-based net and timers],
+AC_ARG_ENABLE(libevent,[--enable-libevent include libevent-based net and timers],
   [ 
   if test "x$enableval" = "xyes" ; then
     AC_CHECK_LIB([event], [event_base_new], [], [AC_MSG_ERROR([no libevent found])])

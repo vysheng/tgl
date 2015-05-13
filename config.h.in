@@ -137,6 +137,9 @@
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
+/* fixed for correct valgrind work */
+#undef VALGRIND_FIXES
+
 /* Define to `int' if <sys/types.h> doesn't define. */
 #undef gid_t
 

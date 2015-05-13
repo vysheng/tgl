@@ -682,6 +682,7 @@ with_openssl
 with_zlib
 enable_extf
 enable_libevent
+enable_valgrind
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1302,7 +1303,8 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
 enables extended queries system
-include libevent-based net and timers
+--enable-libevent include libevent-based net and timers
+fixes for correct valgrind work
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -4073,6 +4075,23 @@ fi
 
 
     EXTRA_OBJECTS="${EXTRA_OBJECTS} objs/tgl-net.o objs/tgl-timers.o"
+  fi
+
+fi
+
+
+# Check whether --enable-valgrind was given.
+if test "${enable_valgrind+set}" = set; then :
+  enableval=$enable_valgrind;
+  if test "x$enableval" = "xyes" ; then
+    ac_fn_c_check_header_mongrel "$LINENO" "valgrind/memcheck.h" "ac_cv_header_valgrind_memcheck_h" "$ac_includes_default"
+if test "x$ac_cv_header_valgrind_memcheck_h" = xyes; then :
+
+$as_echo "#define VALGRIND_FIXES 1" >>confdefs.h
+
+fi
+
+
   fi
 
 fi
