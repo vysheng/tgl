@@ -39,7 +39,7 @@ static void fetch_dc_option_new (struct tgl_state *TLS, struct tl_ds_dc_option *
 }
 
 int tgl_check_pts_diff (struct tgl_state *TLS, int pts, int pts_count) {
-  vlogprintf (E_ERROR, "pts = %d, pts_count = %d\n", pts, pts_count);
+  vlogprintf (E_DEBUG - 1, "pts = %d, pts_count = %d\n", pts, pts_count);
   assert (TLS->pts);
   if (pts < TLS->pts + pts_count) {
     vlogprintf (E_NOTICE, "Duplicate message with pts=%d\n", pts);
