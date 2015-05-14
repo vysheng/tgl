@@ -55,6 +55,7 @@
 //#include "mtproto-common.h"
 #include "tree.h"
 #include "tools.h"
+#include "mtproto-client.h"
 
 #ifndef POLLRDHUP
 #define POLLRDHUP 0

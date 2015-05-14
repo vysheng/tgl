@@ -34,6 +34,7 @@
 #define tcheck tgl_allocator->check
 #define texists tgl_allocator->exists
 #define tstrdup tgl_strdup
+#define tmemdup tgl_memdup
 #define tstrndup tgl_strndup
 #define tasprintf tgl_asprintf
 #define tsnprintf tgl_snprintf
@@ -85,6 +86,7 @@ void tgl_exists_debug (void *ptr, int size);
 void tgl_check_release (void);
 void tgl_exists_release (void *ptr, int size);
 
+void *tgl_memdup (const void *s, size_t n);
 
 int tgl_snprintf (char *buf, int len, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
 int tgl_asprintf (char **res, const char *format, ...) __attribute__ ((format (printf, 2, 3)));

@@ -183,6 +183,12 @@ char *tgl_strndup (const char *s, size_t n) {
   return p;
 }
 
+void *tgl_memdup (const void *s, size_t n) {
+  void *r = talloc (n);
+  memcpy (r, s, n);
+  return r;
+}
+
 
 int tgl_inflate (void *input, int ilen, void *output, int olen) {
   z_stream strm;

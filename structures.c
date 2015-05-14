@@ -34,6 +34,7 @@
 #include <openssl/sha.h>
 #include "queries.h"
 #include "tgl-binlog.h"
+#include "tgl-methods-in.h"
 #include "updates.h"
 #include "mtproto-client.h"
 
@@ -584,7 +585,7 @@ struct tgl_document *tglf_fetch_alloc_audio_new (struct tgl_state *TLS, struct t
   
   tgl_document_insert (TLS, D);
   
-  D->flags = FLAG_DOCUMENT_AUDIO;
+  D->flags = TGLDF_AUDIO;
   
   D->access_hash = DS_LVAL (DS_A->access_hash);
   D->user_id = DS_LVAL (DS_A->user_id);
@@ -600,24 +601,24 @@ struct tgl_document *tglf_fetch_alloc_audio_new (struct tgl_state *TLS, struct t
 void tglf_fetch_document_attribute_new (struct tgl_state *TLS, struct tgl_document *D, struct tl_ds_document_attribute *DS_DA) {
   switch (DS_DA->magic) {
   case CODE_document_attribute_image_size:
-    D->flags |= FLAG_DOCUMENT_IMAGE;
+    D->flags |= TGLDF_IMAGE;
     D->w = DS_LVAL (DS_DA->w);
     D->h = DS_LVAL (DS_DA->h);
     return;
   case CODE_document_attribute_animated:
-    D->flags |= FLAG_DOCUMENT_ANIMATED;
+    D->flags |= TGLDF_ANIMATED;
     return;
   case CODE_document_attribute_sticker:
-    D->flags |= FLAG_DOCUMENT_STICKER;
+    D->flags |= TGLDF_STICKER;
     return;
   case CODE_document_attribute_video:
-    D->flags |= FLAG_DOCUMENT_VIDEO;
+    D->flags |= TGLDF_VIDEO;
     D->duration = DS_LVAL (DS_DA->duration);
     D->w = DS_LVAL (DS_DA->w);
     D->h = DS_LVAL (DS_DA->h);
     return;
   case CODE_document_attribute_audio:
-    D->flags |= FLAG_DOCUMENT_AUDIO;
+    D->flags |= TGLDF_AUDIO;
     D->duration = DS_LVAL (DS_DA->duration);
     return;
   case CODE_document_attribute_filename:
@@ -965,17 +966,17 @@ void tglf_fetch_message_media_encrypted_new (struct tgl_state *TLS, struct tgl_m
   
     switch (DS_DMM->magic) {
     case CODE_decrypted_message_media_photo:
-      M->encr_document->flags = FLAG_DOCUMENT_IMAGE;
+      M->encr_document->flags = TGLDF_IMAGE;
       break;
     case CODE_decrypted_message_media_video:
     case CODE_decrypted_message_media_video_l12:
-      M->encr_document->flags = FLAG_DOCUMENT_VIDEO;
+      M->encr_document->flags = TGLDF_VIDEO;
       break;
     case CODE_decrypted_message_media_document:
-      //M->encr_document->flags = FLAG_DOCUMENT_DOCUMENT;
+      //M->encr_document->flags = TGLDF_DOCUMENT;
       break;
     case CODE_decrypted_message_media_audio:
-      M->encr_document->flags = FLAG_DOCUMENT_AUDIO;
+      M->encr_document->flags = TGLDF_AUDIO;
       break;
     }
     

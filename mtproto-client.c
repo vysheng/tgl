@@ -61,6 +61,7 @@
 #include "updates.h"
 #include "mtproto-utils.h"
 #include "auto.h"
+#include "tgl-methods-in.h"
 
 #if defined(__FreeBSD__)
 #define __builtin_bswap32(x) bswap32(x)

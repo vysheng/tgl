@@ -1,4 +1,16 @@
-current
+2.0.1
+* store error code for last operation in TLS->error/TLS->error_code
+* make interface more consitent
+* deleted outdated *_ex functions
+* fixed bugs 
+* support for layer 28:
+*   support for new pts system
+*   support for new read system
+*   support for passwords
+*   support replies
+*   support photo captions
+*   support group links
+1.2.1
 * fixed registration/login problem
 * added extension to downloads
 1.2.0

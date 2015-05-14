@@ -20,14 +20,15 @@
 #ifndef __TGL_LAYOUT_H__
 #define __TGL_LAYOUT_H__
 
-#define FLAG_DOCUMENT_IMAGE 1
-#define FLAG_DOCUMENT_STICKER 2
-#define FLAG_DOCUMENT_ANIMATED 4
-#define FLAG_DOCUMENT_AUDIO 8
-#define FLAG_DOCUMENT_VIDEO 16
+#define TGLDF_IMAGE 1
+#define TGLDF_STICKER 2
+#define TGLDF_ANIMATED 4
+#define TGLDF_AUDIO 8
+#define TGLDF_VIDEO 16
 
 #define TGLMF_UNREAD 1
 #define TGLMF_OUT 2
+#define TGLMF_DISABLE_PREVIEW 4
 #define TGLMF_MENTION 16
 #define TGLMF_CREATED (1 << 8)
 #define TGLMF_PENDING (1 << 9)
@@ -35,6 +36,7 @@
 #define TGLMF_ENCRYPTED (1 << 11)
 #define TGLMF_EMPTY (1 << 12)
 #define TGLMF_SERVICE (1 << 13)
+
 #define TGLMF_CREATE 0x10000
 
 #define TGLPF_CREATED (1 << 8)

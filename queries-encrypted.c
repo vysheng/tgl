@@ -131,7 +131,7 @@ static int msg_send_encr_on_answer (struct tgl_state *TLS, struct query *q, void
   return 0;
 }
 
-static int msg_send_encr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+static int msg_send_encr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, const char *error) {
   struct tgl_message *M = q->extra;
   tgl_peer_t *P = tgl_peer_get (TLS, M->to_id);
   if (P && P->encr_chat.state != sc_deleted && error_code == 400) {
@@ -277,7 +277,7 @@ static int mark_read_encr_on_receive (struct tgl_state *TLS, struct query *q, vo
   return 0;
 }
 
-static int mark_read_encr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+static int mark_read_encr_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, const char *error) {
   tgl_peer_t *P = q->extra;
   if (P && P->encr_chat.state != sc_deleted && error_code == 400) {
     if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
@@ -348,14 +348,14 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   int *save_ptr = packet_ptr;
   if (f->flags == -1) {
     out_int (CODE_decrypted_message_media_photo);
-  } else if ((f->flags & FLAG_DOCUMENT_VIDEO)) {
+  } else if ((f->flags & TGLDF_VIDEO)) {
     out_int (CODE_decrypted_message_media_video);
-  } else if ((f->flags & FLAG_DOCUMENT_AUDIO)) {
+  } else if ((f->flags & TGLDF_AUDIO)) {
     out_int (CODE_decrypted_message_media_audio);
   } else {
     out_int (CODE_decrypted_message_media_document);
   }
-  if (f->flags == -1 || !(f->flags & FLAG_DOCUMENT_AUDIO)) {
+  if (f->flags == -1 || !(f->flags & TGLDF_AUDIO)) {
     out_cstring ("", 0);
     out_int (90);
     out_int (90);
@@ -364,12 +364,12 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   if (f->flags == -1) {
     out_int (f->w);
     out_int (f->h);
-  } else if (f->flags & FLAG_DOCUMENT_VIDEO) {
+  } else if (f->flags & TGLDF_VIDEO) {
     out_int (f->duration);
     out_string (tg_mime_by_filename (f->file_name));
     out_int (f->w);
     out_int (f->h);
-  } else if (f->flags & FLAG_DOCUMENT_AUDIO) {
+  } else if (f->flags & TGLDF_AUDIO) {
     out_int (f->duration);
     out_string (tg_mime_by_filename (f->file_name));
   } else {
@@ -438,7 +438,7 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
 
 }
 
-void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t id, double latitude, double longitude, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t id, double latitude, double longitude, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   struct tl_ds_decrypted_message_media TDSM;
   TDSM.magic = CODE_decrypted_message_media_geo_point;
   TDSM.latitude = talloc (sizeof (double));
@@ -485,7 +485,7 @@ static int send_encr_request_on_answer (struct tgl_state *TLS, struct query *q, 
   return 0;
 }
 
-static int encr_accept_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, char *error) {
+static int encr_accept_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, const char *error) {
   tgl_peer_t *P = q->extra;
   if (P && P->encr_chat.state != sc_deleted &&  error_code == 400) {
     if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {

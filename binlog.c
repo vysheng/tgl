@@ -49,6 +49,7 @@
 #include "auto/auto-free-ds.h"
 
 #include "tgl-structures.h"
+#include "tgl-methods-in.h"
 
 #include <openssl/sha.h>
 

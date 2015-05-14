@@ -89,7 +89,7 @@ int tgl_signed_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
   return (DC->flags & TGLDCF_LOGGED_IN) != 0;
 }
 
-void tgl_register_app_id (struct tgl_state *TLS, int app_id, char *app_hash) {
+void tgl_register_app_id (struct tgl_state *TLS, int app_id, const char *app_hash) {
   TLS->app_id = app_id;
   TLS->app_hash = tstrdup (app_hash);
 }

@@ -27,6 +27,7 @@
 #include "auto/auto-fetch-ds.h"
 #include "auto/auto-free-ds.h"
 #include "tgl-structures.h"
+#include "tgl-methods-in.h"
 #include "tree.h"
 
 #include <assert.h>
