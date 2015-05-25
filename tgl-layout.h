@@ -36,6 +36,7 @@
 #define TGLMF_ENCRYPTED (1 << 11)
 #define TGLMF_EMPTY (1 << 12)
 #define TGLMF_SERVICE (1 << 13)
+#define TGLMF_SESSION_OUTBOUND (1 << 14)
 
 #define TGLMF_CREATE 0x10000
 
