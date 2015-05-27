@@ -46,7 +46,7 @@
 #define TG_SERVER_TEST_DEFAULT 2
 
 // JUST RANDOM STRING
-#define TGL_VERSION "2.0.1"
+#define TGL_VERSION "2.0.2"
 
 #define TGL_ENCRYPTED_LAYER 17
 #define TGL_SCHEME_LAYER 28
@@ -479,6 +479,11 @@ void tgl_do_del_contact (struct tgl_state *TLS, tgl_peer_id_t id, void (*callbac
 // imports card exported by another user
 void tgl_do_import_card (struct tgl_state *TLS, int size, int *card, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra);
 
+// blocks user
+void tgl_do_block_user (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+
+// unblocks blocked user
+void tgl_do_unblock_user (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 /* }}} */
 
 /* {{{ WORKING WITH SECRET CHATS */

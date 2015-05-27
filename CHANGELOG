@@ -1,3 +1,6 @@
+2.0.2
+* fixed small bugs
+* added block/unblock user method
 2.0.1
 * store error code for last operation in TLS->error/TLS->error_code
 * make interface more consitent

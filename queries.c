@@ -2130,6 +2130,13 @@ static struct query_methods user_info_methods = {
 };
 
 void tgl_do_get_user_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra) {
+  if (tgl_get_peer_type (id) != TGL_PEER_USER) {
+    tgl_set_query_error (TLS, EINVAL, "id should be user id");
+    if (callback) {
+      callback (TLS, callback_extra, 0, NULL);
+    }
+    return;
+  }
   if (offline_mode) {
     tgl_peer_t *C = tgl_peer_get (TLS, id);
     if (!C) {
@@ -3716,6 +3723,69 @@ void tgl_do_send_broadcast (struct tgl_state *TLS, int num, tgl_peer_id_t id[], 
     out_long (E->list[i]);
   }
   out_cstring (text, text_len);
+}
+/* }}} */
+
+/* {{{ block user */
+static int block_user_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 1);
+  }
+  return 0;
+}
+
+static struct query_methods block_user_methods = {
+  .on_answer = block_user_on_answer,
+  .on_error = q_void_on_error,
+  .type = TYPE_TO_PARAM (bool)
+};
+
+void tgl_do_block_user (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  if (tgl_get_peer_type (id) != TGL_PEER_USER) {
+    tgl_set_query_error (TLS, EINVAL, "id should be user id");
+    if (callback) {
+      callback (TLS, callback_extra, 0);
+    }
+    return;
+  }
+  
+  clear_packet ();
+  
+  out_int (CODE_contacts_block);
+  tgl_peer_t *U = tgl_peer_get (TLS, id);
+  if (U && U->user.access_hash) {
+    out_int (CODE_input_user_foreign);
+    out_int (tgl_get_peer_id (id));
+    out_long (U->user.access_hash);
+  } else {
+    out_int (CODE_input_user_contact);
+    out_int (tgl_get_peer_id (id));
+  }
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &block_user_methods, 0, callback, callback_extra);
+}
+
+void tgl_do_unblock_user (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  if (tgl_get_peer_type (id) != TGL_PEER_USER) {
+    tgl_set_query_error (TLS, EINVAL, "id should be user id");
+    if (callback) {
+      callback (TLS, callback_extra, 0);
+    }
+    return;
+  }
+  
+  clear_packet ();
+  
+  out_int (CODE_contacts_unblock);
+  tgl_peer_t *U = tgl_peer_get (TLS, id);
+  if (U && U->user.access_hash) {
+    out_int (CODE_input_user_foreign);
+    out_int (tgl_get_peer_id (id));
+    out_long (U->user.access_hash);
+  } else {
+    out_int (CODE_input_user_contact);
+    out_int (tgl_get_peer_id (id));
+  }
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &block_user_methods, 0, callback, callback_extra);
 }
 /* }}} */
 
