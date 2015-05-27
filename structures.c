@@ -1103,6 +1103,18 @@ void tglf_fetch_message_new (struct tgl_state *TLS, struct tgl_message *M, struc
   assert (M->id == DS_LVAL (DS_M->id));
   
   tgl_peer_id_t to_id = tglf_fetch_peer_id_new (TLS, DS_M->to_id);
+  {
+    tgl_peer_t *P = tgl_peer_get (TLS, to_id);
+    if (!P || !(P->flags & TGLPF_CREATED)) {
+      tgl_do_get_difference (TLS, 0, 0, 0);
+      return;
+    }
+    P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_M->from_id)));
+    if (!P || !(P->flags & TGLPF_CREATED)) {
+      tgl_do_get_difference (TLS, 0, 0, 0);
+      return;
+    }
+  }
 
   int new = !(M->flags & TGLMF_CREATED);
 
