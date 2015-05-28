@@ -3723,6 +3723,10 @@ void tgl_do_send_broadcast (struct tgl_state *TLS, int num, tgl_peer_id_t id[], 
     out_long (E->list[i]);
   }
   out_cstring (text, text_len);
+
+  out_int (CODE_message_media_empty);
+  
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, E, callback, callback_extra);
 }
 /* }}} */
 
