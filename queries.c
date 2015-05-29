@@ -3262,7 +3262,12 @@ static int get_messages_on_answer (struct tgl_state *TLS, struct query *q, void 
     if (q->extra) {
       ((void (*)(struct tgl_state *, void *, int, int, struct tgl_message **))q->callback)(TLS, q->callback_extra, 1, DS_LVAL (DS_MM->messages->cnt), ML);
     } else {
-      ((void (*)(struct tgl_state *, void *, int, struct tgl_message *))q->callback)(TLS, q->callback_extra, 1, *ML);
+      if (DS_LVAL (DS_MM->messages->cnt) > 0) {
+        ((void (*)(struct tgl_state *, void *, int, struct tgl_message *))q->callback)(TLS, q->callback_extra, 1, *ML);
+      } else {
+        tgl_set_query_error (TLS, ENOENT, "no such message");        
+        ((void (*)(struct tgl_state *, void *, int, struct tgl_message *))q->callback)(TLS, q->callback_extra, 0, NULL);
+      }
     }
   }
   if (q->extra) {
