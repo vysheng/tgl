@@ -23,9 +23,12 @@
 
 #define _GNU_SOURCE
 
+#include "config.h"
 #include <stdio.h>
 #include <signal.h>
+#ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
+#endif
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -38,7 +41,6 @@
 #include "generate.h"
 
 #include "tree.h"
-#include "config.h"
 
 int header;
 
