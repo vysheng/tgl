@@ -89,7 +89,25 @@ static int fetch_comb_binlog_dc_option (struct tgl_state *TLS, struct tl_ds_binl
     DS_LVAL (DS_U->port)
   );
 
-  tglmp_alloc_dc (TLS, 
+  tglmp_alloc_dc (TLS,
+    0,
+    DS_LVAL (DS_U->dc), 
+    DS_STR_DUP (DS_U->ip), 
+    DS_LVAL (DS_U->port)
+  );
+  return 0;
+}
+
+static int fetch_comb_binlog_dc_option_new (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
+  vlogprintf (E_NOTICE, "DC%d '%.*s' update: %.*s:%d\n", 
+    DS_LVAL (DS_U->dc), 
+    DS_RSTR (DS_U->name), 
+    DS_RSTR (DS_U->ip), 
+    DS_LVAL (DS_U->port)
+  );
+
+  tglmp_alloc_dc (TLS,
+    DS_LVAL (DS_U->flags), 
     DS_LVAL (DS_U->dc), 
     DS_STR_DUP (DS_U->ip), 
     DS_LVAL (DS_U->port)
@@ -915,6 +933,7 @@ static void replay_log_event (struct tgl_state *TLS) {
   switch (op) {
   FETCH_COMBINATOR_FUNCTION (binlog_start)
   FETCH_COMBINATOR_FUNCTION (binlog_dc_option)
+  FETCH_COMBINATOR_FUNCTION (binlog_dc_option_new)
   FETCH_COMBINATOR_FUNCTION (binlog_auth_key)
   FETCH_COMBINATOR_FUNCTION (binlog_default_dc)
   FETCH_COMBINATOR_FUNCTION (binlog_dc_signed)
@@ -1105,18 +1124,33 @@ static void add_log_event (struct tgl_state *TLS, const int *data, int len) {
   in_end = end;
 }
 
-void bl_do_dc_option (struct tgl_state *TLS, int id, const char *name, int l1, const char *ip, int l2, int port) {
+void bl_do_dc_option_new (struct tgl_state *TLS, int flags, int id, const char *name, int l1, const char *ip, int l2, int port) {
   struct tgl_dc *DC = TLS->DC_list[id];
-  if (DC && !strncmp (ip, DC->ip, l2)) { return; }
-  
+
+  if (DC) {
+    struct tgl_dc_option *O = DC->options[flags & 3];
+    while (O) {
+      if (!strncmp (O->ip, ip, l2)) {
+        return;
+      }
+      O = O->next;
+    }
+  }
+
   clear_packet ();
-  out_int (CODE_binlog_dc_option);
+  out_int (CODE_binlog_dc_option_new);
+  out_int (flags);
   out_int (id);
+
   out_cstring (name, l1);
   out_cstring (ip, l2);
   out_int (port);
 
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
+}
+
+void bl_do_dc_option (struct tgl_state *TLS, int id, const char *name, int l1, const char *ip, int l2, int port) {
+  bl_do_dc_option_new (TLS, 0, id, name, l1, ip, l2, port);
 }
 
 void bl_do_set_working_dc (struct tgl_state *TLS, int num) {

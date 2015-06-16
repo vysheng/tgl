@@ -97,13 +97,19 @@ struct tgl_session {
   struct tgl_timer *ev;
 };
 
+struct tgl_dc_option {
+  struct tgl_dc_option *next;
+  char *ip;
+  int port;
+};
+
 struct tgl_dc {
   int id;
-  int port;
+  //int port;
   int flags;
   int rsa_key_idx;
   enum tgl_dc_state state;
-  char *ip;
+  //char *ip;
   //char *user;
   struct tgl_session *sessions[MAX_DC_SESSIONS];
   char auth_key[256];
@@ -120,6 +126,9 @@ struct tgl_dc {
 
   int server_time_delta;
   double server_time_udelta;
+
+  // ipv4, ipv6, ipv4_media, ipv6_media
+  struct tgl_dc_option *options[4];
 };
 
 enum tgl_message_media_type {

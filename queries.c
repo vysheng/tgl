@@ -184,7 +184,7 @@ struct query *tglq_send_query_ex (struct tgl_state *TLS, struct tgl_dc *DC, int 
   if (!DC->sessions[0]) {
     tglmp_dc_create_session (TLS, DC);
   }
-  vlogprintf (E_DEBUG, "Sending query of size %d to DC (%s:%d)\n", 4 * ints, DC->ip, DC->port);
+  vlogprintf (E_DEBUG, "Sending query of size %d to DC %d\n", 4 * ints, DC->id);
   struct query *q = talloc0 (sizeof (*q));
   q->data_len = ints;
   q->data = talloc (4 * ints);
@@ -533,7 +533,7 @@ static int q_list_on_error (struct tgl_state *TLS, struct query *q, int error_co
 /* {{{ Get config */
 
 static void fetch_dc_option (struct tgl_state *TLS, struct tl_ds_dc_option *DS_DO) {
-  bl_do_dc_option (TLS, DS_LVAL (DS_DO->id), DS_STR (DS_DO->hostname), DS_STR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
+  bl_do_dc_option_new (TLS, DS_LVAL (DS_DO->flags), DS_LVAL (DS_DO->id), DS_STR (DS_DO->hostname), DS_STR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
 }
 
 static int help_get_config_on_answer (struct tgl_state *TLS, struct query *q, void *DS) {
@@ -685,6 +685,17 @@ int tgl_do_send_code_result_auth (struct tgl_state *TLS, const char *phone, int 
   out_cstring (code, code_len);
   out_cstring (first_name, first_name_len);
   out_cstring (last_name, last_name_len);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &sign_in_methods, 0, callback, callback_extra);
+  return 0;
+}
+
+int tgl_do_send_bot_auth (struct tgl_state *TLS, const char *code, int code_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *Self), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_auth_import_bot_authorization);
+  out_int (0);
+  out_int (TLS->app_id);
+  out_string (TLS->app_hash);
+  out_cstring (code, code_len);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &sign_in_methods, 0, callback, callback_extra);
   return 0;
 }
@@ -987,6 +998,7 @@ static struct query_methods mark_read_methods = {
 };
 
 void tgl_do_messages_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, int max_id, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int), void *callback_extra) {
+  if (TLS->is_bot) { return; }
   clear_packet ();
   out_int (CODE_messages_read_history);
   out_peer_id (TLS, id);
@@ -4204,9 +4216,28 @@ void tgl_sign_in_phone (struct tgl_state *TLS, const char *phone, void *arg) {
   tgl_do_send_code (TLS, E->phone, E->phone_len, tgl_sign_in_phone_cb, E);
 }
 
+void tgl_bot_hash (struct tgl_state *TLS, const char *code, void *arg);
+
+void tgl_sign_in_bot_cb (struct tgl_state *TLS, void *_T, int success, struct tgl_user *U) {
+  if (!success) {
+    vlogprintf (E_ERROR, "incorrect bot hash\n");
+    TLS->callback.get_string (TLS, "bot hash:", 0, tgl_bot_hash, NULL);
+    return;
+  }
+  tgl_export_all_auth (TLS);
+}
+
+void tgl_bot_hash (struct tgl_state *TLS, const char *code, void *arg) {
+  tgl_do_send_bot_auth (TLS, code, strlen (code), tgl_sign_in_bot_cb, NULL);
+}
+
 void tgl_sign_in (struct tgl_state *TLS) {
   if (!tgl_signed_dc (TLS, TLS->DC_working)) {
-    TLS->callback.get_string (TLS, "phone number:", 0, tgl_sign_in_phone, NULL);
+    if (TLS->is_bot) {
+      TLS->callback.get_string (TLS, "bot hash:", 0, tgl_bot_hash, NULL);
+    } else {
+      TLS->callback.get_string (TLS, "phone number:", 0, tgl_sign_in_phone, NULL);
+    }
   } else {
     tgl_export_all_auth (TLS);
   }

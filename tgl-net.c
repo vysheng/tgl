@@ -361,10 +361,10 @@ static void restart_connection (struct connection *c) {
     return;
   }
   
-  if (strcmp (c->ip, c->dc->ip)) {
+  /*if (strcmp (c->ip, c->dc->ip)) {
     tfree_str (c->ip);
     c->ip = tstrdup (c->dc->ip);
-  }
+  }*/
   c->last_connect_time = time (0);
   int fd = my_connect (c, c->ip);
   if (fd < 0) {

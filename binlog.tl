@@ -5,6 +5,8 @@ binlog.encrKey key:64*[int] = binlog.EncrKey;
 binlog.start = binlog.Update;
 
 binlog.dcOption dc:int name:string ip:string port:int = binlog.Update;
+binlog.dcOptionNew flags:int dc:int name:string ip:string port:int = binlog.Update;
+
 binlog.authKey dc:int key:%binlog.EncrKey = binlog.Update; 
 binlog.defaultDc dc:int = binlog.Update;
 binlog.dcSigned dc:int = binlog.Update;

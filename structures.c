@@ -609,6 +609,7 @@ void tglf_fetch_document_attribute_new (struct tgl_state *TLS, struct tgl_docume
     D->flags |= TGLDF_ANIMATED;
     return;
   case CODE_document_attribute_sticker:
+  case CODE_document_attribute_sticker_l28:
     D->flags |= TGLDF_STICKER;
     return;
   case CODE_document_attribute_video:

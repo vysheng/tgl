@@ -49,7 +49,7 @@
 #define TGL_VERSION "2.0.2"
 
 #define TGL_ENCRYPTED_LAYER 17
-#define TGL_SCHEME_LAYER 28
+#define TGL_SCHEME_LAYER 30
 
 struct connection;
 struct mtproto_methods;
@@ -242,6 +242,8 @@ struct tgl_state {
 
   char *error;
   int error_code;
+
+  int is_bot;
 };
 #pragma pack(pop)
 //extern struct tgl_state tgl_state;
@@ -261,6 +263,7 @@ int tgl_complete_chat_list (struct tgl_state *TLS, int index, const char *text, 
 int tgl_complete_encr_chat_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_complete_peer_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_secret_chat_for_user (struct tgl_state *TLS, tgl_peer_id_t user_id);
+int tgl_do_send_bot_auth (struct tgl_state *TLS, const char *code, int code_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *Self), void *callback_extra);
 
 #define TGL_PEER_USER 1
 #define TGL_PEER_CHAT 2
@@ -344,6 +347,7 @@ void tgl_register_app_id (struct tgl_state *TLS, int app_id, const char *app_has
 
 void tgl_login (struct tgl_state *TLS);
 void tgl_enable_ipv6 (struct tgl_state *TLS);
+void tgl_enable_bot (struct tgl_state *TLS);
 
 struct tgl_state *tgl_state_alloc (void);
 

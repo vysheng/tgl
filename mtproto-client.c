@@ -769,7 +769,6 @@ long long tglmp_encrypt_send_message (struct tgl_state *TLS, struct connection *
 
   int l = aes_encrypt_message (TLS, DC->temp_auth_key, &enc_msg);
   assert (l > 0);
-  vlogprintf (E_DEBUG, "Sending message to DC%d: %s:%d with key_id=%lld\n", DC->id, DC->ip, DC->port, enc_msg.auth_key_id);
   rpc_send_message (TLS, c, &enc_msg, l + UNENCSZ);
   
   return S->last_msg_id;
@@ -980,7 +979,7 @@ static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long
 
 static struct mtproto_methods mtproto_methods;
 void tgls_free_session (struct tgl_state *TLS, struct tgl_session *S);
-
+/*
 static char *get_ipv6 (struct tgl_state *TLS, int num) {
   static char res[1<< 10];
   if (TLS->test_mode) {
@@ -1020,12 +1019,22 @@ static char *get_ipv6 (struct tgl_state *TLS, int num) {
   }
   return res;
 }
+*/
+
+static void create_session_connect (struct tgl_state *TLS, struct tgl_session *S) {
+  struct tgl_dc *DC = S->dc;
+
+  if (TLS->ipv6_enabled) {
+    S->c = TLS->net_methods->create_connection (TLS, DC->options[1]->ip, DC->options[1]->port, S, DC, &mtproto_methods);
+  } else {
+    S->c = TLS->net_methods->create_connection (TLS, DC->options[0]->ip, DC->options[0]->port, S, DC, &mtproto_methods);
+  }
+}
 
 static void fail_connection (struct tgl_state *TLS, struct connection *c) {
   struct tgl_session *S = TLS->net_methods->get_session (c);
-  struct tgl_dc *DC = TLS->net_methods->get_dc (c);
   TLS->net_methods->free (c);
-  S->c = TLS->net_methods->create_connection (TLS, TLS->ipv6_enabled ? get_ipv6 (TLS, DC->id) : DC->ip, DC->port, S, DC, &mtproto_methods);
+  create_session_connect (TLS, S);
 }
 
 static void fail_session (struct tgl_state *TLS, struct tgl_session *S) {
@@ -1139,7 +1148,6 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
 
 static int rpc_execute (struct tgl_state *TLS, struct connection *c, int op, int len) {
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
-  vlogprintf (E_DEBUG, "outbound rpc connection from dc #%d (%s:%d) : received rpc answer %d with %d content bytes\n", DC->id, DC->ip, DC->port, op, len);
 
   if (len >= MAX_RESPONSE_SIZE/* - 12*/ || len < 0/*12*/) {
     vlogprintf (E_WARNING, "answer too long (%d bytes), skipping\n", len);
@@ -1284,7 +1292,7 @@ void tgl_dc_authorize (struct tgl_state *TLS, struct tgl_dc *DC) {
   if (!DC->sessions[0]) {
     tglmp_dc_create_session (TLS, DC);
   }
-  vlogprintf (E_DEBUG, "Starting authorization for DC #%d: %s:%d\n", DC->id, DC->ip, DC->port);
+  vlogprintf (E_DEBUG, "Starting authorization for DC #%d\n", DC->id);
   //net_loop (0, auth_ok);
 }
 
@@ -1326,26 +1334,41 @@ static void regen_temp_key_gw (struct tgl_state *TLS, void *arg) {
   tglmp_regenerate_temp_auth_key (TLS, arg);
 }
 
-struct tgl_dc *tglmp_alloc_dc (struct tgl_state *TLS, int id, char *ip, int port) {
+struct tgl_dc *tglmp_alloc_dc (struct tgl_state *TLS, int flags, int id, char *ip, int port) {
   //assert (!TLS->DC_list[id]);
+
   if (!TLS->DC_list[id]) {
     struct tgl_dc *DC = talloc0 (sizeof (*DC));
     DC->id = id;
-    DC->ip = ip;
-    DC->port = port;
     TLS->DC_list[id] = DC;
     if (id > TLS->max_dc_num) {
       TLS->max_dc_num = id;
     }
     DC->ev = TLS->timer_methods->alloc (TLS, regen_temp_key_gw, DC);
     TLS->timer_methods->insert (DC->ev, 0);
-    return DC;
-  } else {
-    struct tgl_dc *DC = TLS->DC_list[id];
-    tfree_str (DC->ip);
-    DC->ip = tstrdup (ip);
-    return DC;
   }
+
+  struct tgl_dc *DC = TLS->DC_list[id];
+
+  struct tgl_dc_option *O = DC->options[flags & 3];
+
+  struct tgl_dc_option *O2 = O;
+  while (O2) {
+    if (!strcmp (O2->ip, ip)) {
+      tfree_str (ip);
+      return DC;
+    }
+    O2 = O2->next;
+  }
+
+  struct tgl_dc_option *T = talloc (sizeof (*T));
+  T->ip = ip;
+  T->port = port;
+  T->next = O;
+  DC->options[flags & 3] = T;
+
+
+  return DC;
 }
 
 static struct mtproto_methods mtproto_methods = {
@@ -1359,11 +1382,8 @@ void tglmp_dc_create_session (struct tgl_state *TLS, struct tgl_dc *DC) {
   assert (RAND_pseudo_bytes ((unsigned char *) &S->session_id, 8) >= 0);
   S->dc = DC;
   //S->c = TLS->net_methods->create_connection (TLS, DC->ip, DC->port, S, DC, &mtproto_methods);
-  S->c = TLS->net_methods->create_connection (TLS, TLS->ipv6_enabled ? get_ipv6 (TLS, DC->id) : DC->ip, DC->port, S, DC, &mtproto_methods);
-  if (!S->c) {
-    vlogprintf (E_DEBUG, "Can not create connection to DC. Is network down?\n");
-    exit (1);
-  }
+  
+  create_session_connect (TLS, S);
   S->ev = TLS->timer_methods->alloc (TLS, send_all_acks_gateway, S);
   assert (!DC->sessions[0]);
   DC->sessions[0] = S;
@@ -1428,7 +1448,7 @@ void tgls_free_session (struct tgl_state *TLS, struct tgl_session *S) {
 }
 
 void tgls_free_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
-  if (DC->ip) { tfree_str (DC->ip); }
+  //if (DC->ip) { tfree_str (DC->ip); }
 
   struct tgl_session *S = DC->sessions[0];
   if (S) { tgls_free_session (TLS, S); }
