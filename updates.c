@@ -226,7 +226,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
       tgl_peer_id_t user_id = TGL_MK_USER (DS_LVAL (DS_U->user_id));
       tgl_peer_t *UC = tgl_peer_get (TLS, user_id);
       if (UC && (UC->flags & TGLPF_CREATED)) {
-        bl_do_user_new (TLS, tgl_get_peer_id (user_id), NULL, NULL, 0, NULL, 0, NULL, 0, DS_STR (DS_U->username), NULL, DS_STR (DS_U->first_name), DS_STR (DS_U->last_name), NULL, NULL, NULL, TGL_FLAGS_UNCHANGED);
+        bl_do_user_new (TLS, tgl_get_peer_id (user_id), NULL, NULL, 0, NULL, 0, NULL, 0, DS_STR (DS_U->username), NULL, DS_STR (DS_U->first_name), DS_STR (DS_U->last_name), NULL, NULL, NULL, NULL, TGL_FLAGS_UNCHANGED);
       }
     }
     break;
@@ -236,7 +236,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
       tgl_peer_t *UC = tgl_peer_get (TLS, user_id);
       
       if (UC && (UC->flags & TGLUF_CREATED)) {
-        bl_do_user_new (TLS, tgl_get_peer_id (user_id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, DS_U->photo, NULL, NULL, TGL_FLAGS_UNCHANGED);
+        bl_do_user_new (TLS, tgl_get_peer_id (user_id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, DS_U->photo, NULL, NULL, NULL, TGL_FLAGS_UNCHANGED);
       }
     }
     break;
@@ -374,7 +374,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
         } else {
           flags &= ~TGLUF_BLOCKED;
         }
-        bl_do_user_new (TLS, tgl_get_peer_id (P->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, flags);
+        bl_do_user_new (TLS, tgl_get_peer_id (P->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, NULL, flags);
       }
     }
     break;
@@ -397,7 +397,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
     {
       tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->user_id)));
       if (U && (U->flags & TGLPF_CREATED)) {
-        bl_do_user_new (TLS, tgl_get_peer_id (U->id), NULL, NULL, 0, NULL, 0, DS_STR (DS_U->phone), NULL, 0, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, TGL_FLAGS_UNCHANGED);
+        bl_do_user_new (TLS, tgl_get_peer_id (U->id), NULL, NULL, 0, NULL, 0, DS_STR (DS_U->phone), NULL, 0, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, NULL, TGL_FLAGS_UNCHANGED);
       }
     }
     break;
@@ -407,7 +407,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
       tgl_peer_t *P = tgl_peer_get (TLS, id);
       if (P && (P->flags & TGLPF_CREATED)) {
         if (tgl_get_peer_type (P->id) == TGL_PEER_USER) {
-          bl_do_user_new (TLS, tgl_get_peer_id (P->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, DS_U->max_id, NULL, TGL_FLAGS_UNCHANGED);
+          bl_do_user_new (TLS, tgl_get_peer_id (P->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, DS_U->max_id, NULL, NULL, TGL_FLAGS_UNCHANGED);
         } else {
           bl_do_chat_new (TLS, tgl_get_peer_id (P->id), NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, DS_U->max_id, NULL, TGL_FLAGS_UNCHANGED);
         }
@@ -420,7 +420,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
       tgl_peer_t *P = tgl_peer_get (TLS, id);
       if (P && (P->flags & TGLPF_CREATED)) {
         if (tgl_get_peer_type (P->id) == TGL_PEER_USER) {
-          bl_do_user_new (TLS, tgl_get_peer_id (P->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, NULL, DS_U->max_id, TGL_FLAGS_UNCHANGED);
+          bl_do_user_new (TLS, tgl_get_peer_id (P->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, NULL, DS_U->max_id, NULL, TGL_FLAGS_UNCHANGED);
         } else {
           bl_do_chat_new (TLS, tgl_get_peer_id (P->id), NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, DS_U->max_id, TGL_FLAGS_UNCHANGED);
         }

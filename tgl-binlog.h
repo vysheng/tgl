@@ -44,7 +44,7 @@ void bl_do_encr_chat_delete (struct tgl_state *TLS, struct tgl_secret_chat *U);
 void bl_do_chat_add_user (struct tgl_state *TLS, struct tgl_chat *C, int version, int user, int inviter, int date);
 void bl_do_chat_del_user (struct tgl_state *TLS, struct tgl_chat *C, int version, int user);
 
-void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, int flags);
+void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, struct tl_ds_reply_markup *reply_markup, int flags);
 
 void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *date, const char *message, int message_len, struct tl_ds_decrypted_message_media *media, struct tl_ds_decrypted_message_action *action, struct tl_ds_encrypted_file *file, int flags);
 void bl_do_message_delete (struct tgl_state *TLS, struct tgl_message *M);
@@ -54,7 +54,7 @@ void bl_do_encr_chat_exchange_new (struct tgl_state *TLS, struct tgl_secret_chat
 void bl_do_msg_update (struct tgl_state *TLS, long long id);
 void bl_do_reset_authorization (struct tgl_state *TLS);
 
-void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, const char *first_name, int first_name_len, const char *last_name, int last_name_len, const char *phone, int phone_len, const char *username, int username_len, struct tl_ds_photo *photo, const char *real_first_name, int real_first_name_len, const char *real_last_name, int real_last_name_len, struct tl_ds_user_profile_photo *profile_photo, int *last_read_in, int *last_read_out, int flags);
+void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, const char *first_name, int first_name_len, const char *last_name, int last_name_len, const char *phone, int phone_len, const char *username, int username_len, struct tl_ds_photo *photo, const char *real_first_name, int real_first_name_len, const char *real_last_name, int real_last_name_len, struct tl_ds_user_profile_photo *profile_photo, int *last_read_in, int *last_read_out, struct tl_ds_bot_info *bot_info, int flags);
 
 void bl_do_set_auth_key (struct tgl_state *TLS, int num, unsigned char *buf);
 

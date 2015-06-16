@@ -54,4 +54,6 @@ void tglf_fetch_message_short_chat_new (struct tgl_state *TLS, struct tgl_messag
 struct tgl_message *tglf_fetch_alloc_message_short_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U);
 struct tgl_message *tglf_fetch_alloc_message_short_chat_new (struct tgl_state *TLS, struct tl_ds_updates *DS_U);
 struct tgl_photo *tglf_fetch_alloc_photo_new (struct tgl_state *TLS, struct tl_ds_photo *DS_P);
+struct tgl_bot_info *tglf_fetch_alloc_bot_info (struct tgl_state *TLS, struct tl_ds_bot_info *DS_BI);
+struct tgl_message_reply_markup *tglf_fetch_alloc_reply_markup (struct tgl_state *TLS, struct tl_ds_reply_markup *DS_RM);
 #endif

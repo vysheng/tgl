@@ -260,18 +260,35 @@ int tglf_fetch_user_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds
   }
   
   int flags = U->flags & 0xffff;
-  if (DS_U->magic == CODE_user_self) {
+
+  if (DS_LVAL (DS_U->flags) & (1 << 10)) {
     bl_do_set_our_id (TLS, tgl_get_peer_id (U->id));
     flags |= TGLUF_SELF;
   }
+  
+  if (DS_LVAL (DS_U->flags) & (1 << 11)) {
+    flags |= TGLUF_CONTACT;
+  }
+  
+  if (DS_LVAL (DS_U->flags) & (1 << 12)) {
+    flags |= TGLUF_MUTUAL_CONTACT;
+  }
+  
+  
+  if (DS_LVAL (DS_U->flags) & (1 << 14)) {
+    flags |= TGLUF_BOT;
+  }
+  /*
+  if (DS_LVAL (DS_U->flags) & (1 << 15)) {
+    flags |= TGLUF_BOT_FULL_ACCESS;
+  }
+  
+  if (DS_LVAL (DS_U->flags) & (1 << 16)) {
+    flags |= TGLUF_BOT_NO_GROUPS;
+  }*/
 
   if (!(flags & TGLUF_CREATED)) {
     flags |= TGLUF_CREATE | TGLUF_CREATED;
-  }
-  if (DS_U->magic == CODE_user_contact) {
-    flags |= TGLUF_CONTACT;
-  } else {
-    flags &= ~TGLUF_CONTACT;
   }
 
   bl_do_user_new (TLS, tgl_get_peer_id (U->id), 
@@ -284,14 +301,20 @@ int tglf_fetch_user_new (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds
     NULL, 0, NULL, 0,
     DS_U->photo,
     NULL, NULL,
+    NULL,
     flags
   );
   
-  assert (tglf_fetch_user_status_new (TLS, &U->status, U, DS_U->status) >= 0);
-  
-  if (DS_U->magic == CODE_user_deleted && !(U->flags & TGLUF_DELETED)) {
-    bl_do_user_delete (TLS, U);
+  if (DS_U->status) {
+    assert (tglf_fetch_user_status_new (TLS, &U->status, U, DS_U->status) >= 0);
   }
+  
+  if (DS_LVAL (DS_U->flags) & (1 << 13)) {
+    if (!(U->flags & TGLUF_DELETED)) {
+      bl_do_user_delete (TLS, U);
+    }
+  }
+  
   return 0;
 }
 
@@ -315,9 +338,11 @@ void tglf_fetch_user_full_new (struct tgl_state *TLS, struct tgl_user *U, struct
     NULL, 0,
     NULL, 0,
     DS_UF->profile_photo,
-    DS_STR (DS_UF->real_first_name), DS_STR (DS_UF->real_last_name),
+    //DS_STR (DS_UF->real_first_name), DS_STR (DS_UF->real_last_name),
+    NULL, 0, NULL, 0,
     NULL,
     NULL, NULL,
+    DS_UF->bot_info,
     flags
   );
 }
@@ -478,6 +503,31 @@ void tglf_fetch_chat_full_new (struct tgl_state *TLS, struct tgl_chat *C, struct
     int i;
     for (i = 0; i < DS_LVAL (DS_MCF->chats->cnt); i++) {
       tglf_fetch_alloc_chat_new (TLS, DS_MCF->chats->data[i]);
+    }
+  }
+
+  if (DS_CF->bot_info) {
+    int n = DS_LVAL (DS_CF->bot_info->cnt);
+    int i;
+    for (i = 0; i < n; i++) {
+      struct tl_ds_bot_info *DS_BI = DS_CF->bot_info->data[i];
+
+      tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_BI->user_id)));
+      if (P && (P->flags & TGLCF_CREATED)) {
+        bl_do_user_new (TLS, tgl_get_peer_id (P->id), 
+            NULL,
+            NULL, 0, 
+            NULL, 0,
+            NULL, 0,
+            NULL, 0,
+            NULL,
+            NULL, 0, NULL, 0,
+            NULL,
+            NULL, NULL,
+            DS_BI,
+            TGL_FLAGS_UNCHANGED
+            );
+      }
     }
   }
 }
@@ -830,6 +880,7 @@ void tglf_fetch_message_short_new (struct tgl_state *TLS, struct tgl_message *M,
     &A,
     NULL,
     DS_U->reply_to_msg_id,
+    NULL, 
     flags
   );
 }
@@ -882,6 +933,7 @@ void tglf_fetch_message_short_chat_new (struct tgl_state *TLS, struct tgl_messag
     &A,
     NULL,
     DS_U->reply_to_msg_id,
+    NULL,
     flags
   );
 }
@@ -1143,6 +1195,7 @@ void tglf_fetch_message_new (struct tgl_state *TLS, struct tgl_message *M, struc
       DS_M->media,
       DS_M->action,
       DS_M->reply_to_msg_id,
+      DS_M->reply_markup,
       flags | TGLMF_CREATE | TGLMF_CREATED
     );
   }
@@ -1545,6 +1598,56 @@ struct tgl_chat *tglf_fetch_alloc_chat_full_new (struct tgl_state *TLS, struct t
     return &U->chat;
   }
 }
+
+struct tgl_bot_info *tglf_fetch_alloc_bot_info (struct tgl_state *TLS, struct tl_ds_bot_info *DS_BI) {
+  if (!DS_BI || DS_BI->magic == CODE_bot_info_empty) { return NULL; }
+  struct tgl_bot_info *B = talloc (sizeof (*B));
+  B->version = DS_LVAL (DS_BI->version);
+  B->share_text = DS_STR_DUP (DS_BI->share_text);
+  B->description = DS_STR_DUP (DS_BI->description);
+
+  B->commands_num = DS_LVAL (DS_BI->commands->cnt);
+  B->commands = talloc (sizeof (struct tgl_bot_command) * B->commands_num);
+  int i;
+  for (i = 0; i < B->commands_num; i++) {
+    struct tl_ds_bot_command *BC = DS_BI->commands->data[i];
+    B->commands[i].command = DS_STR_DUP (BC->command);
+    B->commands[i].params = DS_STR_DUP (BC->params);
+    B->commands[i].description = DS_STR_DUP (BC->description);
+  }
+  return B;
+}
+
+struct tgl_message_reply_markup *tglf_fetch_alloc_reply_markup (struct tgl_state *TLS, struct tl_ds_reply_markup *DS_RM) {
+  if (!DS_RM) { return NULL; }
+  
+  struct tgl_message_reply_markup *R = talloc0 (sizeof (*R));
+  R->flags = DS_LVAL (DS_RM->flags);
+
+  R->rows = DS_LVAL (DS_RM->rows->cnt);
+
+  int total = 0;
+  R->row_start = talloc ((R->rows + 1) * 4);
+  R->row_start[0] = 0;
+  int i;
+  for (i = 0; i < R->rows; i++) {
+    struct tl_ds_keyboard_button_row *DS_K = DS_RM->rows->data[i];
+    total += DS_LVAL (DS_K->buttons->cnt);
+    R->row_start[i + 1] = total;
+  }
+  R->buttons = talloc (sizeof (void *) * total);
+  int r = 0;
+  for (i = 0; i < R->rows; i++) {
+    struct tl_ds_keyboard_button_row *DS_K = DS_RM->rows->data[i];
+    int j;
+    for (j = 0; j < DS_LVAL (DS_K->buttons->cnt); j++) {
+      struct tl_ds_keyboard_button *DS_KB = DS_K->buttons->data[j];
+      R->buttons[r ++] = DS_STR_DUP (DS_KB->text);
+    }
+  }
+  assert (r == total);
+  return R;
+}
 /* }}} */
 
 void tglp_insert_encrypted_chat (struct tgl_state *TLS, tgl_peer_t *P) {
@@ -1780,6 +1883,20 @@ void tgls_free_peer (struct tgl_state *TLS, tgl_peer_t *P) {
   } else {
     assert (0);
   }
+}
+
+void tgls_free_bot_info (struct tgl_state *TLS, struct tgl_bot_info *B) {
+  if (!B) { return; }
+  int i;
+  for (i = 0; i < B->commands_num; i++) {
+    tfree_str (B->commands[i].command);
+    tfree_str (B->commands[i].params);
+    tfree_str (B->commands[i].description);
+  }
+  tfree (B->commands, sizeof (struct tgl_bot_command) * B->commands_num);
+  tfree_str (B->share_text);
+  tfree_str (B->description);
+  tfree (B, sizeof (*B));
 }
 /* }}} */
 

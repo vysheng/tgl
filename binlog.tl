@@ -52,6 +52,7 @@ binlog.userNew#127cf2f9 flags:# id:int
   user_photo:flags.23?UserProfilePhoto 
   last_read_in:flags.24?int 
   last_read_out:flags.25?int
+  bot_info:flags.26?BotInfo
     = binlog.Update;
 
 binlog.chatNew#0a10aa92 flags:# id:int 
@@ -80,6 +81,7 @@ binlog.messageNew#427cfcdb flags:# lid:long
   media:flags.21?MessageMedia 
   action:flags.22?MessageAction 
   reply_id:flags.23?int
+  reply_markup:flags.24?ReplyMarkup
     = binlog.Update;
 
 binlog.messageEncrNew#6cf7cabc flags:# lid:long 

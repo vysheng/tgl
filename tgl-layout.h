@@ -46,12 +46,14 @@
 #define TGLPF_DELETED (1 << 10)
 
 #define TGLUF_CONTACT 1
+#define TGLUF_MUTUAL_CONTACT 2
 #define TGLUF_BLOCKED 4
 #define TGLUF_SELF 8
 #define TGLUF_CREATED TGLPF_CREATED
 #define TGLUF_DELETED TGLPF_DELETED
 #define TGLUF_HAS_PHOTO TGLPF_HAS_PHOTO
 #define TGLUF_CREATE TGLPF_CREATE
+#define TGLUF_BOT (1 << 12)
 
 #define TGLCF_CREATED TGLPF_CREATED
 #define TGLCF_CREATE TGLPF_CREATE
@@ -247,6 +249,20 @@ struct tgl_user_status {
   struct tgl_timer *ev;
 };
 
+struct tgl_bot_command {
+  char *command;
+  char *params;
+  char *description;
+};
+
+struct tgl_bot_info {
+  int version;
+  char *share_text;
+  char *description;
+  int commands_num;
+  struct tgl_bot_command *commands;
+};
+
 struct tgl_user {
   tgl_peer_id_t id;
   int flags;
@@ -268,6 +284,8 @@ struct tgl_user {
   char *real_first_name;
   char *real_last_name;
   char *username;
+
+  struct tgl_bot_info *bot_info;
 };
 
 struct tgl_chat_user {
@@ -489,6 +507,13 @@ struct tgl_message_media {
   };
 };
 
+struct tgl_message_reply_markup {
+  int flags;
+  int rows;
+  int *row_start;
+  char **buttons;
+};
+
 struct tgl_message {
   struct tgl_message *next_use, *prev_use;
   struct tgl_message *next, *prev;
@@ -500,6 +525,7 @@ struct tgl_message {
   tgl_peer_id_t from_id;
   tgl_peer_id_t to_id;
   int date;
+  struct tgl_message_reply_markup *reply_markup;
   union {
     struct tgl_message_action action;
     struct {

@@ -640,7 +640,7 @@ void tgl_do_phone_call (struct tgl_state *TLS, const char *phone, int phone_len,
 /* {{{ Sign in / Sign up */
 static int sign_in_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   struct tl_ds_auth_authorization *DS_AA = D;
-  vlogprintf (E_DEBUG, "Expires in %d\n", DS_LVAL (DS_AA->expires));
+  //vlogprintf (E_DEBUG, "Expires in %d\n", DS_LVAL (DS_AA->expires));
 
   struct tgl_user *U = tglf_fetch_alloc_user_new (TLS, DS_AA->user);
   
@@ -747,7 +747,7 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q, void *D) 
   if (M && M->id != DS_LVAL (DS_MSM->id)) {
     assert (M->flags & TGLMF_PENDING);
     bl_do_create_message_new (TLS, M->id, NULL, NULL, NULL, NULL, NULL, 
-      DS_MSM->date, NULL, 0, DS_MSM->media, NULL, NULL, M->flags & 0xffff);
+      DS_MSM->date, NULL, 0, DS_MSM->media, NULL, NULL, NULL, M->flags & 0xffff);
   }
  
   struct tl_ds_update *UPD = talloc0 (sizeof (*UPD));
@@ -810,7 +810,7 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   clear_packet ();
   out_int (CODE_messages_send_message);
   
-  out_int (((M->flags & TGLMF_DISABLE_PREVIEW) ? 2 : 0) | (M->reply_id ? 1 : 0));
+  out_int (((M->flags & TGLMF_DISABLE_PREVIEW) ? 2 : 0) | (M->reply_id ? 1 : 0) | (M->reply_markup ? 4 : 0));
   out_peer_id (TLS, M->to_id);
   if (M->reply_id) {
     out_int (M->reply_id);
@@ -819,6 +819,25 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   out_long (M->id);
   long long *x = talloc (8);
   *x = M->id;
+
+  if (M->reply_markup) {
+    out_int (CODE_reply_keyboard_markup);
+    out_int (M->reply_markup->flags);
+    out_int (CODE_vector);
+    out_int (M->reply_markup->rows);
+    int i;
+    for (i = 0; i < M->reply_markup->rows; i++) {
+      out_int (CODE_keyboard_button_row);
+      out_int (CODE_vector);
+      out_int (M->reply_markup->row_start[i + 1] - M->reply_markup->row_start[i]);
+      int j; 
+      for (j = 0; j < M->reply_markup->row_start[i + 1] - M->reply_markup->row_start[i]; j++) {
+        out_int (CODE_keyboard_button);
+        out_string (M->reply_markup->buttons[j + M->reply_markup->row_start[i]]);
+      }
+    }
+  }
+
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &msg_send_methods, x, callback, callback_extra);
 }
 
@@ -859,7 +878,7 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *t
     struct tl_ds_message_media TDSM;
     TDSM.magic = CODE_message_media_empty;
 
-    bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, text, text_len, &TDSM, NULL, reply ? &reply : NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_SESSION_OUTBOUND | disable_preview);
+    bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, text, text_len, &TDSM, NULL, reply ? &reply : NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_SESSION_OUTBOUND | disable_preview);
   } else {
     struct tl_ds_decrypted_message_media TDSM;
     TDSM.magic = CODE_decrypted_message_media_empty;
@@ -967,7 +986,7 @@ static int mark_read_on_receive (struct tgl_state *TLS, struct query *q, void *D
     tgl_do_messages_mark_read (TLS, E->id, E->max_id, offset, q->callback, q->callback_extra);
   } else {
     if (tgl_get_peer_type (E->id) == TGL_PEER_USER) {
-      bl_do_user_new (TLS, tgl_get_peer_id (E->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, &E->max_id, NULL, TGL_FLAGS_UNCHANGED);
+      bl_do_user_new (TLS, tgl_get_peer_id (E->id), NULL, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, NULL, 0, NULL, 0, NULL, &E->max_id, NULL, NULL, TGL_FLAGS_UNCHANGED);
     } else {
       assert (tgl_get_peer_type (E->id) == TGL_PEER_CHAT);
       bl_do_chat_new (TLS, tgl_get_peer_id (E->id), NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, &E->max_id, NULL, TGL_FLAGS_UNCHANGED);
@@ -3713,7 +3732,7 @@ void tgl_do_send_broadcast (struct tgl_state *TLS, int num, tgl_peer_id_t id[], 
       disable_preview = TGLMF_DISABLE_PREVIEW;
     }
 
-    bl_do_create_message_new (TLS, E->list[i], &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, text, text_len, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | disable_preview);
+    bl_do_create_message_new (TLS, E->list[i], &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, text, text_len, &TDSM, NULL, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | disable_preview);
   }
 
   clear_packet ();

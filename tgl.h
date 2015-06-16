@@ -46,10 +46,10 @@
 #define TG_SERVER_TEST_DEFAULT 2
 
 // JUST RANDOM STRING
-#define TGL_VERSION "2.0.2"
+#define TGL_VERSION "2.0.3"
 
 #define TGL_ENCRYPTED_LAYER 17
-#define TGL_SCHEME_LAYER 30
+#define TGL_SCHEME_LAYER 31
 
 struct connection;
 struct mtproto_methods;

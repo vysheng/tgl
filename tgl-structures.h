@@ -32,6 +32,7 @@ void tgls_free_user (struct tgl_state *TLS, struct tgl_user *U);
 void tgls_free_chat (struct tgl_state *TLS, struct tgl_chat *U);
 void tgls_free_photo (struct tgl_state *TLS, struct tgl_photo *P);
 void tgls_free_message (struct tgl_state *TLS, struct tgl_message *M);
+void tgls_free_bot_info (struct tgl_state *TLS, struct tgl_bot_info *B);
 void tgls_clear_message (struct tgl_state *TLS, struct tgl_message *M);
 
 struct tgl_message *tglm_message_alloc (struct tgl_state *TLS, long long id);

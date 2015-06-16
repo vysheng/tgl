@@ -347,6 +347,13 @@ static int fetch_comb_binlog_user_new (struct tgl_state *TLS, struct tl_ds_binlo
     tgls_messages_mark_read (TLS, U->last, TGLMF_OUT, U->last_read_out);
   }
 
+  if (DS_U->bot_info) {
+    if (U->bot_info) {
+      tgls_free_bot_info (TLS, U->bot_info);
+    }
+    U->bot_info = tglf_fetch_alloc_bot_info (TLS, DS_U->bot_info);
+  }
+
   if (TLS->callback.user_update && updates) {
     TLS->callback.user_update (TLS, U, updates);
   }
@@ -699,6 +706,10 @@ static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_bi
 
   if (DS_U->reply_id) {
     M->reply_id = DS_LVAL (DS_U->reply_id);
+  }
+
+  if (DS_U->reply_markup) {
+    M->reply_markup = tglf_fetch_alloc_reply_markup (TLS, DS_U->reply_markup);
   }
 
   if (flags & 0x10000) {
@@ -1280,7 +1291,7 @@ void bl_do_chat_del_user (struct tgl_state *TLS, struct tgl_chat *C, int version
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 
-void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, int flags) {
+void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id, int *to_type, int *to_id, int *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, struct tl_ds_reply_markup *reply_markup, int flags) {
   clear_packet ();
   assert (!(flags & 0xfffe0000));
 
@@ -1331,6 +1342,11 @@ void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id
   if (reply_id) {
     (*flags_p) |= (1 << 23);
     out_int (*reply_id);
+  }
+
+  if (reply_markup) {
+    (*flags_p) |= (1 << 24);
+    store_ds_type_reply_markup (reply_markup, TYPE_TO_PARAM (reply_markup));
   }
 
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
@@ -1440,7 +1456,7 @@ void bl_do_set_auth_key (struct tgl_state *TLS, int num, unsigned char *buf) {
   add_log_event (TLS, ev, 8 + 256);
 }
 
-void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, const char *first_name, int first_name_len, const char *last_name, int last_name_len, const char *phone, int phone_len, const char *username, int username_len, struct tl_ds_photo *photo, const char *real_first_name, int real_first_name_len, const char *real_last_name, int real_last_name_len, struct tl_ds_user_profile_photo *profile_photo, int *last_read_in, int *last_read_out, int flags) {
+void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, const char *first_name, int first_name_len, const char *last_name, int last_name_len, const char *phone, int phone_len, const char *username, int username_len, struct tl_ds_photo *photo, const char *real_first_name, int real_first_name_len, const char *real_last_name, int real_last_name_len, struct tl_ds_user_profile_photo *profile_photo, int *last_read_in, int *last_read_out, struct tl_ds_bot_info *bot_info, int flags) {
   tgl_peer_t *PP = tgl_peer_get (TLS, TGL_MK_USER (id));
   struct tgl_user *P = &PP->user;
 
@@ -1465,7 +1481,6 @@ void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, cons
   }
  
   if (first_name) {
-    assert (last_name);
     if (!P || !P->first_name || !P->last_name || mystreq1 (P->first_name, first_name, first_name_len) || mystreq1 (P->last_name, last_name, last_name_len)) {
       out_cstring (first_name, first_name_len);
       out_cstring (last_name, last_name_len);
@@ -1523,6 +1538,13 @@ void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, cons
     if (!P || P->last_read_out < *last_read_out) {
       out_int (*last_read_out);
       (*flags_p) |= (1 << 25);
+    }
+  }
+
+  if (bot_info) {
+    if (!P || !P->bot_info || P->bot_info->version != DS_LVAL (bot_info->version)) {
+      store_ds_type_bot_info (bot_info, TYPE_TO_PARAM (bot_info));
+      (*flags_p) |= (1 << 26);
     }
   }
   
