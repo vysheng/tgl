@@ -841,7 +841,7 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &msg_send_methods, x, callback, callback_extra);
 }
 
-void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *text, int text_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *text, int text_len, unsigned long long flags, struct tl_ds_reply_markup *reply_markup, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   if (tgl_get_peer_type (id) == TGL_PEER_ENCR_CHAT) {
     tgl_peer_t *P = tgl_peer_get (TLS, id);
     if (!P) {
@@ -878,7 +878,7 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *t
     struct tl_ds_message_media TDSM;
     TDSM.magic = CODE_message_media_empty;
 
-    bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, text, text_len, &TDSM, NULL, reply ? &reply : NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_SESSION_OUTBOUND | disable_preview);
+    bl_do_create_message_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, NULL, NULL, &date, text, text_len, &TDSM, NULL, reply ? &reply : NULL, reply_markup, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_SESSION_OUTBOUND | disable_preview);
   } else {
     struct tl_ds_decrypted_message_media TDSM;
     TDSM.magic = CODE_decrypted_message_media_empty;
@@ -910,7 +910,7 @@ void tgl_do_reply_message (struct tgl_state *TLS, int reply_id, const char *text
     id = M->from_id;
   }
 
-  tgl_do_send_message (TLS, id, text, text_len, flags | TGL_SEND_MSG_FLAG_REPLY (reply_id), callback, callback_extra);
+  tgl_do_send_message (TLS, id, text, text_len, flags | TGL_SEND_MSG_FLAG_REPLY (reply_id), NULL, callback, callback_extra);
 }
 /* }}} */
 
@@ -934,7 +934,7 @@ void tgl_do_send_text (struct tgl_state *TLS, tgl_peer_id_t id, const char *file
       callback (TLS, callback_extra, 0, NULL);
     }
   } else {
-    tgl_do_send_message (TLS, id, buf, x, flags, callback, callback_extra);
+    tgl_do_send_message (TLS, id, buf, x, flags, NULL, callback, callback_extra);
   }
 }
 

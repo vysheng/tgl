@@ -362,9 +362,12 @@ void tgl_do_set_password (struct tgl_state *TLS, const char *hint, int hint_len,
 
 /* {{{ SENDING MESSAGES */
 
+struct tl_ds_reply_markup;
+
 // send plain text message to peer id
 // flags is combination of TGL_SEND_MSG_FLAG_* 
-void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *text, int text_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
+// reply markup can be NULL 
+void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *text, int text_len, unsigned long long flags, struct tl_ds_reply_markup *reply_markup, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
 
 // sends plain text reply on message *reply_id*
 // message *reply_id* should be cached

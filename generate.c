@@ -2355,6 +2355,7 @@ void gen_store_header (void) {
 
 
   printf ("struct paramed_type *tglf_extf_store (struct tgl_state *TLS, const char *data, int data_len);\n");
+  printf ("int tglf_store_type (struct tgl_state *TLS, const char *work, int work_len, struct paramed_type *P);\n");
 
   int i, j;
   for (i = 0; i < tn; i++) {

@@ -252,4 +252,11 @@ struct paramed_type *tglf_extf_store (struct tgl_state *TLS, const char *data, i
   local_next_token ();
   return store_function_any ();
 }
+
+int tglf_store_type (struct tgl_state *TLS, const char *data, int data_len, struct paramed_type *P) {
+  buffer_pos = (char *)data;
+  buffer_end = (char *)(data + data_len);
+  local_next_token ();
+  return store_type_any (P);
+}
 #endif

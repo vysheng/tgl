@@ -21,11 +21,13 @@
 #ifndef __TGL_INNER_H__
 #define __TGL_INNER_H__
 
+#ifndef vlogprintf
 #define vlogprintf(verbosity_level,...) \
   do { \
     if (TLS->verbosity >= verbosity_level) { \
       TLS->callback.logprintf (__VA_ARGS__); \
     } \
   } while (0)
+#endif
 
 #endif
