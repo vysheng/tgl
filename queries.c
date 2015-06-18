@@ -2775,22 +2775,6 @@ void tgl_do_msg_search (struct tgl_state *TLS, tgl_peer_id_t id, int from, int t
 }
 /* }}} */
 
-/* {{{ Contacts search */
-static struct query_methods contacts_search_methods = {
-  .on_answer = contact_search_on_answer,
-  .on_error = q_list_on_error,
-  .type = TYPE_TO_PARAM(contacts_found)
-};
-
-void tgl_do_contacts_search (struct tgl_state *TLS, int limit, const char *s, void (*callback) (struct tgl_state *, void *callback_extra, int success, int size, struct tgl_user *users[]), void *callback_extra) {
-  clear_packet ();
-  out_int (CODE_contacts_search);
-  out_string (s);
-  out_int (limit);
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &contacts_search_methods, 0, callback, callback_extra);
-}
-/* }}} */
-
 /* {{{ Get difference */
 
 static int get_state_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
