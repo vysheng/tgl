@@ -508,6 +508,7 @@ struct tgl_message_media {
 };
 
 struct tgl_message_reply_markup {
+  int refcnt;
   int flags;
   int rows;
   int *row_start;

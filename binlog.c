@@ -708,16 +708,16 @@ static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_bi
     M->reply_id = DS_LVAL (DS_U->reply_id);
   }
 
-  if (DS_U->reply_markup) {
-    M->reply_markup = tglf_fetch_alloc_reply_markup (TLS, DS_U->reply_markup);
-  }
-
   if (flags & 0x10000) {
     tglm_message_insert (TLS, M);
   }
 
   if (!(flags & TGLMF_UNREAD) && (M->flags & TGLMF_UNREAD)) {
     tgls_messages_mark_read (TLS, M, M->flags & TGLMF_OUT, M->id);
+  }
+
+  if (DS_U->reply_markup) {
+    M->reply_markup = tglf_fetch_alloc_reply_markup (TLS, M->next, DS_U->reply_markup);
   }
   return 0;
 }

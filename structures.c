@@ -1618,11 +1618,12 @@ struct tgl_bot_info *tglf_fetch_alloc_bot_info (struct tgl_state *TLS, struct tl
   return B;
 }
 
-struct tgl_message_reply_markup *tglf_fetch_alloc_reply_markup (struct tgl_state *TLS, struct tl_ds_reply_markup *DS_RM) {
+struct tgl_message_reply_markup *tglf_fetch_alloc_reply_markup (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_reply_markup *DS_RM) {
   if (!DS_RM) { return NULL; }
-  
+
   struct tgl_message_reply_markup *R = talloc0 (sizeof (*R));
   R->flags = DS_LVAL (DS_RM->flags);
+  R->refcnt = 1;
 
   R->rows = DS_LVAL (DS_RM->rows->cnt);
 
@@ -1840,8 +1841,21 @@ void tgls_clear_message (struct tgl_state *TLS, struct tgl_message *M) {
   }
 }
 
+void tgls_free_reply_markup (struct tgl_state *TLS, struct tgl_message_reply_markup *R) { 
+  if (!--R->refcnt) {
+    tfree (R->buttons, R->row_start[R->rows] * sizeof (void *));
+    tfree (R->row_start, 4 * (R->rows + 1));
+    tfree (R, sizeof (*R));
+  } else {
+    assert (R->refcnt > 0);
+  }
+}
+
 void tgls_free_message (struct tgl_state *TLS, struct tgl_message *M) {
   tgls_clear_message (TLS, M);
+  if (M->reply_markup) {
+    tgls_free_reply_markup (TLS, M->reply_markup);
+  }
   tfree (M, sizeof (*M));
 }
 

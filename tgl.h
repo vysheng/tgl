@@ -519,8 +519,8 @@ void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_user_id_t id, void (*
 // if limit is > 100 there is a (small) chance of one dialog received twice
 void tgl_do_get_dialog_list (struct tgl_state *TLS, int limit, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, tgl_peer_id_t peers[], int last_msg_id[], int unread_count[]), void *callback_extra);
 
-// searches contacts by name
-void tgl_do_contact_search (struct tgl_state *TLS, const char *pattern, int pattern_len, int limit, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int cnt, struct tgl_user *U[]), void *callback_extra);
+// resolves username
+void tgl_do_contact_search (struct tgl_state *TLS, const char *name, int name_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra);
 
 // requests contact list
 void tgl_do_update_contact_list (struct tgl_state *TLS, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_user *contacts[]), void *callback_extra);

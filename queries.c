@@ -1784,34 +1784,27 @@ void tgl_do_set_username (struct tgl_state *TLS, const char *username, int usern
 /* {{{ Contacts search */
 
 int contact_search_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
-  struct tl_ds_contacts_found *DS_CF = D;
+  struct tl_ds_user *DS_U = D;
+
+  struct tgl_user *U = tglf_fetch_alloc_user_new (TLS, DS_U);
   
-  int n = DS_LVAL (DS_CF->users->cnt);
-
-  struct tgl_user **UL = talloc (sizeof (void *) * n);
-  int i;
-  for (i = 0; i < n; i++) {
-    UL[i] = tglf_fetch_alloc_user_new (TLS, DS_CF->users->data[i]);
-  }
-
   if (q->callback) {
-    ((void (*)(struct tgl_state *,void *, int, int, struct tgl_user  **))q->callback) (TLS, q->callback_extra, 1, n, UL);
+    ((void (*)(struct tgl_state *,void *, int, struct tgl_user  *))q->callback) (TLS, q->callback_extra, 1, U);
   }
-  tfree (UL, sizeof (void *) * n);
+  
   return 0;
 }
 
 static struct query_methods contact_search_methods = {
   .on_answer = contact_search_on_answer,
   .on_error = q_list_on_error,
-  .type = TYPE_TO_PARAM(contacts_found)
+  .type = TYPE_TO_PARAM(user)
 };
 
-void tgl_do_contact_search (struct tgl_state *TLS, const char *name, int name_len, int limit, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int cnt, struct tgl_user *U[]), void *callback_extra) {
+void tgl_do_contact_search (struct tgl_state *TLS, const char *name, int name_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra) {
   clear_packet ();
-  out_int (CODE_contacts_search);
+  out_int (CODE_contacts_resolve_username);
   out_cstring (name, name_len);
-  out_int (limit);
 
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &contact_search_methods, 0, callback, callback_extra);
 }

@@ -500,6 +500,7 @@ keyboardButton#a2fa4880 text:string = KeyboardButton;
 
 keyboardButtonRow#77608b83 buttons:Vector<KeyboardButton> = KeyboardButtonRow;
 
+replyKeyboardHide#ced6ebbc = ReplyMarkup;
 replyKeyboardMarkup#3502758c flags:int rows:Vector<KeyboardButtonRow> = ReplyMarkup;
 
 ---functions---

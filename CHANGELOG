@@ -1,5 +1,6 @@
 2.0.3
 * updated to layer 31 (bot support)
+* changed signature of contact_search method
 2.0.2
 * fixed small bugs
 * added block/unblock user method
