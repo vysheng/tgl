@@ -210,6 +210,12 @@ void tgl_do_send_encr_msg_action (struct tgl_state *TLS, struct tgl_message *M, 
     out_int (CODE_decrypted_message_action_abort_key);
     out_long (M->action.exchange_id);
     break;
+  case tgl_message_action_delete_messages:
+    out_int (CODE_decrypted_message_action_delete_messages);
+    out_int(CODE_vector);
+    out_int(1);
+    out_long (M->id);
+    break;
   case tgl_message_action_noop:
     out_int (CODE_decrypted_message_action_noop);
     break;
