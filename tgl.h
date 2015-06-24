@@ -585,4 +585,8 @@ int tglf_extf_autocomplete (struct tgl_state *TLS, const char *text, int text_le
 struct paramed_type *tglf_extf_store (struct tgl_state *TLS, const char *data, int data_len);
 char *tglf_extf_fetch (struct tgl_state *TLS, struct paramed_type *T);
 /* }}} */
+
+/* {{{ BOT */
+void tgl_do_start_bot (struct tgl_state *TLS, tgl_peer_id_t bot, tgl_peer_id_t chat, const char *str, int str_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+/* }}} */
 #endif

@@ -424,6 +424,7 @@ int tglq_query_result (struct tgl_state *TLS, long long id) {
       vlogprintf (E_DEBUG, "in_ptr = %p, end_ptr = %p\n", in_ptr, in_end);
       if (skip_type_any (q->type) < 0) {
         vlogprintf (E_ERROR, "Skipped %ld int out of %ld (type %s)\n", (long)(in_ptr - save), (long)(in_end - save), q->type->type->id);
+        vlogprintf (E_ERROR, "0x%08x 0x%08x\n", *(in_ptr - 1), *in_ptr);
         assert (0);
       }
 
@@ -821,20 +822,24 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   *x = M->id;
 
   if (M->reply_markup) {
-    out_int (CODE_reply_keyboard_markup);
-    out_int (M->reply_markup->flags);
-    out_int (CODE_vector);
-    out_int (M->reply_markup->rows);
-    int i;
-    for (i = 0; i < M->reply_markup->rows; i++) {
-      out_int (CODE_keyboard_button_row);
+    if (M->reply_markup->rows) {
+      out_int (CODE_reply_keyboard_markup);
+      out_int (M->reply_markup->flags);
       out_int (CODE_vector);
-      out_int (M->reply_markup->row_start[i + 1] - M->reply_markup->row_start[i]);
-      int j; 
-      for (j = 0; j < M->reply_markup->row_start[i + 1] - M->reply_markup->row_start[i]; j++) {
-        out_int (CODE_keyboard_button);
-        out_string (M->reply_markup->buttons[j + M->reply_markup->row_start[i]]);
+      out_int (M->reply_markup->rows);
+      int i;
+      for (i = 0; i < M->reply_markup->rows; i++) {
+        out_int (CODE_keyboard_button_row);
+        out_int (CODE_vector);
+        out_int (M->reply_markup->row_start[i + 1] - M->reply_markup->row_start[i]);
+        int j; 
+        for (j = 0; j < M->reply_markup->row_start[i + 1] - M->reply_markup->row_start[i]; j++) {
+          out_int (CODE_keyboard_button);
+          out_string (M->reply_markup->buttons[j + M->reply_markup->row_start[i]]);
+        }
       }
+    } else {
+      out_int (CODE_reply_keyboard_hide);
     }
   }
 
@@ -3142,6 +3147,26 @@ void tgl_do_import_card (struct tgl_state *TLS, int size, int *card, void (*call
 }
 /* }}} */
 
+void tgl_do_start_bot (struct tgl_state *TLS, tgl_peer_id_t bot, tgl_peer_id_t chat, const char *str, int str_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_messages_start_bot);
+  struct tgl_user *U = (void *)tgl_peer_get (TLS, bot);
+  if (U && U->access_hash) {
+    out_int (CODE_input_user_foreign);
+    out_int (tgl_get_peer_id (bot));
+    out_long (U->access_hash);
+  } else {
+    out_int (CODE_input_user_contact);
+    out_int (tgl_get_peer_id (bot));
+  }
+  out_int (tgl_get_peer_id (chat));
+  long long m;
+  tglt_secure_random (&m, 8);
+  out_long (m);
+  out_cstring (str, str_len);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+
 /* {{{ Send typing */
 static int send_typing_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   if (q->callback) {
@@ -3805,6 +3830,8 @@ void tgl_do_unblock_user (struct tgl_state *TLS, tgl_peer_id_t id, void (*callba
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &block_user_methods, 0, callback, callback_extra);
 }
 /* }}} */
+
+
 
 static void set_flag_4 (struct tgl_state *TLS, void *_D, int success) {
   struct tgl_dc *D = _D;

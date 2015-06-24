@@ -251,7 +251,6 @@ struct tgl_user_status {
 
 struct tgl_bot_command {
   char *command;
-  char *params;
   char *description;
 };
 

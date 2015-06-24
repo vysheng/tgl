@@ -1612,7 +1612,6 @@ struct tgl_bot_info *tglf_fetch_alloc_bot_info (struct tgl_state *TLS, struct tl
   for (i = 0; i < B->commands_num; i++) {
     struct tl_ds_bot_command *BC = DS_BI->commands->data[i];
     B->commands[i].command = DS_STR_DUP (BC->command);
-    B->commands[i].params = DS_STR_DUP (BC->params);
     B->commands[i].description = DS_STR_DUP (BC->description);
   }
   return B;
@@ -1625,7 +1624,7 @@ struct tgl_message_reply_markup *tglf_fetch_alloc_reply_markup (struct tgl_state
   R->flags = DS_LVAL (DS_RM->flags);
   R->refcnt = 1;
 
-  R->rows = DS_LVAL (DS_RM->rows->cnt);
+  R->rows = DS_RM->rows ? DS_LVAL (DS_RM->rows->cnt) : 0;
 
   int total = 0;
   R->row_start = talloc ((R->rows + 1) * 4);
@@ -1904,7 +1903,6 @@ void tgls_free_bot_info (struct tgl_state *TLS, struct tgl_bot_info *B) {
   int i;
   for (i = 0; i < B->commands_num; i++) {
     tfree_str (B->commands[i].command);
-    tfree_str (B->commands[i].params);
     tfree_str (B->commands[i].description);
   }
   tfree (B->commands, sizeof (struct tgl_bot_command) * B->commands_num);
