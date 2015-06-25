@@ -931,6 +931,15 @@ void tgl_do_send_text (struct tgl_state *TLS, tgl_peer_id_t id, const char *file
   }
   static char buf[(1 << 20) + 1];
   int x = read (fd, buf, (1 << 20) + 1);
+  if (x < 0) {
+    tgl_set_query_error (TLS, EBADF, "Can not read from file: %m");
+    close (fd);
+    if (callback) {
+      callback (TLS, callback_extra, 0, NULL);
+    }
+    return;
+  }
+
   assert (x >= 0);
   close (fd);
   if (x == (1 << 20) + 1) {
