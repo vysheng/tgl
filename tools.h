@@ -1,4 +1,4 @@
-/* 
+/*
     This file is part of tgl-library
 
     This library is free software; you can redistribute it and/or
@@ -27,7 +27,7 @@
 
 #define talloc tgl_allocator->alloc
 #define talloc0 tgl_alloc0
-#define tfree tgl_allocator->free 
+#define tfree tgl_allocator->free
 #define tfree_str tgl_free_str
 #define tfree_secure tgl_free_secure
 #define trealloc tgl_allocator->realloc
@@ -96,7 +96,7 @@ void tgl_my_clock_gettime (int clock_id, struct timespec *T);
 
 static inline void tgl_free_str (void *ptr) {
   if (!ptr) { return; }
-  tfree (ptr, strlen (ptr) + 1);
+  tfree (ptr, strlen ((const char *)ptr) + 1);
 }
 
 static inline void tgl_free_secure (void *ptr, int size) {
@@ -110,7 +110,7 @@ static inline void hexdump (void *ptr, void *end_ptr) {
     fprintf (stderr, "%02x", (int)*(unsigned char *)ptr);
     ptr ++;
     total ++;
-    if (total == 16) { 
+    if (total == 16) {
       fprintf (stderr, "\n");
       total = 0;
     }
