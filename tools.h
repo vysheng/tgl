@@ -106,9 +106,10 @@ static inline void tgl_free_secure (void *ptr, int size) {
 
 static inline void hexdump (void *ptr, void *end_ptr) {
   int total = 0;
-  while (ptr < end_ptr) {
-    fprintf (stderr, "%02x", (int)*(unsigned char *)ptr);
-    ptr ++;
+  unsigned char *bptr = (unsigned char *)ptr;
+  while (bptr < end_ptr) {
+    fprintf (stderr, "%02x", (int)*bptr);
+    bptr ++;
     total ++;
     if (total == 16) {
       fprintf (stderr, "\n");

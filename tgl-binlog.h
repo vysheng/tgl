@@ -1,4 +1,4 @@
-/* 
+/*
     This file is part of tgl-library
 
     This library is free software; you can redistribute it and/or
@@ -23,6 +23,10 @@
 //#include "structures.h"
 #include "tgl.h"
 #include "auto/auto-types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void bl_do_dc_option (struct tgl_state *TLS, int id, const char *name, int l1, const char *ip, int l2, int port);
 void bl_do_dc_option_new (struct tgl_state *TLS, int flags, int id, const char *name, int l1, const char *ip, int l2, int port);
@@ -61,4 +65,9 @@ void bl_do_set_auth_key (struct tgl_state *TLS, int num, unsigned char *buf);
 void bl_do_chat_new (struct tgl_state *TLS, int id, const char *title, int title_len, int *user_num, int *date, int *version, struct tl_ds_vector *participants, struct tl_ds_chat_photo *chat_photo, struct tl_ds_photo *photo, int *admin, int *last_read_in, int *last_read_out, int flags);
 
 void bl_do_encr_chat_new (struct tgl_state *TLS, int id, long long *access_hash, int *date, int *admin, int *user_id, void *key, void *g_key, void *first_key_id, int *state, int *ttl, int *layer, int *in_seq_no, int *last_in_seq_no, int *out_seq_no, long long *key_fingerprint, int flags);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
