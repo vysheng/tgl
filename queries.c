@@ -4279,7 +4279,7 @@ static void check_authorized (struct tgl_state *TLS, void *arg) {
   int i;
   int ok = 1;
   for (i = 0; i <= TLS->max_dc_num; i++) {
-    if (TLS->DC_list[i] && !tgl_authorized_dc (TLS, TLS->DC_list[i])) {
+    if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i]) && !tgl_authorized_dc (TLS, TLS->DC_list[i])) {
       ok = 0;
       break;
     }
@@ -4298,7 +4298,7 @@ void tgl_login (struct tgl_state *TLS) {
   int i;
   int ok = 1;
   for (i = 0; i <= TLS->max_dc_num; i++) {
-    if (TLS->DC_list[i] && !tgl_authorized_dc (TLS, TLS->DC_list[i])) {
+    if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i]) && !tgl_authorized_dc (TLS, TLS->DC_list[i])) {
       ok = 0;
       break;
     }
