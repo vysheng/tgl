@@ -107,7 +107,7 @@ static inline void tgl_free_secure (void *ptr, int size) {
 static inline void hexdump (void *ptr, void *end_ptr) {
   int total = 0;
   unsigned char *bptr = (unsigned char *)ptr;
-  while (bptr < end_ptr) {
+  while (bptr < (unsigned char *)end_ptr) {
     fprintf (stderr, "%02x", (int)*bptr);
     bptr ++;
     total ++;
