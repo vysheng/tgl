@@ -84,11 +84,22 @@ extern struct tgl_allocator tgl_allocator_release;
 extern struct tgl_allocator tgl_allocator_debug;
 struct tgl_state;
 
+enum tgl_value_type {
+    tgl_phone_number,           // user phone number
+    tgl_code,                   // telegram login code, or 'call' for phone call request
+    tgl_register_info,          // "Y/n" register?, first name, last name
+    tgl_new_password,           // new pass, confirm new pass
+    tgl_cur_and_new_password,   // curr pass, new pass, confirm new pass
+    tgl_cur_password,           // current pass
+    tgl_bot_hash
+};
+
 struct tgl_update_callback {
   void (*new_msg)(struct tgl_state *TLS, struct tgl_message *M);
   void (*marked_read)(struct tgl_state *TLS, int num, struct tgl_message *list[]);
   void (*logprintf)(const char *format, ...)  __attribute__ ((format (printf, 1, 2)));
-  void (*get_string)(struct tgl_state *TLS, const char *prompt, int flags, void (*callback)(struct tgl_state *TLS, const char *string, void *arg), void *arg);
+  void (*get_values)(struct tgl_state *TLS, enum tgl_value_type type, const char *prompt, int num_values,
+          void (*callback)(struct tgl_state *TLS, const char *string[], void *arg), void *arg);
   void (*logged_in)(struct tgl_state *TLS);
   void (*started)(struct tgl_state *TLS);
   void (*type_notification)(struct tgl_state *TLS, struct tgl_user *U, enum tgl_typing_status status);
