@@ -1349,6 +1349,7 @@ struct tgl_dc *tglmp_alloc_dc (struct tgl_state *TLS, int flags, int id, char *i
     DC->ev = TLS->timer_methods->alloc (TLS, regen_temp_key_gw, DC);
     TLS->timer_methods->insert (DC->ev, 0);
   }
+  assert(TLS->DC_list[id]->id == id);
 
   struct tgl_dc *DC = TLS->DC_list[id];
 

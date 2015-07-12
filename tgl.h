@@ -25,6 +25,7 @@
 #include <stdlib.h>
 
 #define TGL_MAX_DC_NUM 100
+#define TGL_DC_AUTO_ID 0
 #define TG_SERVER_1 "149.154.175.50"
 #define TG_SERVER_2 "149.154.167.51"
 #define TG_SERVER_3 "149.154.175.100"
