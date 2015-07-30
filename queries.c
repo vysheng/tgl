@@ -4269,7 +4269,7 @@ void tgl_bot_hash_cb (struct tgl_state *TLS, const char *code[], void *arg) {
 void tgl_sign_in (struct tgl_state *TLS) {
   if (!tgl_signed_dc (TLS, TLS->DC_working)) {
     if (TLS->is_bot) {
-      TLS->callback.get_values (TLS, tgl_bot_hash, "bot hash:", 0, tgl_bot_hash_cb, NULL);
+      TLS->callback.get_values (TLS, tgl_bot_hash, "bot hash:", 1, tgl_bot_hash_cb, NULL);
     } else {
       TLS->callback.get_values (TLS, tgl_phone_number, "phone number:", 1, tgl_sign_in_phone, NULL);
     }
