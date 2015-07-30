@@ -1,4 +1,4 @@
-/* 
+/*
     This file is part of tgl-library
 
     This library is free software; you can redistribute it and/or
@@ -160,7 +160,7 @@ struct tgl_state {
   int date;
   int seq;
   int binlog_enabled;
-  int test_mode; 
+  int test_mode;
   int verbosity;
   int unread_messages;
   int active_queries;
@@ -168,7 +168,7 @@ struct tgl_state {
   int started;
   int disable_link_preview;
 
-  long long locks; 
+  long long locks;
   struct tgl_dc *DC_list[TGL_MAX_DC_NUM];
   struct tgl_dc *DC_working;
   int max_dc_num;
@@ -224,8 +224,8 @@ struct tgl_state {
 
   struct tree_query *queries_tree;
 
-  char *base_path; 
-  
+  char *base_path;
+
   struct tree_user *online_updates;
 
   struct tgl_timer *online_updates_timer;
@@ -247,6 +247,10 @@ struct tgl_state {
 };
 #pragma pack(pop)
 //extern struct tgl_state tgl_state;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void tgl_reopen_binlog_for_writing (struct tgl_state *TLS);
 void tgl_replay_log (struct tgl_state *TLS);
@@ -365,8 +369,8 @@ void tgl_do_set_password (struct tgl_state *TLS, const char *hint, int hint_len,
 struct tl_ds_reply_markup;
 
 // send plain text message to peer id
-// flags is combination of TGL_SEND_MSG_FLAG_* 
-// reply markup can be NULL 
+// flags is combination of TGL_SEND_MSG_FLAG_*
+// reply markup can be NULL
 void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *text, int text_len, unsigned long long flags, struct tl_ds_reply_markup *reply_markup, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
 
 // sends plain text reply on message *reply_id*
@@ -391,14 +395,14 @@ void tgl_do_forward_message (struct tgl_state *TLS, tgl_user_or_chat_id_t id, in
 // messages can not be encrypted and peer can not be secret chat
 void tgl_do_forward_messages (struct tgl_state *TLS, tgl_user_or_chat_id_t id, int size, const int ids[], unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int count, struct tgl_message *ML[]), void *callback_extra);
 
-// sends contact to another user. 
+// sends contact to another user.
 // This contact may be or may not be telegram user
 void tgl_do_send_contact (struct tgl_state *TLS, tgl_peer_id_t id, const char *phone, int phone_len, const char *first_name, int first_name_len, const char *last_name, int last_name_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
 
-// reply on message *reply_id* with contact 
+// reply on message *reply_id* with contact
 void tgl_do_reply_contact (struct tgl_state *TLS, int reply_id, const char *phone, int phone_len, const char *first_name, int first_name_len, const char *last_name, int last_name_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra);
 
-// sends media from message *msg_id* to another dialog 
+// sends media from message *msg_id* to another dialog
 // a bit different from forwarding message with media
 // secret message media can be forwarded to secret chats
 // and non-secret - to non-secret chats and users
@@ -443,7 +447,7 @@ void tgl_do_set_chat_photo (struct tgl_state *TLS, tgl_chat_id_t chat_id, const 
 // sets chat title
 void tgl_do_rename_chat (struct tgl_state *TLS, tgl_chat_id_t id, const char *new_title, int new_title_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 
-// requests full info about chat *id*. 
+// requests full info about chat *id*.
 // if *offline_mode* is set no actual query is sent
 void tgl_do_get_chat_info (struct tgl_state *TLS, tgl_chat_id_t id, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_chat *C), void *callback_extra);
 
@@ -471,7 +475,7 @@ void tgl_do_import_chat_link (struct tgl_state *TLS, const char *link, int link_
 
 /* {{{ WORKING WITH USERS */
 
-// requests full info about user *id*. 
+// requests full info about user *id*.
 // if *offline_mode* is set no actual query is sent
 void tgl_do_get_user_info (struct tgl_state *TLS, tgl_user_id_t id, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra);
 
@@ -508,7 +512,7 @@ void tgl_do_set_encr_chat_ttl (struct tgl_state *TLS, struct tgl_secret_chat *E,
 // returns secret chat fingerprint
 int tgl_do_visualize_key (struct tgl_state *TLS, tgl_secret_chat_id_t id, unsigned char buf[16]);
 
-// requests creation of secret chat with user id 
+// requests creation of secret chat with user id
 void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_user_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra);
 /* }}} */
 
@@ -579,7 +583,7 @@ void tgl_do_get_message (struct tgl_state *TLS, long long id, void (*callback)(s
 /* {{{ EXTENDED QUERIES USE WITH CAUTION */
 // sends query with extended text syntax
 // use only for debug or when you known what are you doing
-// since answer is not interpretated by library in any way 
+// since answer is not interpretated by library in any way
 void tgl_do_send_extf (struct tgl_state *TLS, const char *data, int data_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *data), void *callback_extra);
 int tglf_extf_autocomplete (struct tgl_state *TLS, const char *text, int text_len, int index, char **R, char *data, int data_len);
 struct paramed_type *tglf_extf_store (struct tgl_state *TLS, const char *data, int data_len);
@@ -589,4 +593,9 @@ char *tglf_extf_fetch (struct tgl_state *TLS, struct paramed_type *T);
 /* {{{ BOT */
 void tgl_do_start_bot (struct tgl_state *TLS, tgl_peer_id_t bot, tgl_peer_id_t chat, const char *str, int str_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 /* }}} */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
