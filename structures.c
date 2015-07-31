@@ -602,6 +602,8 @@ struct tgl_document *tglf_fetch_alloc_video_new (struct tgl_state *TLS, struct t
   
   tgl_document_insert (TLS, D);
 
+  D->flags = TGLDF_VIDEO;
+
   D->access_hash = DS_LVAL (DS_V->access_hash);
   D->user_id = DS_LVAL (DS_V->user_id);
   D->date = DS_LVAL (DS_V->date);
