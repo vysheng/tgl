@@ -1717,7 +1717,9 @@ static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, cons
 void tgl_do_send_document (struct tgl_state *TLS, tgl_peer_id_t to_id, const char *file_name, const char *caption, int caption_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   if (flags & TGL_SEND_MSG_FLAG_DOCUMENT_AUTO) {
     char *mime_type = tg_mime_by_filename (file_name);
-    if (!memcmp (mime_type, "image/", 6)) {
+    if (strcmp (mime_type, "image/gif") == 0) {
+      flags |= TGL_SEND_MSG_FLAG_DOCUMENT_ANIMATED;
+    } else if (!memcmp (mime_type, "image/", 6)) {
       flags |= TGL_SEND_MSG_FLAG_DOCUMENT_PHOTO;
     } else if (!memcmp (mime_type, "video/", 6)) {
       flags |= TGLDF_VIDEO;
