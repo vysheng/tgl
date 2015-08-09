@@ -2476,9 +2476,8 @@ void tgl_do_load_document_thumb (struct tgl_state *TLS, struct tgl_document *vid
   tgl_do_load_photo_size (TLS, &video->thumb, callback, callback_extra);
 }
 
-void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
+static void _tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, struct download *D, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
   assert (V);
-  struct download *D = talloc0 (sizeof (*D));
   D->offset = 0;
   D->size = V->size;
   D->id = V->id;
@@ -2486,13 +2485,7 @@ void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (
   D->dc = V->dc_id;
   D->name = 0;
   D->fd = -1;
-  if (V->flags & TGLDF_VIDEO) {
-    D->type = CODE_input_video_file_location;
-  } else if (V->flags & TGLDF_AUDIO) {
-    D->type = CODE_input_audio_file_location;
-  } else {
-    D->type = CODE_input_document_file_location;
-  }
+  
   if (V->mime_type) {
     char *r = tg_extension_by_mime (V->mime_type);
     if (r) {
@@ -2500,6 +2493,30 @@ void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (
     }
   }
   load_next_part (TLS, D, callback, callback_extra);
+}
+
+void tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
+  
+  struct download *D = talloc0 (sizeof (*D));
+  D->type = CODE_input_document_file_location;
+  
+  _tgl_do_load_document (TLS, V, D, callback, callback_extra);
+}
+
+void tgl_do_load_video (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
+
+  struct download *D = talloc0 (sizeof (*D));
+  D->type = CODE_input_video_file_location;
+  
+  _tgl_do_load_document (TLS, V, D, callback, callback_extra);
+}
+
+void tgl_do_load_audio (struct tgl_state *TLS, struct tgl_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
+  
+  struct download *D = talloc0 (sizeof (*D));
+  D->type = CODE_input_audio_file_location;
+
+  _tgl_do_load_document (TLS, V, D, callback, callback_extra);
 }
 
 void tgl_do_load_encr_document (struct tgl_state *TLS, struct tgl_encr_document *V, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
