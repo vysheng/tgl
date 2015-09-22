@@ -19,6 +19,7 @@ if you want to use provided net/timers then install libevent and add --enable-li
 
 Then,
 
+     autoheader
      autoconf
      ./configure
      make
