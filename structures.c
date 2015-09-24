@@ -30,7 +30,7 @@
 //#include "telegram.h"
 #include "tree.h"
 #include <openssl/aes.h>
-#include <openssl/bn.h>
+#include "crypto/bn.h"
 #include <openssl/sha.h>
 #include "queries.h"
 #include "tgl-binlog.h"
@@ -2395,7 +2395,7 @@ void tgl_free_all (struct tgl_state *TLS) {
   for (i = 0; i <= TLS->max_dc_num; i++) if (TLS->DC_list[i]) {
     tgls_free_dc (TLS, TLS->DC_list[i]);
   }
-  BN_CTX_free (TLS->BN_ctx);
+  TGLC_bn_ctx_free (TLS->TGLC_bn_ctx);
   tgls_free_pubkey (TLS);
 
   if (TLS->ev_login) { TLS->timer_methods->free (TLS->ev_login); }

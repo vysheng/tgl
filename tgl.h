@@ -20,6 +20,7 @@
 #ifndef __TGL_H__
 #define __TGL_H__
 
+#include "crypto/bn.h"
 #include "tgl-layout.h"
 #include <string.h>
 #include <stdlib.h>
@@ -166,7 +167,7 @@ struct tgl_state {
   tgl_peer_id_t our_id;
   int encr_root;
   unsigned char *encr_prime;
-  void *encr_prime_bn;
+  TGLC_bn *encr_prime_bn;
   int encr_param_version;
   int pts;
   int qts;
@@ -207,7 +208,7 @@ struct tgl_state {
   long long rsa_key_fingerprint[TGL_MAX_RSA_KEYS_NUM];
   int rsa_key_num;
 
-  struct bignum_ctx *BN_ctx;
+  TGLC_bn_ctx *TGLC_bn_ctx;
 
   struct tgl_allocator *allocator;
 

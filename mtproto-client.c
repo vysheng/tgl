@@ -266,11 +266,11 @@ static int send_req_pq_temp_packet (struct tgl_state *TLS, struct connection *c)
 // req_DH_params#d712e4be nonce:int128 server_nonce:int128 p:string q:string public_key_fingerprint:long encrypted_data:string = Server_DH_Params;
 // p_q_inner_data#83c95aec pq:string p:string q:string nonce:int128 server_nonce:int128 new_nonce:int256 = P_Q_inner_data;
 // p_q_inner_data_temp#3c6a84d4 pq:string p:string q:string nonce:int128 server_nonce:int128 new_nonce:int256 expires_in:int = P_Q_inner_data;
-static void send_req_dh_packet (struct tgl_state *TLS, struct connection *c, BIGNUM *pq, int temp_key) {
+static void send_req_dh_packet (struct tgl_state *TLS, struct connection *c, TGLC_bn *pq, int temp_key) {
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
 
-  BIGNUM *p = BN_new ();
-  BIGNUM *q = BN_new ();
+  TGLC_bn *p = TGLC_bn_new ();
+  TGLC_bn *q = TGLC_bn_new ();
   assert (bn_factorize (pq, p, q) >= 0);
 
   clear_packet ();
@@ -302,8 +302,8 @@ static void send_req_dh_packet (struct tgl_state *TLS, struct connection *c, BIG
   out_long (TLS->rsa_key_fingerprint[DC->rsa_key_idx]);
   out_cstring ((char *) encrypt_buffer, l);
 
-  BN_free (p);
-  BN_free (q);
+  TGLC_bn_free (p);
+  TGLC_bn_free (q);
   DC->state = temp_key ? st_reqdh_sent_temp : st_reqdh_sent;
   rpc_send_packet (TLS, c);
 }
@@ -312,7 +312,7 @@ static void send_req_dh_packet (struct tgl_state *TLS, struct connection *c, BIG
 /* {{{ SEND DH PARAMS */
 // set_client_DH_params#f5045f1f nonce:int128 server_nonce:int128 encrypted_data:string = Set_client_DH_params_answer;
 // client_DH_inner_data#6643b654 nonce:int128 server_nonce:int128 retry_id:long g_b:string = Client_DH_Inner_Data
-static void send_dh_params (struct tgl_state *TLS, struct connection *c, BIGNUM *dh_prime, BIGNUM *g_a, int g, int temp_key) {
+static void send_dh_params (struct tgl_state *TLS, struct connection *c, TGLC_bn *dh_prime, TGLC_bn *g_a, int g, int temp_key) {
   struct tgl_dc *DC = TLS->net_methods->get_dc (c);
 
   clear_packet ();
@@ -322,34 +322,34 @@ static void send_dh_params (struct tgl_state *TLS, struct connection *c, BIGNUM 
   out_ints ((int *) DC->server_nonce, 4);
   out_long (0);
 
-  BIGNUM *dh_g = BN_new ();
-  ensure (BN_set_word (dh_g, g));
+  TGLC_bn *dh_g = TGLC_bn_new ();
+  ensure (TGLC_bn_set_word (dh_g, g));
 
   static unsigned char s_power[256];
   tglt_secure_random (s_power, 256);
-  BIGNUM *dh_power = BN_bin2bn ((unsigned char *)s_power, 256, 0);
+  TGLC_bn *dh_power = TGLC_bn_bin2bn ((unsigned char *)s_power, 256, 0);
   ensure_ptr (dh_power);
 
-  BIGNUM *y = BN_new ();
+  TGLC_bn *y = TGLC_bn_new ();
   ensure_ptr (y);
-  ensure (BN_mod_exp (y, dh_g, dh_power, dh_prime, TLS->BN_ctx));
+  ensure (TGLC_bn_mod_exp (y, dh_g, dh_power, dh_prime, TLS->TGLC_bn_ctx));
   out_bignum (y);
-  BN_free (y);
+  TGLC_bn_free (y);
 
-  BIGNUM *auth_key_num = BN_new ();
-  ensure (BN_mod_exp (auth_key_num, g_a, dh_power, dh_prime, TLS->BN_ctx));
-  int l = BN_num_bytes (auth_key_num);
+  TGLC_bn *auth_key_num = TGLC_bn_new ();
+  ensure (TGLC_bn_mod_exp (auth_key_num, g_a, dh_power, dh_prime, TLS->TGLC_bn_ctx));
+  int l = TGLC_bn_num_bytes (auth_key_num);
   assert (l >= 250 && l <= 256);
-  assert (BN_bn2bin (auth_key_num, (unsigned char *)(temp_key ? DC->temp_auth_key : DC->auth_key)));
+  assert (TGLC_bn_bn2bin (auth_key_num, (unsigned char *)(temp_key ? DC->temp_auth_key : DC->auth_key)));
   if (l < 256) {
     char *key = temp_key ? DC->temp_auth_key : DC->auth_key;
     memmove (key + 256 - l, key, l);
     memset (key, 0, 256 - l);
   }
 
-  BN_free (dh_power);
-  BN_free (auth_key_num);
-  BN_free (dh_g);
+  TGLC_bn_free (dh_power);
+  TGLC_bn_free (auth_key_num);
+  TGLC_bn_free (dh_g);
 
   sha1 ((unsigned char *) (packet_buffer + 5), (packet_ptr - packet_buffer - 5) * 4, (unsigned char *) packet_buffer);
 
@@ -395,7 +395,7 @@ static int process_respq_answer (struct tgl_state *TLS, struct connection *c, ch
   }
   fetch_ints (DC->server_nonce, 4);
 
-  BIGNUM *pq = BN_new ();
+  TGLC_bn *pq = TGLC_bn_new ();
   assert (fetch_bignum (pq) >= 0);
 
   assert (fetch_int ()  == CODE_vector);
@@ -424,7 +424,7 @@ static int process_respq_answer (struct tgl_state *TLS, struct connection *c, ch
 
   send_req_dh_packet (TLS, c, pq, temp_key);
 
-  BN_free (pq);
+  TGLC_bn_free (pq);
   return 1;
 }
 /* }}} */
@@ -506,8 +506,8 @@ static int process_dh_answer (struct tgl_state *TLS, struct connection *c, char 
   assert (!memcmp (tmp, DC->server_nonce, 16));
   int g = fetch_int ();
 
-  BIGNUM *dh_prime = BN_new ();
-  BIGNUM *g_a = BN_new ();
+  TGLC_bn *dh_prime = TGLC_bn_new ();
+  TGLC_bn *g_a = TGLC_bn_new ();
   assert (fetch_bignum (dh_prime) > 0);
   assert (fetch_bignum (g_a) > 0);
 
@@ -539,8 +539,8 @@ static int process_dh_answer (struct tgl_state *TLS, struct connection *c, char 
 
   send_dh_params (TLS, c, dh_prime, g_a, g, temp_key);
 
-  BN_free (dh_prime);
-  BN_free (g_a);
+  TGLC_bn_free (dh_prime);
+  TGLC_bn_free (g_a);
 
   return 1;
 }

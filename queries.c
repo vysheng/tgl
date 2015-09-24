@@ -41,7 +41,7 @@
 #include "tgl-structures.h"
 //#include "interface.h"
 //#include "net.h"
-#include <openssl/bn.h>
+#include "crypto/bn.h"
 #include <openssl/rand.h>
 #include <openssl/aes.h>
 #include <openssl/sha.h>

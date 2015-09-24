@@ -23,7 +23,7 @@
 
 #include <string.h>
 #include <openssl/rsa.h>
-#include <openssl/bn.h>
+#include "crypto/bn.h"
 #include <openssl/aes.h>
 #include <stdio.h>
 #include <assert.h>
@@ -115,10 +115,10 @@ struct encrypted_message {
 
 #pragma pack(pop)
 
-//BN_CTX *BN_ctx;
+//TGLC_bn_ctx *bn_ctx;
 
 void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int password_length);
-int tgl_serialize_bignum (BIGNUM *b, char *buffer, int maxlen);
+int tgl_serialize_bignum (TGLC_bn *b, char *buffer, int maxlen);
 long long tgl_do_compute_rsa_key_fingerprint (RSA *key);
 
 #define packet_buffer tgl_packet_buffer
@@ -168,7 +168,7 @@ static inline void out_string (const char *str) {
   out_cstring (str, strlen (str));
 }
 
-static inline void out_bignum (BIGNUM *n) {
+static inline void out_bignum (TGLC_bn *n) {
   int l = tgl_serialize_bignum (n, (char *)packet_ptr, (PACKET_BUFFER_SIZE - (packet_ptr - packet_buffer)) * 4);
   assert (l > 0);
   packet_ptr += l >> 2;
@@ -288,7 +288,7 @@ static inline long have_prefetch_ints (void) {
   return in_end - in_ptr;
 }
 
-int tgl_fetch_bignum (BIGNUM *x);
+int tgl_fetch_bignum (TGLC_bn *x);
 #define fetch_bignum tgl_fetch_bignum
 
 static inline int fetch_int (void) {
@@ -357,8 +357,8 @@ static inline int in_remaining (void) {
 
 //int get_random_bytes (unsigned char *buf, int n);
 
-int tgl_pad_rsa_encrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, BIGNUM *N, BIGNUM *E);
-int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, BIGNUM *N, BIGNUM *D);
+int tgl_pad_rsa_encrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, TGLC_bn *N, TGLC_bn *E);
+int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, TGLC_bn *N, TGLC_bn *D);
 
 //extern long long rsa_encrypted_chunks, rsa_decrypted_chunks;
 

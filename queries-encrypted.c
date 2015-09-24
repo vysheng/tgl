@@ -515,7 +515,7 @@ static struct query_methods send_encr_request_methods  = {
 //int encr_root;
 //unsigned char *encr_prime;
 //int encr_param_version;
-//static BN_CTX *ctx;
+//static TGLC_bn_ctx *ctx;
 
 void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char *random, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra) {
   int i;
@@ -533,28 +533,28 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
     return; 
   } // Already generated key for this chat
   assert (E->g_key);
-  assert (TLS->BN_ctx);
+  assert (TLS->TGLC_bn_ctx);
   unsigned char random_here[256];
   tglt_secure_random (random_here, 256);
   for (i = 0; i < 256; i++) {
     random[i] ^= random_here[i];
   }
-  BIGNUM *b = BN_bin2bn (random, 256, 0);
+  TGLC_bn *b = TGLC_bn_bin2bn (random, 256, 0);
   ensure_ptr (b);
-  BIGNUM *g_a = BN_bin2bn (E->g_key, 256, 0);
+  TGLC_bn *g_a = TGLC_bn_bin2bn (E->g_key, 256, 0);
   ensure_ptr (g_a);
   assert (tglmp_check_g_a (TLS, TLS->encr_prime_bn, g_a) >= 0);
   //if (!ctx) {
-  //  ctx = BN_CTX_new ();
+  //  ctx = TGLC_bn_ctx_new ();
   //  ensure_ptr (ctx);
   //}
-  BIGNUM *p = TLS->encr_prime_bn;
-  BIGNUM *r = BN_new ();
+  TGLC_bn *p = TLS->encr_prime_bn;
+  TGLC_bn *r = TGLC_bn_new ();
   ensure_ptr (r);
-  ensure (BN_mod_exp (r, g_a, b, p, TLS->BN_ctx));
+  ensure (TGLC_bn_mod_exp (r, g_a, b, p, TLS->TGLC_bn_ctx));
   static unsigned char kk[256];
   memset (kk, 0, sizeof (kk));
-  BN_bn2bin (r, kk + (256 - BN_num_bytes (r)));
+  TGLC_bn_bn2bin (r, kk + (256 - TGLC_bn_num_bytes (r)));
   static unsigned char sha_buffer[20];
   sha1 (kk, 256, sha_buffer);
 
@@ -579,40 +579,40 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
   out_int (tgl_get_peer_id (E->id));
   out_long (E->access_hash);
   
-  ensure (BN_set_word (g_a, TLS->encr_root));
-  ensure (BN_mod_exp (r, g_a, b, p, TLS->BN_ctx));
+  ensure (TGLC_bn_set_word (g_a, TLS->encr_root));
+  ensure (TGLC_bn_mod_exp (r, g_a, b, p, TLS->TGLC_bn_ctx));
   static unsigned char buf[256];
   memset (buf, 0, sizeof (buf));
-  BN_bn2bin (r, buf + (256 - BN_num_bytes (r)));
+  TGLC_bn_bn2bin (r, buf + (256 - TGLC_bn_num_bytes (r)));
   out_cstring ((void *)buf, 256);
 
   out_long (E->key_fingerprint);
-  BN_clear_free (b);
-  BN_clear_free (g_a);
-  BN_clear_free (r);
+  TGLC_bn_clear_free (b);
+  TGLC_bn_clear_free (g_a);
+  TGLC_bn_clear_free (r);
 
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_encr_accept_methods, E, callback, callback_extra);
 }
 
 void tgl_do_create_keys_end (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   assert (TLS->encr_prime);
-  BIGNUM *g_b = BN_bin2bn (U->g_key, 256, 0);
+  TGLC_bn *g_b = TGLC_bn_bin2bn (U->g_key, 256, 0);
   ensure_ptr (g_b);
   assert (tglmp_check_g_a (TLS, TLS->encr_prime_bn, g_b) >= 0);
   
-  BIGNUM *p = TLS->encr_prime_bn; 
+  TGLC_bn *p = TLS->encr_prime_bn;
   ensure_ptr (p);
-  BIGNUM *r = BN_new ();
+  TGLC_bn *r = TGLC_bn_new ();
   ensure_ptr (r);
-  BIGNUM *a = BN_bin2bn ((void *)U->key, 256, 0);
+  TGLC_bn *a = TGLC_bn_bin2bn ((void *)U->key, 256, 0);
   ensure_ptr (a);
-  ensure (BN_mod_exp (r, g_b, a, p, TLS->BN_ctx));
+  ensure (TGLC_bn_mod_exp (r, g_b, a, p, TLS->TGLC_bn_ctx));
 
   unsigned char *t = talloc (256);
   memcpy (t, U->key, 256);
   
   memset (U->key, 0, sizeof (U->key));
-  BN_bn2bin (r, (void *)(((char *)(U->key)) + (256 - BN_num_bytes (r))));
+  TGLC_bn_bn2bin (r, (void *)(((char *)(U->key)) + (256 - TGLC_bn_num_bytes (r))));
   
   static unsigned char sha_buffer[20];
   sha1 ((void *)U->key, 256, sha_buffer);
@@ -625,9 +625,9 @@ void tgl_do_create_keys_end (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   memcpy (U->first_key_sha, sha_buffer, 20);
   tfree_secure (t, 256);
   
-  BN_clear_free (g_b);
-  BN_clear_free (r);
-  BN_clear_free (a);
+  TGLC_bn_clear_free (g_b);
+  TGLC_bn_clear_free (r);
+  TGLC_bn_clear_free (a);
 }
 
 void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char *random, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra) {
@@ -638,27 +638,27 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   for (i = 0; i < 256; i++) {
     random[i] ^= random_here[i];
   }
-  BIGNUM *a = BN_bin2bn (random, 256, 0);
+  TGLC_bn *a = TGLC_bn_bin2bn (random, 256, 0);
   ensure_ptr (a);
-  BIGNUM *p = BN_bin2bn (TLS->encr_prime, 256, 0); 
+  TGLC_bn *p = TGLC_bn_bin2bn (TLS->encr_prime, 256, 0);
   ensure_ptr (p);
  
-  BIGNUM *g = BN_new ();
+  TGLC_bn *g = TGLC_bn_new ();
   ensure_ptr (g);
 
-  ensure (BN_set_word (g, TLS->encr_root));
+  ensure (TGLC_bn_set_word (g, TLS->encr_root));
 
-  BIGNUM *r = BN_new ();
+  TGLC_bn *r = TGLC_bn_new ();
   ensure_ptr (r);
 
-  ensure (BN_mod_exp (r, g, a, p, TLS->BN_ctx));
+  ensure (TGLC_bn_mod_exp (r, g, a, p, TLS->TGLC_bn_ctx));
 
-  BN_clear_free (a);
+  TGLC_bn_clear_free (a);
 
   static char g_a[256];
   memset (g_a, 0, 256);
 
-  BN_bn2bin (r, (void *)(g_a + (256 - BN_num_bytes (r))));
+  TGLC_bn_bn2bin (r, (void *)(g_a + (256 - TGLC_bn_num_bytes (r))));
   
   int t = lrand48 ();
   while (tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t))) {
@@ -689,9 +689,9 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   out_cstring (g_a, 256);
   //write_secret_chat_file ();
   
-  BN_clear_free (g);
-  BN_clear_free (p);
-  BN_clear_free (r);
+  TGLC_bn_clear_free (g);
+  TGLC_bn_clear_free (p);
+  TGLC_bn_clear_free (r);
 
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_encr_request_methods, E, callback, callback_extra);
 }

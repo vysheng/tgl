@@ -33,10 +33,8 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <netdb.h>
-#include <openssl/bn.h>
 #include <openssl/rand.h>
 #include <openssl/pem.h>
-#include <openssl/aes.h>
 #include <openssl/sha.h>
 
 #include "mtproto-common.h"
@@ -141,12 +139,12 @@ void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int pa
       tfree_secure (a, password_length);
     }
   }
-  TLS->BN_ctx = BN_CTX_new ();
-  ensure_ptr (TLS->BN_ctx);
+  TLS->TGLC_bn_ctx = TGLC_bn_ctx_new ();
+  ensure_ptr (TLS->TGLC_bn_ctx);
 }
 
-int tgl_serialize_bignum (BIGNUM *b, char *buffer, int maxlen) {
-  int itslen = BN_num_bytes (b);
+int tgl_serialize_bignum (TGLC_bn *b, char *buffer, int maxlen) {
+  int itslen = TGLC_bn_num_bytes (b);
   int reqlen;
   if (itslen < 254) {
     reqlen = itslen + 1;
@@ -165,7 +163,7 @@ int tgl_serialize_bignum (BIGNUM *b, char *buffer, int maxlen) {
     *(int *)buffer = (itslen << 8) + 0xfe;
     buffer += 4;
   }
-  int l = BN_bn2bin (b, (unsigned char *)buffer);
+  int l = TGLC_bn_bn2bin (b, (unsigned char *)buffer);
   assert (l == itslen);
   buffer += l;
   while (pad --> 0) {
@@ -239,72 +237,74 @@ void tgl_out_data (const void *data, long len) {
 
 int *tgl_in_ptr, *tgl_in_end;
 
-int tgl_fetch_bignum (BIGNUM *x) {
+int tgl_fetch_bignum (TGLC_bn *x) {
   int l = prefetch_strlen ();
   if (l < 0) {
     return l;
   }
   char *str = fetch_str (l);
-  assert (BN_bin2bn ((unsigned char *) str, l, x) == x);
+  assert (TGLC_bn_bin2bn ((unsigned char *) str, l, x) == x);
   return l;
 }
 
-int tgl_pad_rsa_encrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, BIGNUM *N, BIGNUM *E) {
+int tgl_pad_rsa_encrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, TGLC_bn *N, TGLC_bn *E) {
   int pad = (255000 - from_len - 32) % 255 + 32;
   int chunks = (from_len + pad) / 255;
-  int bits = BN_num_bits (N);
+  int bits = TGLC_bn_num_bits (N);
   assert (bits >= 2041 && bits <= 2048);
   assert (from_len > 0 && from_len <= 2550);
   assert (size >= chunks * 256);
   assert (RAND_pseudo_bytes ((unsigned char *) from + from_len, pad) >= 0);
   int i;
-  BIGNUM x, y;
-  BN_init (&x);
-  BN_init (&y);
+  TGLC_bn *x = TGLC_bn_new ();
+  TGLC_bn *y = TGLC_bn_new ();
+  assert(x);
+  assert(y);
   rsa_encrypted_chunks += chunks;
   for (i = 0; i < chunks; i++) {
-    BN_bin2bn ((unsigned char *) from, 255, &x);
-    assert (BN_mod_exp (&y, &x, E, N, TLS->BN_ctx) == 1);
-    unsigned l = 256 - BN_num_bytes (&y);
+    TGLC_bn_bin2bn ((unsigned char *) from, 255, x);
+    assert (TGLC_bn_mod_exp (y, x, E, N, TLS->TGLC_bn_ctx) == 1);
+    unsigned l = 256 - TGLC_bn_num_bytes (y);
     assert (l <= 256);
     memset (to, 0, l);
-    BN_bn2bin (&y, (unsigned char *) to + l);
+    TGLC_bn_bn2bin (y, (unsigned char *) to + l);
     to += 256;
   }
-  BN_free (&x);
-  BN_free (&y);
+  TGLC_bn_free (x);
+  TGLC_bn_free (y);
   return chunks * 256;
 }
 
-int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, BIGNUM *N, BIGNUM *D) {
+int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, TGLC_bn *N, TGLC_bn *D) {
   if (from_len < 0 || from_len > 0x1000 || (from_len & 0xff)) {
     return -1;
   }
   int chunks = (from_len >> 8);
-  int bits = BN_num_bits (N);
+  int bits = TGLC_bn_num_bits (N);
   assert (bits >= 2041 && bits <= 2048);
   assert (size >= chunks * 255);
   int i;
-  BIGNUM x, y;
-  BN_init (&x);
-  BN_init (&y);
+  TGLC_bn *x = TGLC_bn_new ();
+  TGLC_bn *y = TGLC_bn_new ();
+  assert(x);
+  assert(y);
   for (i = 0; i < chunks; i++) {
     ++rsa_decrypted_chunks;
-    BN_bin2bn ((unsigned char *) from, 256, &x);
-    assert (BN_mod_exp (&y, &x, D, N, TLS->BN_ctx) == 1);
-    int l = BN_num_bytes (&y);
+    TGLC_bn_bin2bn ((unsigned char *) from, 256, x);
+    assert (TGLC_bn_mod_exp (y, x, D, N, TLS->TGLC_bn_ctx) == 1);
+    int l = TGLC_bn_num_bytes (y);
     if (l > 255) {
-      BN_free (&x);
-      BN_free (&y);
+      TGLC_bn_free (x);
+      TGLC_bn_free (y);
       return -1;
     }
     assert (l >= 0 && l <= 255);
     memset (to, 0, 255 - l);
-    BN_bn2bin (&y, (unsigned char *) to + 255 - l);
+    TGLC_bn_bn2bin (y, (unsigned char *) to + 255 - l);
     to += 255;
   }
-  BN_free (&x);
-  BN_free (&y);
+  TGLC_bn_free (x);
+  TGLC_bn_free (y);
   return chunks * 255;
 }
 

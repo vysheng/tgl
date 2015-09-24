@@ -32,7 +32,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <openssl/bn.h>
+#include "crypto/bn.h"
 
 #include "tgl-binlog.h"
 #include "mtproto-common.h"
@@ -130,14 +130,14 @@ void bl_do_set_our_id (struct tgl_state *TLS, tgl_peer_id_t id) /* {{{ */ {
 /* }}} */
 
 void bl_do_set_dh_params (struct tgl_state *TLS, int root, unsigned char prime[], int version) /* {{{ */ {
-  if (TLS->encr_prime) { tfree (TLS->encr_prime, 256); BN_free (TLS->encr_prime_bn); }
+  if (TLS->encr_prime) { tfree (TLS->encr_prime, 256); TGLC_bn_free (TLS->encr_prime_bn); }
 
   TLS->encr_root = root;
 
   TLS->encr_prime = talloc (256);
   memcpy (TLS->encr_prime, prime, 256);
-  TLS->encr_prime_bn = BN_new ();
-  BN_bin2bn ((void *)TLS->encr_prime, 256, TLS->encr_prime_bn);
+  TLS->encr_prime_bn = TGLC_bn_new ();
+  TGLC_bn_bin2bn ((void *)TLS->encr_prime, 256, TLS->encr_prime_bn);
   
   TLS->encr_param_version = version;
     
