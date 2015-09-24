@@ -44,7 +44,7 @@
 #include "crypto/bn.h"
 #include <openssl/rand.h>
 #include <openssl/aes.h>
-#include <openssl/sha.h>
+#include "crypto/sha.h"
 #include "crypto/md5.h"
 
 #include "no-preview.h"
@@ -67,8 +67,6 @@
 // https://lists.freebsd.org/pipermail/freebsd-standards/2003-June/000124.html
 #define EPROTO EIO
 #endif
-
-#define sha1 SHA1
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -3916,7 +3914,7 @@ static void tgl_do_act_set_password (struct tgl_state *TLS, const char *current_
     memcpy (s + current_salt_len, current_password, current_password_len);
     memcpy (s + current_salt_len + current_password_len, current_salt, current_salt_len);
 
-    SHA256 ((void *)s, 2 * current_salt_len + current_password_len, shab);
+    TGLC_sha256 ((void *)s, 2 * current_salt_len + current_password_len, shab);
     out_cstring ((void *)shab, 32);
   } else {
     out_string ("");
@@ -3937,7 +3935,7 @@ static void tgl_do_act_set_password (struct tgl_state *TLS, const char *current_
     memcpy (s + l, new_password, new_password_len);
     memcpy (s + l + new_password_len, d, l);
 
-    SHA256 ((void *)s, 2 * l + new_password_len, shab);
+    TGLC_sha256 ((void *)s, 2 * l + new_password_len, shab);
 
     out_cstring (d, l);
     out_cstring ((void *)shab, 32);
@@ -4113,7 +4111,7 @@ static void tgl_pwd_got (struct tgl_state *TLS, const char *pwd[], void *_T) {
 
     memcpy (s + l + r, E->current_salt, l);
 
-    SHA256 ((void *)s, 2 * l + r, shab);
+    TGLC_sha256 ((void *)s, 2 * l + r, shab);
     out_cstring ((void *)shab, 32);
   } else {
     out_string ("");

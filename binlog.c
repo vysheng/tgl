@@ -51,7 +51,7 @@
 #include "tgl-structures.h"
 #include "tgl-methods-in.h"
 
-#include <openssl/sha.h>
+#include "crypto/sha.h"
 
 static int mystreq1 (const char *a, const char *b, int l) {
   if ((int)strlen (a) != l) { return 1; }
@@ -108,7 +108,7 @@ void bl_do_set_auth_key (struct tgl_state *TLS, int num, unsigned char *buf) /* 
   memcpy (TLS->DC_list[num]->auth_key, buf, 256);
   
   static unsigned char sha1_buffer[20];
-  SHA1 ((void *)TLS->DC_list[num]->auth_key, 256, sha1_buffer);
+  TGLC_sha1 ((void *)TLS->DC_list[num]->auth_key, 256, sha1_buffer);
   TLS->DC_list[num]->auth_key_id = *(long long *)(sha1_buffer + 12);
 
   TLS->DC_list[num]->flags |= TGLDCF_AUTHORIZED;
@@ -516,7 +516,7 @@ void bl_do_encr_chat_exchange (struct tgl_state *TLS, tgl_peer_id_t id, long lon
   case tgl_sce_accepted:
     memcpy (P->encr_chat.exchange_key, key, 256);
   
-    SHA1 ((unsigned char *)P->encr_chat.exchange_key, 256, sha_buffer);
+    TGLC_sha1 ((unsigned char *)P->encr_chat.exchange_key, 256, sha_buffer);
     P->encr_chat.exchange_key_fingerprint = *(long long *)(sha_buffer + 12);
     break;
   case tgl_sce_committed:
@@ -525,7 +525,7 @@ void bl_do_encr_chat_exchange (struct tgl_state *TLS, tgl_peer_id_t id, long lon
 
     memcpy (P->encr_chat.key, key, 256);
   
-    SHA1 ((unsigned char *)P->encr_chat.key, 256, sha_buffer);
+    TGLC_sha1 ((unsigned char *)P->encr_chat.key, 256, sha_buffer);
     P->encr_chat.key_fingerprint = *(long long *)(sha_buffer + 12);
     break;
   case tgl_sce_confirmed:

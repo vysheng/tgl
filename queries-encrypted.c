@@ -12,26 +12,26 @@ static char *encrypt_decrypted_message (struct tgl_secret_chat *E) {
   static unsigned char sha1d_buffer[20];
   int x = *(encr_ptr);  
   assert (x >= 0 && !(x & 3));
-  sha1 ((void *)encr_ptr, 4 + x, sha1a_buffer);
+  TGLC_sha1 ((void *)encr_ptr, 4 + x, sha1a_buffer);
   memcpy (msg_key, sha1a_buffer + 4, 16);
  
   static unsigned char buf[64];
   memcpy (buf, msg_key, 16);
   memcpy (buf + 16, E->key, 32);
-  sha1 (buf, 48, sha1a_buffer);
+  TGLC_sha1 (buf, 48, sha1a_buffer);
   
   memcpy (buf, E->key + 8, 16);
   memcpy (buf + 16, msg_key, 16);
   memcpy (buf + 32, E->key + 12, 16);
-  sha1 (buf, 48, sha1b_buffer);
+  TGLC_sha1 (buf, 48, sha1b_buffer);
   
   memcpy (buf, E->key + 16, 32);
   memcpy (buf + 32, msg_key, 16);
-  sha1 (buf, 48, sha1c_buffer);
+  TGLC_sha1 (buf, 48, sha1c_buffer);
   
   memcpy (buf, msg_key, 16);
   memcpy (buf + 16, E->key + 24, 32);
-  sha1 (buf, 48, sha1d_buffer);
+  TGLC_sha1 (buf, 48, sha1d_buffer);
 
   static unsigned char key[32];
   memcpy (key, sha1a_buffer + 0, 8);
@@ -556,7 +556,7 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
   memset (kk, 0, sizeof (kk));
   TGLC_bn_bn2bin (r, kk + (256 - TGLC_bn_num_bytes (r)));
   static unsigned char sha_buffer[20];
-  sha1 (kk, 256, sha_buffer);
+  TGLC_sha1 (kk, 256, sha_buffer);
 
   long long fingerprint = *(long long *)(sha_buffer + 12);
 
@@ -615,7 +615,7 @@ void tgl_do_create_keys_end (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   TGLC_bn_bn2bin (r, (void *)(((char *)(U->key)) + (256 - TGLC_bn_num_bytes (r))));
   
   static unsigned char sha_buffer[20];
-  sha1 ((void *)U->key, 256, sha_buffer);
+  TGLC_sha1 ((void *)U->key, 256, sha_buffer);
   long long k = *(long long *)(sha_buffer + 12);
   if (k != U->key_fingerprint) {
     vlogprintf (E_WARNING, "Key fingerprint mismatch (my 0x%llx 0x%llx)\n", (unsigned long long)k, (unsigned long long)U->key_fingerprint);

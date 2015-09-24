@@ -21,6 +21,9 @@
 #ifndef __TGL_CRYPTO_SHA_H__
 #define __TGL_CRYPTO_SHA_H__
 
-/* Declarations go here. */
+#include <stddef.h> /* size_t */
+
+unsigned char* TGLC_sha1 (const unsigned char *d, size_t n, unsigned char *md);
+unsigned char* TGLC_sha256 (const unsigned char *d, size_t n, unsigned char *md);
 
 #endif

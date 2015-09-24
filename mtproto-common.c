@@ -34,7 +34,7 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <openssl/rand.h>
-#include <openssl/sha.h>
+#include "crypto/sha.h"
 
 #include "mtproto-common.h"
 #include "tools.h"
@@ -180,7 +180,7 @@ long long tgl_do_compute_rsa_key_fingerprint (TGLC_rsa *key) {
   assert (l1 > 0);
   int l2 = tgl_serialize_bignum (TGLC_rsa_e (key), tempbuff + l1, 4096 - l1);
   assert (l2 > 0 && l1 + l2 <= 4096);
-  SHA1 ((unsigned char *)tempbuff, l1 + l2, sha);
+  TGLC_sha1 ((unsigned char *)tempbuff, l1 + l2, sha);
   return *(long long *)(sha + 12);
 }
 
@@ -314,12 +314,12 @@ void tgl_init_aes_unauth (const char server_nonce[16], const char hidden_client_
   static unsigned char buffer[64], hash[20];
   memcpy (buffer, hidden_client_nonce, 32);
   memcpy (buffer + 32, server_nonce, 16);
-  SHA1 (buffer, 48, aes_key_raw);
+  TGLC_sha1 (buffer, 48, aes_key_raw);
   memcpy (buffer + 32, hidden_client_nonce, 32);
-  SHA1 (buffer, 64, aes_iv + 8);
+  TGLC_sha1 (buffer, 64, aes_iv + 8);
   memcpy (buffer, server_nonce, 16);
   memcpy (buffer + 16, hidden_client_nonce, 32);
-  SHA1 (buffer, 48, hash);
+  TGLC_sha1 (buffer, 48, hash);
   memcpy (aes_key_raw + 20, hash, 12);
   memcpy (aes_iv, hash + 12, 8);
   memcpy (aes_iv + 28, hidden_client_nonce, 4);
@@ -341,26 +341,26 @@ void tgl_init_aes_auth (char auth_key[192], char msg_key[16], int encrypt) {
   //  aes_iv = substr (sha1_a, 8, 12) + substr (sha1_b, 0, 8) + substr (sha1_c, 16, 4) + substr (sha1_d, 0, 8);
   memcpy (buffer, msg_key, 16);
   memcpy (buffer + 16, auth_key, 32);
-  SHA1 (buffer, 48, hash);
+  TGLC_sha1 (buffer, 48, hash);
   memcpy (aes_key_raw, hash, 8);
   memcpy (aes_iv, hash + 8, 12);
 
   memcpy (buffer, auth_key + 32, 16);
   memcpy (buffer + 16, msg_key, 16);
   memcpy (buffer + 32, auth_key + 48, 16);
-  SHA1 (buffer, 48, hash);
+  TGLC_sha1 (buffer, 48, hash);
   memcpy (aes_key_raw + 8, hash + 8, 12);
   memcpy (aes_iv + 12, hash, 8);
 
   memcpy (buffer, auth_key + 64, 32);
   memcpy (buffer + 32, msg_key, 16);
-  SHA1 (buffer, 48, hash);
+  TGLC_sha1 (buffer, 48, hash);
   memcpy (aes_key_raw + 20, hash + 4, 12);
   memcpy (aes_iv + 20, hash + 16, 4);
 
   memcpy (buffer, msg_key, 16);
   memcpy (buffer + 16, auth_key + 96, 32);
-  SHA1 (buffer, 48, hash);
+  TGLC_sha1 (buffer, 48, hash);
   memcpy (aes_iv + 24, hash, 8);
   
   if (encrypt == AES_ENCRYPT) {

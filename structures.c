@@ -31,7 +31,7 @@
 #include "tree.h"
 #include <openssl/aes.h>
 #include "crypto/bn.h"
-#include <openssl/sha.h>
+#include "crypto/sha.h"
 #include "queries.h"
 #include "tgl-binlog.h"
 #include "tgl-methods-in.h"
@@ -44,13 +44,6 @@
 #include "auto/auto-skip.h"
 #include "auto/auto-fetch-ds.h"
 #include "auto/auto-free-ds.h"
-
-#define sha1 SHA1
-
-/*struct random2local {
-  long long random_id;
-  tgl_message_id_t local_id;
-};*/
 
 static int id_cmp (struct tgl_message *M1, struct tgl_message *M2);
 #define peer_cmp(a,b) (tgl_cmp_peer_id (a->id, b->id))
@@ -1473,20 +1466,20 @@ static int decrypt_encrypted_message (struct tgl_secret_chat *E) {
 
   memcpy (buf, msg_key, 16);
   memcpy (buf + 16, e_key, 32);
-  sha1 (buf, 48, sha1a_buffer);
+  TGLC_sha1 (buf, 48, sha1a_buffer);
   
   memcpy (buf, e_key + 8, 16);
   memcpy (buf + 16, msg_key, 16);
   memcpy (buf + 32, e_key + 12, 16);
-  sha1 (buf, 48, sha1b_buffer);
+  TGLC_sha1 (buf, 48, sha1b_buffer);
   
   memcpy (buf, e_key + 16, 32);
   memcpy (buf + 32, msg_key, 16);
-  sha1 (buf, 48, sha1c_buffer);
+  TGLC_sha1 (buf, 48, sha1c_buffer);
   
   memcpy (buf, msg_key, 16);
   memcpy (buf + 16, e_key + 24, 32);
-  sha1 (buf, 48, sha1d_buffer);
+  TGLC_sha1 (buf, 48, sha1d_buffer);
 
   static unsigned char key[32];
   memcpy (key, sha1a_buffer + 0, 8);
@@ -1509,7 +1502,7 @@ static int decrypt_encrypted_message (struct tgl_secret_chat *E) {
     return -1;
   }
   assert (x >= 0 && !(x & 3));
-  sha1 ((void *)decr_ptr, 4 + x, sha1a_buffer);
+  TGLC_sha1 ((void *)decr_ptr, 4 + x, sha1a_buffer);
 
   if (memcmp (sha1a_buffer + 4, msg_key, 16)) {
     return -1;

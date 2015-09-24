@@ -39,7 +39,7 @@
 #include <netdb.h>
 #include <openssl/rand.h>
 #include "crypto/rsa_pem.h"
-#include <openssl/sha.h>
+#include "crypto/sha.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -69,8 +69,6 @@
 #if defined(__OpenBSD__)
 #define __builtin_bswap32(x) __swap32gen(x)
 #endif
-
-#define sha1 SHA1
 
 #include "mtproto-common.h"
 
@@ -287,7 +285,7 @@ static void send_req_dh_packet (struct tgl_state *TLS, struct connection *c, TGL
   if (temp_key) {
     out_int (TLS->temp_key_expire_time);
   }
-  sha1 ((unsigned char *) (packet_buffer + 5), (packet_ptr - packet_buffer - 5) * 4, (unsigned char *) packet_buffer);
+  TGLC_sha1 ((unsigned char *) (packet_buffer + 5), (packet_ptr - packet_buffer - 5) * 4, (unsigned char *) packet_buffer);
 
   int l = encrypt_packet_buffer (TLS, DC);
 
@@ -350,7 +348,7 @@ static void send_dh_params (struct tgl_state *TLS, struct connection *c, TGLC_bn
   TGLC_bn_free (auth_key_num);
   TGLC_bn_free (dh_g);
 
-  sha1 ((unsigned char *) (packet_buffer + 5), (packet_ptr - packet_buffer - 5) * 4, (unsigned char *) packet_buffer);
+  TGLC_sha1 ((unsigned char *) (packet_buffer + 5), (packet_ptr - packet_buffer - 5) * 4, (unsigned char *) packet_buffer);
 
   l = encrypt_packet_buffer_aes_unauth (DC->server_nonce, DC->new_nonce);
 
@@ -523,7 +521,7 @@ static int process_dh_answer (struct tgl_state *TLS, struct connection *c, char 
   assert (in_ptr <= in_end);
 
   static char sha1_buffer[20];
-  sha1 ((unsigned char *) decrypt_buffer + 20, (in_ptr - decrypt_buffer - 5) * 4, (unsigned char *) sha1_buffer);
+  TGLC_sha1 ((unsigned char *) decrypt_buffer + 20, (in_ptr - decrypt_buffer - 5) * 4, (unsigned char *) sha1_buffer);
   if (memcmp (decrypt_buffer, sha1_buffer, 20)) {
     vlogprintf (E_ERROR, "bad encrypted message SHA1\n");
     return -1;
@@ -602,12 +600,12 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
   memcpy (th, DC->new_nonce, 32);
   th[32] = 1;
   if (!temp_key) {
-    sha1 ((unsigned char *)DC->auth_key, 256, sha1_buffer);
+    TGLC_sha1 ((unsigned char *)DC->auth_key, 256, sha1_buffer);
   } else {
-    sha1 ((unsigned char *)DC->temp_auth_key, 256, sha1_buffer);
+    TGLC_sha1 ((unsigned char *)DC->temp_auth_key, 256, sha1_buffer);
   }
   memcpy (th + 33, sha1_buffer, 8);
-  sha1 (th, 41, sha1_buffer);
+  TGLC_sha1 (th, 41, sha1_buffer);
   if (memcmp (tmp, sha1_buffer + 4, 16)) {
     vlogprintf (E_ERROR, "hash mismatch\n");
     return -1;
@@ -615,9 +613,9 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
 
   if (!temp_key) {
     bl_do_set_auth_key (TLS, DC->id, (unsigned char *)DC->auth_key);
-    sha1 ((unsigned char *)DC->auth_key, 256, sha1_buffer);
+    TGLC_sha1 ((unsigned char *)DC->auth_key, 256, sha1_buffer);
   } else {
-    sha1 ((unsigned char *)DC->temp_auth_key, 256, sha1_buffer);
+    TGLC_sha1 ((unsigned char *)DC->temp_auth_key, 256, sha1_buffer);
     DC->temp_auth_key_id = *(long long *)(sha1_buffer + 12);
   }
 
@@ -737,7 +735,7 @@ static int aes_encrypt_message (struct tgl_state *TLS, char *key, struct encrypt
 
   int enc_len = (MINSZ - UNENCSZ) + enc->msg_len;
   assert (enc->msg_len >= 0 && enc->msg_len <= MAX_MESSAGE_INTS * 4 - 16 && !(enc->msg_len & 3));
-  sha1 ((unsigned char *) &enc->server_salt, enc_len, sha1_buffer);
+  TGLC_sha1 ((unsigned char *) &enc->server_salt, enc_len, sha1_buffer);
   vlogprintf (E_DEBUG, "sending message with sha1 %08x\n", *(int *)sha1_buffer);
   memcpy (enc->msg_key, sha1_buffer + 4, 16);
   tgl_init_aes_auth (key, enc->msg_key, AES_ENCRYPT);
@@ -1098,7 +1096,7 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
   }
 
   static unsigned char sha1_buffer[20];
-  sha1 ((void *)&enc->server_salt, enc->msg_len + (MINSZ - UNENCSZ), sha1_buffer);
+  TGLC_sha1 ((void *)&enc->server_salt, enc->msg_len + (MINSZ - UNENCSZ), sha1_buffer);
   if (memcmp (&enc->msg_key, sha1_buffer + 4, 16)) {
     vlogprintf (E_WARNING, "Incorrect packet from server. Closing connection\n");
     fail_connection (TLS, c);
