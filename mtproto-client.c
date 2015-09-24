@@ -38,8 +38,7 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <openssl/rand.h>
-#include <openssl/rsa.h>
-#include <openssl/pem.h>
+#include "crypto/rsa_pem.h"
 #include <openssl/sha.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -108,16 +107,16 @@ static double get_utime (int clock_id) {
 
 #define MAX_RESPONSE_SIZE        (1L << 24)
 
-static RSA *rsa_load_public_key (struct tgl_state *TLS, const char *public_key_name) {
+static TGLC_rsa *rsa_load_public_key (struct tgl_state *TLS, const char *public_key_name) {
   FILE *f = fopen (public_key_name, "r");
   if (f == NULL) {
     vlogprintf (E_WARNING, "Couldn't open public key file: %s\n", public_key_name);
     return NULL;
   }
-  RSA *res = PEM_read_RSAPublicKey (f, NULL, NULL, NULL);
+  TGLC_rsa *res = TGLC_pem_read_RSAPublicKey (f);
   fclose (f);
   if (res == NULL) {
-    vlogprintf (E_WARNING, "PEM_read_RSAPublicKey returns NULL.\n");
+    vlogprintf (E_WARNING, "TGLC_pem_read_RSAPublicKey returns NULL.\n");
     return NULL;
   }
 
@@ -142,8 +141,8 @@ static int encrypt_buffer[ENCRYPT_BUFFER_INTS];
 static int decrypt_buffer[ENCRYPT_BUFFER_INTS];
 
 static int encrypt_packet_buffer (struct tgl_state *TLS, struct tgl_dc *DC) {
-  RSA *key = TLS->rsa_key_loaded[DC->rsa_key_idx];
-  return tgl_pad_rsa_encrypt (TLS, (char *) packet_buffer, (packet_ptr - packet_buffer) * 4, (char *) encrypt_buffer, ENCRYPT_BUFFER_INTS * 4, key->n, key->e);
+  TGLC_rsa *key = TLS->rsa_key_loaded[DC->rsa_key_idx];
+  return tgl_pad_rsa_encrypt (TLS, (char *) packet_buffer, (packet_ptr - packet_buffer) * 4, (char *) encrypt_buffer, ENCRYPT_BUFFER_INTS * 4, TGLC_rsa_n (key), TGLC_rsa_e (key));
 }
 
 static int encrypt_packet_buffer_aes_unauth (const char server_nonce[16], const char hidden_client_nonce[32]) {
@@ -1283,7 +1282,7 @@ void tglmp_on_start (struct tgl_state *TLS) {
   int ok = 0;
   for (i = 0; i < TLS->rsa_key_num; i++) {
     char *key = TLS->rsa_key_list[i];
-    RSA *res = rsa_load_public_key (TLS, key);
+    TGLC_rsa *res = rsa_load_public_key (TLS, key);
     if (!res) {
       vlogprintf (E_WARNING, "Can not load key %s\n", key);
       TLS->rsa_key_loaded[i] = NULL;
@@ -1474,7 +1473,7 @@ void tgls_free_pubkey (struct tgl_state *TLS) {
   int i;
   for (i = 0; i < TLS->rsa_key_num; i++) {
     if (TLS->rsa_key_loaded[i]) {
-      RSA_free (TLS->rsa_key_loaded[i]);
+      TGLC_rsa_free (TLS->rsa_key_loaded[i]);
       TLS->rsa_key_loaded[i] = NULL;
     }
   }

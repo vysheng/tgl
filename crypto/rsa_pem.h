@@ -18,15 +18,20 @@
     Copyright Ben Wiederhake 2015
 */
 
-#include "crypto-config.h"
+#ifndef __TGL_CRYPTO_RSA_H__
+#define __TGL_CRYPTO_RSA_H__
 
-#ifndef TGL_AVOID_OPENSSL_RSA
+#include <stdio.h> /* FILE */
 
-#include <openssl/rsa.h>
+#include "bn.h"
 
-#include "rsa.h"
+typedef struct TGLC_rsa TGLC_rsa;
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-dependent defines for rsa
+TGLC_bn *TGLC_rsa_n (TGLC_rsa *);
+TGLC_bn *TGLC_rsa_e (TGLC_rsa *);
+
+void TGLC_rsa_free (TGLC_rsa *);
+
+TGLC_rsa *TGLC_pem_read_RSAPublicKey (FILE *fp);
 
 #endif

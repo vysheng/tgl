@@ -18,9 +18,16 @@
     Copyright Ben Wiederhake 2015
 */
 
-#ifndef __TGL_CRYPTO_RSA_H__
-#define __TGL_CRYPTO_RSA_H__
+#include "crypto-config.h"
 
-/* Declarations go here. */
+#ifdef TGL_AVOID_OPENSSL_BN
+
+// #include <gcrypt/rsa.h>
+// Or similar
+
+#include "rsa_pem.h"
+
+/* FIXME */
+#error Not yet implemented: OpenSSL-independent defines for rsa and pem
 
 #endif

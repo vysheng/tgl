@@ -20,14 +20,35 @@
 
 #include "crypto-config.h"
 
-#ifdef TGL_AVOID_OPENSSL_PEM
+#ifndef TGL_AVOID_OPENSSL_BN
 
-// #include <gcrypt/pem.h>
-// Or similar
+//#include <stddef.h> /* NULL */
 
-#include "pem.h"
+#include <openssl/rsa.h>
+#include <openssl/pem.h>
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-independent defines for pem
+#include "meta.h"
+#include "rsa_pem.h"
+
+TGLC_WRAPPER_ASSOC(rsa,RSA)
+
+// TODO: Refactor crucial struct-identity into its own header.
+TGLC_WRAPPER_ASSOC(bn,BIGNUM)
+
+#define RSA_GETTER(M)                                                          \
+  TGLC_bn *TGLC_rsa_ ## M (TGLC_rsa *key) {                                    \
+    return wrap_bn (unwrap_rsa (key)->M);                                      \
+  }                                                                            \
+
+RSA_GETTER(n);
+RSA_GETTER(e);
+
+void TGLC_rsa_free (TGLC_rsa *p) {
+  RSA_free (unwrap_rsa (p));
+}
+
+TGLC_rsa *TGLC_pem_read_RSAPublicKey (FILE *fp) {
+  return wrap_rsa (PEM_read_RSAPublicKey (fp, NULL, NULL, NULL));
+}
 
 #endif

@@ -34,7 +34,6 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <openssl/rand.h>
-#include <openssl/pem.h>
 #include <openssl/sha.h>
 
 #include "mtproto-common.h"
@@ -173,13 +172,13 @@ int tgl_serialize_bignum (TGLC_bn *b, char *buffer, int maxlen) {
 }
 
 
-long long tgl_do_compute_rsa_key_fingerprint (RSA *key) {
+long long tgl_do_compute_rsa_key_fingerprint (TGLC_rsa *key) {
   static char tempbuff[4096];
   static unsigned char sha[20]; 
-  assert (key->n && key->e);
-  int l1 = tgl_serialize_bignum (key->n, tempbuff, 4096);
+  assert (TGLC_rsa_n (key) && TGLC_rsa_e (key));
+  int l1 = tgl_serialize_bignum (TGLC_rsa_n (key), tempbuff, 4096);
   assert (l1 > 0);
-  int l2 = tgl_serialize_bignum (key->e, tempbuff + l1, 4096 - l1);
+  int l2 = tgl_serialize_bignum (TGLC_rsa_e (key), tempbuff + l1, 4096 - l1);
   assert (l2 > 0 && l1 + l2 <= 4096);
   SHA1 ((unsigned char *)tempbuff, l1 + l2, sha);
   return *(long long *)(sha + 12);

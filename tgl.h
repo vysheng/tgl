@@ -204,6 +204,7 @@ struct tgl_state {
   void *ev_base;
 
   char *rsa_key_list[TGL_MAX_RSA_KEYS_NUM];
+  // (TGLC_rsa *)
   void *rsa_key_loaded[TGL_MAX_RSA_KEYS_NUM];
   long long rsa_key_fingerprint[TGL_MAX_RSA_KEYS_NUM];
   int rsa_key_num;

@@ -22,7 +22,7 @@
 #define __MTPROTO_COMMON_H__
 
 #include <string.h>
-#include <openssl/rsa.h>
+#include "crypto/rsa_pem.h"
 #include "crypto/bn.h"
 #include <openssl/aes.h>
 #include <stdio.h>
@@ -119,7 +119,7 @@ struct encrypted_message {
 
 void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int password_length);
 int tgl_serialize_bignum (TGLC_bn *b, char *buffer, int maxlen);
-long long tgl_do_compute_rsa_key_fingerprint (RSA *key);
+long long tgl_do_compute_rsa_key_fingerprint (TGLC_rsa *key);
 
 #define packet_buffer tgl_packet_buffer
 #define packet_ptr tgl_packet_ptr
