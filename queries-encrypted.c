@@ -419,7 +419,7 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   unsigned char str[64];
   memcpy (str, f->key, 32);
   memcpy (str + 32, f->init_iv, 32);
-  MD5 (str, 64, md5);
+  TGLC_md5 (str, 64, md5);
   out_int ((*(int *)md5) ^ (*(int *)(md5 + 4)));
 
   tfree_secure (f->iv, 32);

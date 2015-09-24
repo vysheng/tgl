@@ -26,7 +26,8 @@
 
 #include "md5.h"
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-dependent defines for md5
+unsigned char* TGLC_md5(const unsigned char *d, size_t n, unsigned char *md) {
+  return MD5(d, n, md);
+}
 
 #endif

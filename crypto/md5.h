@@ -21,6 +21,8 @@
 #ifndef __TGL_CRYPTO_MD5_H__
 #define __TGL_CRYPTO_MD5_H__
 
-/* Declarations go here. */
+#include <stddef.h> /* size_t */
+
+unsigned char* TGLC_md5(const unsigned char *d, size_t n, unsigned char *md);
 
 #endif

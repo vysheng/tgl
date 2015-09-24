@@ -45,7 +45,7 @@
 #include <openssl/rand.h>
 #include <openssl/aes.h>
 #include <openssl/sha.h>
-#include <openssl/md5.h>
+#include "crypto/md5.h"
 
 #include "no-preview.h"
 #include "tgl-binlog.h"
@@ -2849,7 +2849,7 @@ void tgl_do_load_encr_document (struct tgl_state *TLS, struct tgl_encr_document 
   unsigned char str[64];
   memcpy (str, V->key, 32);
   memcpy (str + 32, V->iv, 32);
-  MD5 (str, 64, md5);
+  TGLC_md5 (str, 64, md5);
   assert (V->key_fingerprint == ((*(int *)md5) ^ (*(int *)(md5 + 4))));
 }
 /* }}} */
