@@ -49,7 +49,7 @@
 #define TGL_VERSION "2.0.3"
 
 #define TGL_ENCRYPTED_LAYER 17
-#define TGL_SCHEME_LAYER 31
+#define TGL_SCHEME_LAYER 38
 
 struct connection;
 struct mtproto_methods;
@@ -110,6 +110,7 @@ struct tgl_update_callback {
   void (*user_activated)(struct tgl_state *TLS, struct tgl_user *U);
   void (*new_authorization)(struct tgl_state *TLS, const char *device, const char *location);
   void (*chat_update)(struct tgl_state *TLS, struct tgl_chat *C, unsigned flags);
+  void (*channel_update)(struct tgl_state *TLS, struct tgl_channel *C, unsigned flags);
   void (*user_update)(struct tgl_state *TLS, struct tgl_user *C, unsigned flags);
   void (*secret_chat_update)(struct tgl_state *TLS, struct tgl_secret_chat *C, unsigned flags);
   void (*msg_receive)(struct tgl_state *TLS, struct tgl_message *M);
@@ -221,6 +222,7 @@ struct tgl_state {
   int users_allocated;
   int chats_allocated;
   int messages_allocated;
+  int channels_allocated;
   int peer_num;
   int peer_size;
   int encr_chats_allocated;
@@ -284,10 +286,12 @@ int tgl_do_send_bot_auth (struct tgl_state *TLS, const char *code, int code_len,
 #define TGL_PEER_CHAT 2
 #define TGL_PEER_GEO_CHAT 3
 #define TGL_PEER_ENCR_CHAT 4
+#define TGL_PEER_CHANNEL 5
 #define TGL_PEER_UNKNOWN 0
 
 #define TGL_MK_USER(id) tgl_set_peer_id (TGL_PEER_USER,id)
 #define TGL_MK_CHAT(id) tgl_set_peer_id (TGL_PEER_CHAT,id)
+#define TGL_MK_CHANNEL(id) tgl_set_peer_id (TGL_PEER_CHANNEL,id)
 #define TGL_MK_GEO_CHAT(id) tgl_set_peer_id (TGL_PEER_GEO_CHAT,id)
 #define TGL_MK_ENCR_CHAT(id) tgl_set_peer_id (TGL_PEER_ENCR_CHAT,id)
 

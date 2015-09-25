@@ -53,7 +53,8 @@ void tglp_peer_delete_name (struct tgl_state *TLS, tgl_peer_t *P);
 void tglp_insert_encrypted_chat (struct tgl_state *TLS, tgl_peer_t *P);
 void tglp_insert_user (struct tgl_state *TLS, tgl_peer_t *P);
 void tglp_insert_chat (struct tgl_state *TLS, tgl_peer_t *P);
-enum tgl_typing_status tglf_fetch_typing (void);
+void tglp_insert_channel (struct tgl_state *TLS, tgl_peer_t *P);
+//enum tgl_typing_status tglf_fetch_typing_buf (void);
 void tgls_messages_mark_read (struct tgl_state *TLS, struct tgl_message *M, int out, int seq);
 
 void tgls_insert_random2local (struct tgl_state *TLS, long long random_id, int local_id);
