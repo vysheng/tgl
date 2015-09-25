@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/err.h>
-#include <openssl/rand.h>
+#include "crypto/rand.h"
 #include <zlib.h>
 #include <time.h>
 #include <sys/time.h>
@@ -277,9 +277,9 @@ double tglt_get_double_time (void) {
 }
 
 void tglt_secure_random (void *s, int l) {
-  if (RAND_bytes (s, l) <= 0) {
+  if (TGLC_rand_bytes (s, l) <= 0) {
     /*if (allow_weak_random) {
-      RAND_pseudo_bytes (s, l);
+      TGLC_rand_pseudo_bytes (s, l);
     } else {*/
       assert (0 && "End of random. If you want, you can start with -w");
     //}

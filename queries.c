@@ -42,7 +42,7 @@
 //#include "interface.h"
 //#include "net.h"
 #include "crypto/bn.h"
-#include <openssl/rand.h>
+#include "crypto/rand.h"
 #include <openssl/aes.h>
 #include "crypto/sha.h"
 #include "crypto/md5.h"

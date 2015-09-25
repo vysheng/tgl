@@ -33,7 +33,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <netdb.h>
-#include <openssl/rand.h>
+#include "crypto/rand.h"
 #include "crypto/sha.h"
 
 #include "mtproto-common.h"
@@ -106,19 +106,19 @@ static __inline__ unsigned long long rdtsc (void) {
 void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int password_length) {
   struct timespec T;
   tgl_my_clock_gettime (CLOCK_REALTIME, &T);
-  RAND_add (&T, sizeof (T), 4.0);
+  TGLC_rand_add (&T, sizeof (T), 4.0);
 #ifdef HAVE_RDTSC
   unsigned long long r = rdtsc ();
-  RAND_add (&r, 8, 4.0);
+  TGLC_rand_add (&r, 8, 4.0);
 #endif
   unsigned short p = getpid ();
-  RAND_add (&p, sizeof (p), 0.0);
+  TGLC_rand_add (&p, sizeof (p), 0.0);
   p = getppid ();
-  RAND_add (&p, sizeof (p), 0.0);
+  TGLC_rand_add (&p, sizeof (p), 0.0);
   unsigned char rb[32];
   int s = get_random_bytes (TLS, rb, 32);
   if (s > 0) {
-    RAND_add (rb, s, s);
+    TGLC_rand_add (rb, s, s);
   }
   memset (rb, 0, sizeof (rb));
   if (password_filename && password_length > 0) {
@@ -132,7 +132,7 @@ void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int pa
         vlogprintf (E_WARNING, "Warning: fail to read password file - \"%s\", %m.\n", password_filename);
       } else {
         vlogprintf (E_DEBUG, "read %d bytes from password file.\n", l);
-        RAND_add (a, l, l);
+        TGLC_rand_add (a, l, l);
       }
       close (fd);
       tfree_secure (a, password_length);
@@ -253,7 +253,7 @@ int tgl_pad_rsa_encrypt (struct tgl_state *TLS, char *from, int from_len, char *
   assert (bits >= 2041 && bits <= 2048);
   assert (from_len > 0 && from_len <= 2550);
   assert (size >= chunks * 256);
-  assert (RAND_pseudo_bytes ((unsigned char *) from + from_len, pad) >= 0);
+  assert (TGLC_rand_pseudo_bytes ((unsigned char *) from + from_len, pad) >= 0);
   int i;
   TGLC_bn *x = TGLC_bn_new ();
   TGLC_bn *y = TGLC_bn_new ();
@@ -375,7 +375,7 @@ int tgl_pad_aes_encrypt (char *from, int from_len, char *to, int size) {
   int padded_size = (from_len + 15) & -16;
   assert (from_len > 0 && padded_size <= size);
   if (from_len < padded_size) {
-    assert (RAND_pseudo_bytes ((unsigned char *) from + from_len, padded_size - from_len) >= 0);
+    assert (TGLC_rand_pseudo_bytes ((unsigned char *) from + from_len, padded_size - from_len) >= 0);
   }
   AES_ige_encrypt ((unsigned char *) from, (unsigned char *) to, padded_size, &aes_key, aes_iv, AES_ENCRYPT);
   return padded_size;

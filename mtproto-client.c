@@ -37,7 +37,7 @@
 #endif
 #include <sys/types.h>
 #include <netdb.h>
-#include <openssl/rand.h>
+#include "crypto/rand.h"
 #include "crypto/rsa_pem.h"
 #include "crypto/sha.h"
 #include <sys/socket.h>
@@ -1389,7 +1389,7 @@ static struct mtproto_methods mtproto_methods = {
 
 void tglmp_dc_create_session (struct tgl_state *TLS, struct tgl_dc *DC) {
   struct tgl_session *S = talloc0 (sizeof (*S));
-  assert (RAND_pseudo_bytes ((unsigned char *) &S->session_id, 8) >= 0);
+  assert (TGLC_rand_pseudo_bytes ((unsigned char *) &S->session_id, 8) >= 0);
   S->dc = DC;
   //S->c = TLS->net_methods->create_connection (TLS, DC->ip, DC->port, S, DC, &mtproto_methods);
 

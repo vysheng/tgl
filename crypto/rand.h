@@ -21,6 +21,8 @@
 #ifndef __TGL_CRYPTO_RAND_H__
 #define __TGL_CRYPTO_RAND_H__
 
-/* Declarations go here. */
+void TGLC_rand_add (const void *buf, int num, double entropy);
+int TGLC_rand_bytes (unsigned char *buf, int num);
+int TGLC_rand_pseudo_bytes (unsigned char *buf, int num);
 
 #endif
