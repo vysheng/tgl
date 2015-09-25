@@ -21,6 +21,8 @@
 #ifndef __TGL_CRYPTO_ERR_H__
 #define __TGL_CRYPTO_ERR_H__
 
-/* Declarations go here. */
+#include <stdio.h>
+
+void TGLC_err_print_errors_fp (FILE *fp);
 
 #endif

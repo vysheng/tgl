@@ -21,7 +21,6 @@
 #ifndef __TOOLS_H__
 #define __TOOLS_H__
 #include <time.h>
-#include <openssl/err.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -65,8 +64,8 @@ static inline void out_of_memory (void) {
 
 static inline void ensure (int r) {
   if (!r) {
-    fprintf (stderr, "Open SSL error\n");
-    ERR_print_errors_fp (stderr);
+    fprintf (stderr, "Crypto error\n");
+    TGLC_err_print_errors_fp (stderr);
     assert (0);
   }
 }

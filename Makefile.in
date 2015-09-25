@@ -23,7 +23,7 @@ TGL_OBJECTS=${OBJ}/mtproto-common.o ${OBJ}/mtproto-client.o ${OBJ}/queries.o ${O
 TGL_OBJECTS_AUTO=${OBJ}/auto/auto-skip.o ${OBJ}/auto/auto-fetch.o ${OBJ}/auto/auto-store.o ${OBJ}/auto/auto-autocomplete.o ${OBJ}/auto/auto-types.o ${OBJ}/auto/auto-fetch-ds.o  ${OBJ}/auto/auto-free-ds.o ${OBJ}/auto/auto-store-ds.o ${OBJ}/auto/auto-print-ds.o
 TLD_OBJECTS=${OBJ}/dump-tl-file.o
 GENERATE_OBJECTS=${OBJ}/generate.o
-COMMON_OBJECTS=${OBJ}/tools.o ${OBJ}/crypto/rand_openssl.o ${OBJ}/crypto/rand_altern.o
+COMMON_OBJECTS=${OBJ}/tools.o ${OBJ}/crypto/rand_openssl.o ${OBJ}/crypto/rand_altern.o ${OBJ}/crypto/err_openssl.o ${OBJ}/crypto/err_altern.o
 OBJ_C=${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS} ${TLD_OBJECTS}
 
 DEPENDENCE=$(subst ${OBJ}/,${DEP}/,$(patsubst %.o,%.d,${OBJ_C}))

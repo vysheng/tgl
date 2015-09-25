@@ -26,7 +26,8 @@
 
 #include "err.h"
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-dependent defines for err
+void TGLC_err_print_errors_fp (FILE *fp) {
+  ERR_print_errors_fp (fp);
+}
 
 #endif

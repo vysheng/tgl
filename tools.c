@@ -28,7 +28,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <openssl/err.h>
 #include "crypto/rand.h"
 #include <zlib.h>
 #include <time.h>
