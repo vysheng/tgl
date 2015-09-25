@@ -35,8 +35,8 @@ typedef struct TGLC_aes_key {
               ];
 } TGLC_aes_key;
 
-int TGLC_aes_set_encrypt_key (const unsigned char *userKey, const int bits, TGLC_aes_key *key);
-int TGLC_aes_set_decrypt_key (const unsigned char *userKey, const int bits, TGLC_aes_key *key);
+void TGLC_aes_set_encrypt_key (const unsigned char *userKey, const int bits, TGLC_aes_key *key);
+void TGLC_aes_set_decrypt_key (const unsigned char *userKey, const int bits, TGLC_aes_key *key);
 void TGLC_aes_ige_encrypt (const unsigned char *in, unsigned char *out, size_t length, const TGLC_aes_key *key, unsigned char *ivec, const int enc);
 
 #endif
