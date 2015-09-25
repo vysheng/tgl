@@ -972,6 +972,13 @@ struct mark_read_extra {
 
 void tgl_do_messages_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, int max_id, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int), void *callback_extra);
 
+static int mark_read_channels_on_receive (struct tgl_state *TLS, struct query *q, void *D) {
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 1);
+  }
+  return 0;
+}
+
 static int mark_read_on_receive (struct tgl_state *TLS, struct query *q, void *D) {
   struct tl_ds_messages_affected_history *DS_MAH = D;
 
@@ -1018,19 +1025,43 @@ static struct query_methods mark_read_methods = {
   .type = TYPE_TO_PARAM(messages_affected_history)
 };
 
+static struct query_methods mark_read_channels_methods = {
+  .on_answer = mark_read_channels_on_receive,
+  .on_error = q_void_on_error,
+  .type = TYPE_TO_PARAM(bool)
+};
+
 void tgl_do_messages_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, int max_id, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int), void *callback_extra) {
   if (TLS->is_bot) { return; }
+  if (tgl_get_peer_type (id) == TGL_PEER_ENCR_CHAT) {
+    tgl_do_mark_read (TLS, id, callback, callback_extra);
+    return;
+  }
   clear_packet ();
-  out_int (CODE_messages_read_history);
-  out_peer_id (TLS, id);
-  out_int (max_id);
-  out_int (offset);
+  if (tgl_get_peer_type (id) != TGL_PEER_CHANNEL) {
+    out_int (CODE_messages_read_history);
+    out_peer_id (TLS, id);
+    out_int (max_id);
+    out_int (offset);
 
-  struct mark_read_extra *E = talloc (sizeof (*E));
-  E->id = id;
-  E->max_id = max_id;
+    struct mark_read_extra *E = talloc (sizeof (*E));
+    E->id = id;
+    E->max_id = max_id;
 
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &mark_read_methods, E, callback, callback_extra);
+    tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &mark_read_methods, E, callback, callback_extra);
+  } else {
+    out_int (CODE_channels_read_history);
+
+    tgl_peer_t *U = tgl_peer_get (TLS, id);
+    
+    out_int (CODE_input_channel);
+    out_int (tgl_get_peer_id (id));
+    out_long (U ? U->channel.access_hash : 0);
+    
+    out_int (max_id);
+    
+    tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &mark_read_channels_methods, NULL, callback, callback_extra);
+  }
 }
 
 void tgl_do_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -1197,7 +1228,7 @@ static void _tgl_do_get_history (struct tgl_state *TLS, struct get_history_extra
     out_int (CODE_channels_get_important_history);
     
     tgl_peer_t *U = tgl_peer_get (TLS, E->id);
-    vlogprintf (E_ERROR, "id = %d, access_hash=%lld\n", tgl_get_peer_id (E->id), U->channel.access_hash);
+    //vlogprintf (E_ERROR, "id = %d, access_hash=%lld\n", tgl_get_peer_id (E->id), U->channel.access_hash);
     
     out_int (CODE_input_channel);
     out_int (tgl_get_peer_id (E->id));
