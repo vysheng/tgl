@@ -957,7 +957,7 @@ static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long
   case CODE_update_short_message:
   case CODE_update_short_chat_message:
   case CODE_updates_too_long:
-    tglu_work_any_updates (TLS);
+    tglu_work_any_updates_buf (TLS);
     return 0;
   case CODE_gzip_packed:
     return work_packed (TLS, c, msg_id);

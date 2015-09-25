@@ -83,11 +83,10 @@ static void encr_finish (struct tgl_secret_chat *E) {
 void tgl_do_send_encr_action (struct tgl_state *TLS, struct tgl_secret_chat *E, struct tl_ds_decrypted_message_action *A) {
   long long t;
   tglt_secure_random (&t, 8);
-  int peer_id = tgl_get_peer_id (E->id);
-  int peer_type = TGL_PEER_ENCR_CHAT;
   int date = time (0);
   
-  bl_do_create_message_encr_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, NULL, A, NULL, TGLMF_PENDING | TGLMF_OUT | TGLMF_UNREAD | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
+  tgl_peer_id_t from_id = TGL_MK_USER (TLS->our_id);
+  bl_do_edit_message_encr (TLS, t, &from_id, &E->id, &date, NULL, 0, NULL, A, NULL, TGLMF_PENDING | TGLMF_OUT | TGLMF_UNREAD | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
 
   struct tgl_message *M = tgl_message_get (TLS, t);
   assert (M);
@@ -118,7 +117,7 @@ static int msg_send_encr_on_answer (struct tgl_state *TLS, struct query *q, void
   assert (M->flags & TGLMF_ENCRYPTED);
   
   if (M->flags & TGLMF_PENDING) {
-    bl_do_create_message_encr_new (TLS, M->id, NULL, NULL, NULL, 
+    bl_do_edit_message_encr (TLS, M->id, NULL, NULL,  
       &M->date,
       NULL, 0, NULL, NULL, NULL, M->flags ^ TGLMF_PENDING);
     
@@ -136,14 +135,14 @@ static int msg_send_encr_on_error (struct tgl_state *TLS, struct query *q, int e
   tgl_peer_t *P = tgl_peer_get (TLS, M->to_id);
   if (P && P->encr_chat.state != sc_deleted && error_code == 400) {
     if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
-      bl_do_encr_chat_delete (TLS, &P->encr_chat);
+      bl_do_peer_delete (TLS, P->id);
     }
   }
   if (q->callback) {
     ((void (*)(struct tgl_state *TLS, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 0, M);
   }
   if (M) {
-    bl_do_message_delete (TLS, M);
+    bl_do_message_delete (TLS, M->id);
   }
   return 0;
 }
@@ -281,7 +280,7 @@ static int mark_read_encr_on_error (struct tgl_state *TLS, struct query *q, int 
   tgl_peer_t *P = q->extra;
   if (P && P->encr_chat.state != sc_deleted && error_code == 400) {
     if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
-      bl_do_encr_chat_delete(TLS, &P->encr_chat);
+      bl_do_peer_delete (TLS, P->id);
     }
   }
   return 0;
@@ -308,7 +307,7 @@ static int send_encr_file_on_answer (struct tgl_state *TLS, struct query *q, voi
   struct tgl_message *M = q->extra;
 
   if (M->flags & TGLMF_PENDING) {
-    bl_do_create_message_encr_new (TLS, M->id, NULL, NULL, NULL, DS_MSEM->date, 
+    bl_do_edit_message_encr (TLS, M->id, NULL, NULL, DS_MSEM->date, 
     NULL, 0, NULL, NULL, DS_MSEM->file, M->flags ^ TGLMF_PENDING);   
     bl_do_msg_update (TLS, M->id);
   }
@@ -399,8 +398,6 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   in_ptr = save_in_end;
 
 
-  int peer_type = tgl_get_peer_type (f->to_id);
-  int peer_id = tgl_get_peer_id (f->to_id);
   int date = time (NULL);
 
 
@@ -424,8 +421,9 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   out_int ((*(int *)md5) ^ (*(int *)(md5 + 4)));
 
   tfree_secure (f->iv, 32);
-  
-  bl_do_create_message_encr_new (TLS, r, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, DS_DMM, NULL, NULL, TGLMF_OUT | TGLMF_UNREAD | TGLMF_ENCRYPTED | TGLMF_CREATE | TGLMF_CREATED);
+ 
+  tgl_peer_id_t from_id = TGL_MK_USER (TLS->our_id);
+  bl_do_edit_message_encr (TLS, r, &from_id, &f->to_id, &date, NULL, 0, DS_DMM, NULL, NULL, TGLMF_OUT | TGLMF_UNREAD | TGLMF_ENCRYPTED | TGLMF_CREATE | TGLMF_CREATED);
 
   free_ds_type_decrypted_message_media (DS_DMM, TYPE_TO_PARAM (decrypted_message_media));
   struct tgl_message *M = tgl_message_get (TLS, r);
@@ -446,14 +444,13 @@ void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t id, double 
   TDSM.longitude = talloc (sizeof (double));
   *TDSM.longitude = longitude;
   
-  int peer_type = tgl_get_peer_type (id);
-  int peer_id = tgl_get_peer_id (id);
   int date = time (0);
 
   long long t;
   tglt_secure_random (&t, 8);
 
-  bl_do_create_message_encr_new (TLS, t, &TLS->our_id, &peer_type, &peer_id, &date, NULL, 0, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
+  tgl_peer_id_t from_id = TGL_MK_USER (TLS->our_id);
+  bl_do_edit_message_encr (TLS, t, &from_id, &id, &date, NULL, 0, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
 
   tfree (TDSM.latitude, sizeof (double));
   tfree (TDSM.longitude, sizeof (double));
@@ -465,7 +462,7 @@ void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t id, double 
 
 /* {{{ Encr accept */
 static int send_encr_accept_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
-  struct tgl_secret_chat *E = tglf_fetch_alloc_encrypted_chat_new (TLS, D);
+  struct tgl_secret_chat *E = tglf_fetch_alloc_encrypted_chat (TLS, D);
 
   if (E->state == sc_ok) {
     tgl_do_send_encr_chat_layer (TLS, E);
@@ -477,7 +474,7 @@ static int send_encr_accept_on_answer (struct tgl_state *TLS, struct query *q, v
 }
 
 static int send_encr_request_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
-  struct tgl_secret_chat *E = tglf_fetch_alloc_encrypted_chat_new (TLS, D);
+  struct tgl_secret_chat *E = tglf_fetch_alloc_encrypted_chat (TLS, D);
   
   if (q->callback) {
     ((void (*)(struct tgl_state *, void *, int, struct tgl_secret_chat *))q->callback) (TLS, q->callback_extra, E->state != sc_deleted, E);
@@ -489,7 +486,7 @@ static int encr_accept_on_error (struct tgl_state *TLS, struct query *q, int err
   tgl_peer_t *P = q->extra;
   if (P && P->encr_chat.state != sc_deleted &&  error_code == 400) {
     if (strncmp (error, "ENCRYPTION_DECLINED", 19) == 0) {
-      bl_do_encr_chat_delete(TLS, &P->encr_chat);
+      bl_do_peer_delete (TLS, P->id);
     }
   }
   if (q->callback) {
@@ -563,7 +560,7 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
 
   int state = sc_ok;
 
-  bl_do_encr_chat_new (TLS, tgl_get_peer_id (E->id), 
+  bl_do_encr_chat (TLS, tgl_get_peer_id (E->id), 
     NULL, NULL, NULL, NULL, 
     kk, NULL, sha_buffer, &state, 
     NULL, NULL, NULL, NULL, NULL, 
@@ -666,7 +663,7 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   //bl_do_encr_chat_init (TLS, t, user_id, (void *)random, (void *)g_a);
   
   int state = sc_waiting;
-  bl_do_encr_chat_new (TLS, t, NULL, NULL, &TLS->our_id, &user_id, random, NULL, NULL, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED);
+  bl_do_encr_chat (TLS, t, NULL, NULL, &TLS->our_id, &user_id, random, NULL, NULL, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED);
 
   
   tgl_peer_t *_E = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t));
@@ -677,14 +674,11 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   out_int (CODE_messages_request_encryption);
   tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_USER (E->user_id));
   assert (U);
-  if (U && U->user.access_hash) {
-    out_int (CODE_input_user_foreign);
-    out_int (E->user_id);
-    out_long (U->user.access_hash);
-  } else {
-    out_int (CODE_input_user_contact);
-    out_int (E->user_id);
-  }
+  
+  out_int (CODE_input_user);
+  out_int (E->user_id);
+  out_long (U ? U->user.access_hash : 0);
+
   out_int (tgl_get_peer_id (E->id));
   out_cstring (g_a, 256);
   //write_secret_chat_file ();
