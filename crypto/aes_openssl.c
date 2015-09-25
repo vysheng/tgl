@@ -25,8 +25,22 @@
 #include <openssl/aes.h>
 
 #include "aes.h"
+#include "meta.h"
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-dependent defines for aes
+typedef char check_struct_sizes[(sizeof (AES_KEY) == sizeof (TGLC_aes_key)) - 1];
+
+TGLC_WRAPPER_ASSOC(aes_key,AES_KEY)
+
+int TGLC_aes_set_encrypt_key (const unsigned char *userKey, const int bits, TGLC_aes_key *key) {
+  return AES_set_encrypt_key(userKey, bits, unwrap_aes_key (key));
+}
+
+int TGLC_aes_set_decrypt_key (const unsigned char *userKey, const int bits, TGLC_aes_key *key) {
+  return AES_set_decrypt_key(userKey, bits, unwrap_aes_key (key));
+}
+
+void TGLC_aes_ige_encrypt (const unsigned char *in, unsigned char *out, size_t length, const TGLC_aes_key *key, unsigned char *ivec, const int enc) {
+  AES_ige_encrypt (in, out, length, unwrap_aes_key (key), ivec, enc);
+}
 
 #endif

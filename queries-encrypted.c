@@ -44,9 +44,9 @@ static char *encrypt_decrypted_message (struct tgl_secret_chat *E) {
   memcpy (iv + 20, sha1c_buffer + 16, 4);
   memcpy (iv + 24, sha1d_buffer + 0, 8);
 
-  AES_KEY aes_key;
-  AES_set_encrypt_key (key, 256, &aes_key);
-  AES_ige_encrypt ((void *)encr_ptr, (void *)encr_ptr, 4 * (encr_end - encr_ptr), &aes_key, iv, 1);
+  TGLC_aes_key aes_key;
+  TGLC_aes_set_encrypt_key (key, 256, &aes_key);
+  TGLC_aes_ige_encrypt ((void *)encr_ptr, (void *)encr_ptr, 4 * (encr_end - encr_ptr), &aes_key, iv, 1);
   memset (&aes_key, 0, sizeof (aes_key));
 
   return (void *)msg_key;

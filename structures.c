@@ -29,7 +29,7 @@
 #include "mtproto-common.h"
 //#include "telegram.h"
 #include "tree.h"
-#include <openssl/aes.h>
+#include "crypto/aes.h"
 #include "crypto/bn.h"
 #include "crypto/sha.h"
 #include "queries.h"
@@ -1492,9 +1492,9 @@ static int decrypt_encrypted_message (struct tgl_secret_chat *E) {
   memcpy (iv + 20, sha1c_buffer + 16, 4);
   memcpy (iv + 24, sha1d_buffer + 0, 8);
 
-  AES_KEY aes_key;
-  AES_set_decrypt_key (key, 256, &aes_key);
-  AES_ige_encrypt ((void *)decr_ptr, (void *)decr_ptr, 4 * (decr_end - decr_ptr), &aes_key, iv, 0);
+  TGLC_aes_key aes_key;
+  TGLC_aes_set_decrypt_key (key, 256, &aes_key);
+  TGLC_aes_ige_encrypt ((void *)decr_ptr, (void *)decr_ptr, 4 * (decr_end - decr_ptr), &aes_key, iv, 0);
   memset (&aes_key, 0, sizeof (aes_key));
 
   int x = *(decr_ptr);

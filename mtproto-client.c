@@ -144,7 +144,7 @@ static int encrypt_packet_buffer (struct tgl_state *TLS, struct tgl_dc *DC) {
 }
 
 static int encrypt_packet_buffer_aes_unauth (const char server_nonce[16], const char hidden_client_nonce[32]) {
-  tgl_init_aes_unauth (server_nonce, hidden_client_nonce, AES_ENCRYPT);
+  tgl_init_aes_unauth (server_nonce, hidden_client_nonce, 1);
   return tgl_pad_aes_encrypt ((char *) packet_buffer, (packet_ptr - packet_buffer) * 4, (char *) encrypt_buffer, ENCRYPT_BUFFER_INTS * 4);
 }
 
@@ -469,7 +469,7 @@ static int process_dh_answer (struct tgl_state *TLS, struct connection *c, char 
     return -1;
   }
 
-  tgl_init_aes_unauth (DC->server_nonce, DC->new_nonce, AES_DECRYPT);
+  tgl_init_aes_unauth (DC->server_nonce, DC->new_nonce, 0);
 
   int l = prefetch_strlen ();
   assert (l >= 0);
@@ -738,7 +738,7 @@ static int aes_encrypt_message (struct tgl_state *TLS, char *key, struct encrypt
   TGLC_sha1 ((unsigned char *) &enc->server_salt, enc_len, sha1_buffer);
   vlogprintf (E_DEBUG, "sending message with sha1 %08x\n", *(int *)sha1_buffer);
   memcpy (enc->msg_key, sha1_buffer + 4, 16);
-  tgl_init_aes_auth (key, enc->msg_key, AES_ENCRYPT);
+  tgl_init_aes_auth (key, enc->msg_key, 1);
   return tgl_pad_aes_encrypt ((char *) &enc->server_salt, enc_len, (char *) &enc->server_salt, MAX_MESSAGE_INTS * 4 + (MINSZ - UNENCSZ));
 }
 
@@ -1072,11 +1072,11 @@ static int process_rpc_message (struct tgl_state *TLS, struct connection *c, str
   if (enc->auth_key_id == DC->temp_auth_key_id) {
     assert (enc->auth_key_id == DC->temp_auth_key_id);
     assert (DC->temp_auth_key_id);
-    tgl_init_aes_auth (DC->temp_auth_key + 8, enc->msg_key, AES_DECRYPT);
+    tgl_init_aes_auth (DC->temp_auth_key + 8, enc->msg_key, 0);
   } else {
     assert (enc->auth_key_id == DC->auth_key_id);
     assert (DC->auth_key_id);
-    tgl_init_aes_auth (DC->auth_key + 8, enc->msg_key, AES_DECRYPT);
+    tgl_init_aes_auth (DC->auth_key + 8, enc->msg_key, 0);
   }
 
   int l = tgl_pad_aes_decrypt ((char *)&enc->server_salt, len - UNENCSZ, (char *)&enc->server_salt, len - UNENCSZ);

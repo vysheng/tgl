@@ -44,7 +44,7 @@
 //#include "net.h"
 #include "crypto/bn.h"
 #include "crypto/rand.h"
-#include <openssl/aes.h>
+#include "crypto/aes.h"
 #include "crypto/sha.h"
 #include "crypto/md5.h"
 
@@ -1719,9 +1719,9 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
         x = (x + 15) & ~15;
       }
 
-      AES_KEY aes_key;
-      AES_set_encrypt_key (f->key, 256, &aes_key);
-      AES_ige_encrypt ((void *)buf, (void *)buf, x, &aes_key, f->iv, 1);
+      TGLC_aes_key aes_key;
+      TGLC_aes_set_encrypt_key (f->key, 256, &aes_key);
+      TGLC_aes_ige_encrypt ((void *)buf, (void *)buf, x, &aes_key, f->iv, 1);
       memset (&aes_key, 0, sizeof (aes_key));
     }
     out_cstring (buf, x);
@@ -2598,9 +2598,9 @@ static int download_on_answer (struct tgl_state *TLS, struct query *q, void *DD)
     assert (!(len & 15));
     void *ptr = DS_UF->bytes->data;
 
-    AES_KEY aes_key;
-    AES_set_decrypt_key (D->key, 256, &aes_key);
-    AES_ige_encrypt (ptr, ptr, len, &aes_key, D->iv, 0);
+    TGLC_aes_key aes_key;
+    TGLC_aes_set_decrypt_key (D->key, 256, &aes_key);
+    TGLC_aes_ige_encrypt (ptr, ptr, len, &aes_key, D->iv, 0);
     memset (&aes_key, 0, sizeof (aes_key));
     if (len > D->size - D->offset) {
       len = D->size - D->offset;

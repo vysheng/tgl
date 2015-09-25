@@ -33,6 +33,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <netdb.h>
+#include "crypto/aes.h"
 #include "crypto/rand.h"
 #include "crypto/sha.h"
 
@@ -308,7 +309,7 @@ int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *
 }
 
 static unsigned char aes_key_raw[32], aes_iv[32];
-static AES_KEY aes_key;
+static TGLC_aes_key aes_key;
 
 void tgl_init_aes_unauth (const char server_nonce[16], const char hidden_client_nonce[32], int encrypt) {
   static unsigned char buffer[64], hash[20];
@@ -323,10 +324,10 @@ void tgl_init_aes_unauth (const char server_nonce[16], const char hidden_client_
   memcpy (aes_key_raw + 20, hash, 12);
   memcpy (aes_iv, hash + 12, 8);
   memcpy (aes_iv + 28, hidden_client_nonce, 4);
-  if (encrypt == AES_ENCRYPT) {
-    AES_set_encrypt_key (aes_key_raw, 32*8, &aes_key);
+  if (encrypt) {
+    TGLC_aes_set_encrypt_key (aes_key_raw, 32*8, &aes_key);
   } else {
-    AES_set_decrypt_key (aes_key_raw, 32*8, &aes_key);
+    TGLC_aes_set_decrypt_key (aes_key_raw, 32*8, &aes_key);
   }
   memset (aes_key_raw, 0, sizeof (aes_key_raw));
 }
@@ -363,10 +364,10 @@ void tgl_init_aes_auth (char auth_key[192], char msg_key[16], int encrypt) {
   TGLC_sha1 (buffer, 48, hash);
   memcpy (aes_iv + 24, hash, 8);
   
-  if (encrypt == AES_ENCRYPT) {
-    AES_set_encrypt_key (aes_key_raw, 32*8, &aes_key);
+  if (encrypt) {
+    TGLC_aes_set_encrypt_key (aes_key_raw, 32*8, &aes_key);
   } else {
-    AES_set_decrypt_key (aes_key_raw, 32*8, &aes_key);
+    TGLC_aes_set_decrypt_key (aes_key_raw, 32*8, &aes_key);
   }
   memset (aes_key_raw, 0, sizeof (aes_key_raw));
 }
@@ -377,7 +378,7 @@ int tgl_pad_aes_encrypt (char *from, int from_len, char *to, int size) {
   if (from_len < padded_size) {
     assert (TGLC_rand_pseudo_bytes ((unsigned char *) from + from_len, padded_size - from_len) >= 0);
   }
-  AES_ige_encrypt ((unsigned char *) from, (unsigned char *) to, padded_size, &aes_key, aes_iv, AES_ENCRYPT);
+  TGLC_aes_ige_encrypt ((unsigned char *) from, (unsigned char *) to, padded_size, &aes_key, aes_iv, 1);
   return padded_size;
 }
 
@@ -385,8 +386,6 @@ int tgl_pad_aes_decrypt (char *from, int from_len, char *to, int size) {
   if (from_len <= 0 || from_len > size || (from_len & 15)) {
     return -1;
   }
-  AES_ige_encrypt ((unsigned char *) from, (unsigned char *) to, from_len, &aes_key, aes_iv, AES_DECRYPT); 
+  TGLC_aes_ige_encrypt ((unsigned char *) from, (unsigned char *) to, from_len, &aes_key, aes_iv, 0);
   return from_len;
 }
-
-

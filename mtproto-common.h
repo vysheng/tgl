@@ -24,7 +24,6 @@
 #include <string.h>
 #include "crypto/rsa_pem.h"
 #include "crypto/bn.h"
-#include <openssl/aes.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -363,7 +362,7 @@ int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *
 //extern long long rsa_encrypted_chunks, rsa_decrypted_chunks;
 
 //extern unsigned char aes_key_raw[32], aes_iv[32];
-//extern AES_KEY aes_key;
+//extern TGLC_aes_key aes_key;
 
 void tgl_init_aes_unauth (const char server_nonce[16], const char hidden_client_nonce[32], int encrypt);
 void tgl_init_aes_auth (char auth_key[192], char msg_key[16], int encrypt);
