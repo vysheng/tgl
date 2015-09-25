@@ -100,6 +100,7 @@ struct send_file {
   int h;
   int duration;
   char *caption;
+  int channel;
 };
 
 #define memcmp8(a,b) memcmp ((a), (b), 8)
@@ -1114,9 +1115,9 @@ static int get_history_on_answer (struct tgl_state *TLS, struct query *q, void *
     if (q->callback) {
       ((void (*)(struct tgl_state *TLS, void *, int, int, struct tgl_message **))q->callback) (TLS, q->callback_extra, 1, E->list_offset, E->ML);
     }
-    if (E->list_offset > 0) {
+    /*if (E->list_offset > 0) {
       tgl_do_messages_mark_read (TLS, E->id, E->ML[0]->id, 0, 0, 0);
-    }
+    }*/
 
     tfree (E->ML, sizeof (void *) * E->list_size);
     tfree (E, sizeof (*E));
@@ -1213,7 +1214,7 @@ static void _tgl_do_get_history (struct tgl_state *TLS, struct get_history_extra
 void tgl_do_get_history (struct tgl_state *TLS, tgl_peer_id_t id, int offset, int limit, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
   if (tgl_get_peer_type (id) == TGL_PEER_ENCR_CHAT || offline_mode) {
     tgl_do_get_local_history (TLS, id, offset, limit, callback, callback_extra);
-    tgl_do_mark_read (TLS, id, 0, 0);
+    //tgl_do_mark_read (TLS, id, 0, 0);
     return;
   }
   struct get_history_extra *E = talloc0 (sizeof (*E));
@@ -1474,7 +1475,7 @@ static void send_avatar_end (struct tgl_state *TLS, struct send_file *f, void *c
 
 static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
   out_int (CODE_messages_send_media);
-  out_int ((f->reply ? 1 : 0));
+  out_int ((f->reply ? 1 : 0) | f->channel);
   out_peer_id (TLS, f->to_id);
   if (f->reply) {
     out_int (f->reply);
@@ -1690,6 +1691,10 @@ static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, cons
     f->part_size *= 2;
   }
   f->flags = flags;
+  f->channel = 0;
+  if (flags & TGLMF_POST_AS_CHANNEL) {
+    f->channel = 16;
+  }
 
   if (f->part_size > (512 << 10)) {
     close (fd);
@@ -2079,7 +2084,11 @@ void tgl_do_send_location (struct tgl_state *TLS, tgl_peer_id_t id, double latit
     int reply_id = flags >> 32;
     clear_packet ();
     out_int (CODE_messages_send_media);
-    out_int (reply_id ? 1 : 0);
+    unsigned f = reply_id ? 1 : 0;
+    if (flags & TGLMF_POST_AS_CHANNEL) {
+      f |= 16;
+    }
+    out_int (f);
     if (reply_id) { out_int (reply_id); }
     out_peer_id (TLS, id);
     out_int (CODE_input_media_geo_point);

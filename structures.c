@@ -1246,13 +1246,11 @@ void tglf_fetch_message (struct tgl_state *TLS, struct tgl_message *M, struct tl
   {
     tgl_peer_t *P = tgl_peer_get (TLS, to_id);
     if (!P || !(P->flags & TGLPF_CREATED)) {
-      vlogprintf (E_ERROR, "flags=%d (%d,%d)\n", P ? P->flags : -1, tgl_get_peer_type (to_id), tgl_get_peer_id (to_id));
       tgl_do_get_difference (TLS, 0, 0, 0);
       return;
     }
     
     if (DS_M->from_id) {
-      vlogprintf (E_ERROR, "%d\n", DS_LVAL (DS_M->from_id));
       P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_M->from_id)));
       if (!P || !(P->flags & TGLPF_CREATED)) {
         tgl_do_get_difference (TLS, 0, 0, 0);
@@ -1683,7 +1681,6 @@ struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_d
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = U;
   }
-  vlogprintf (E_ERROR, "(%d,%d)\n", tgl_get_peer_type (U->id), tgl_get_peer_id (U->id));
   tglf_fetch_channel (TLS, &U->channel, DS_C);
   return &U->channel;
 }
