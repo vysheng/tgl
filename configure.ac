@@ -16,6 +16,7 @@ LDFLAGS="$LDFLAGS -L/usr/local/lib"
 
 # Checks for libraries.
 AC_CHECK_LIB([m], [sqrt])
+AC_CHECK_LIB([gcrypt], [gcry_md_open])
 AC_SEARCH_LIBS([clock_gettime], [rt])
 
 EVENT_VER=""

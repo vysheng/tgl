@@ -28,7 +28,7 @@
 typedef struct TGLC_aes_key {
   char _dummy[
 #ifdef TGL_AVOID_OPENSSL_AES
-#error Not specified!
+              32
 #else
               244
 #endif
