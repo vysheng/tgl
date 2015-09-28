@@ -28,7 +28,7 @@ EXTRA_OBJECTS=""
 AX_CHECK_OPENSSL(,[AC_MSG_ERROR([No openssl found])])
 AX_CHECK_ZLIB(, [AC_MSG_ERROR([No zlib found])])
 
-AC_ARG_ENABLE(extf,[enables extended queries system],
+AC_ARG_ENABLE(extf,[  --enable-extf		  enables extended queries system],
   [ 
   if test "x$enableval" = "xno" ; then    
     AC_DEFINE([DISABLE_EXTF],[1],[disable extf queries])
@@ -36,7 +36,7 @@ AC_ARG_ENABLE(extf,[enables extended queries system],
   ],[
   ])
 
-AC_ARG_ENABLE(libevent,[--enable-libevent include libevent-based net and timers],
+AC_ARG_ENABLE(libevent,[  --enable-libevent	  include libevent-based net and timers],
   [ 
   if test "x$enableval" = "xyes" ; then
     AC_CHECK_LIB([event], [event_base_new], [], [AC_MSG_ERROR([no libevent found])])
@@ -48,7 +48,7 @@ AC_ARG_ENABLE(libevent,[--enable-libevent include libevent-based net and timers]
   ],[
   ])
 
-AC_ARG_ENABLE(valgrind,[fixes for correct valgrind work],
+AC_ARG_ENABLE(valgrind,[  --enable-valgrind	  fixes for correct valgrind work],
   [ 
   if test "x$enableval" = "xyes" ; then
     AC_CHECK_HEADER(valgrind/memcheck.h, [AC_DEFINE([VALGRIND_FIXES], [1], [fixed for correct valgrind work])], [
