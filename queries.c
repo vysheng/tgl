@@ -61,6 +61,12 @@
 #include "mtproto-utils.h"
 #include "tgl-methods-in.h"
 
+#ifndef EPROTO
+// BSD doesn't define EPROTO, even though it is POSIX:
+// https://lists.freebsd.org/pipermail/freebsd-standards/2003-June/000124.html
+#define EPROTO EIO
+#endif
+
 #define sha1 SHA1
 
 #ifndef PATH_MAX
