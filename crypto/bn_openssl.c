@@ -22,6 +22,8 @@
 
 #ifndef TGL_AVOID_OPENSSL_BN
 
+#include <assert.h>
+
 #include <openssl/bn.h>
 
 #include "bn.h"
@@ -78,8 +80,9 @@ int TGLC_bn_num_bits (const TGLC_bn *a) {
   return BN_num_bits (unwrap_bn (a));
 }
 
-int TGLC_bn_sub (TGLC_bn *r, const TGLC_bn *a, const TGLC_bn *b) {
-  return BN_sub (unwrap_bn (r), unwrap_bn (a), unwrap_bn (b));
+void TGLC_bn_sub (TGLC_bn *r, const TGLC_bn *a, const TGLC_bn *b) {
+  int res = BN_sub (unwrap_bn (r), unwrap_bn (a), unwrap_bn (b));
+  assert (res);
 }
 
 int TGLC_bn_div (TGLC_bn *dv, TGLC_bn *rem, const TGLC_bn *a, const TGLC_bn *d, TGLC_bn_ctx *ctx) {
