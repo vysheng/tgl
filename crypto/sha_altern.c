@@ -22,12 +22,20 @@
 
 #ifdef TGL_AVOID_OPENSSL_SHA
 
-// #include <gcrypt/sha.h>
-// Or similar
+/* Marginally speed up compilation */
+#define GCRYPT_NO_MPI_MACROS
+/* Fail-fast when something becomes deprecated. */
+#define GCRYPT_NO_DEPRECATED
+
+#include <gcrypt.h>
 
 #include "sha.h"
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-independent defines for sha
+void TGLC_sha1 (const unsigned char *d, size_t n, unsigned char *md) {
+  gcry_md_hash_buffer (GCRY_MD_SHA1, md, d, n);
+}
+void TGLC_sha256 (const unsigned char *d, size_t n, unsigned char *md) {
+  gcry_md_hash_buffer (GCRY_MD_SHA256, md, d, n);
+}
 
 #endif
