@@ -22,12 +22,13 @@
 
 #ifdef TGL_AVOID_OPENSSL_ERR
 
-// #include <gcrypt/err.h>
-// Or similar
+#include <gcrypt.h>
 
 #include "err.h"
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-independent defines for err
+void TGLC_err_print_errors_fp (FILE *fp) {
+  // Can't print anything meaningful, so don't.
+  (void) fp;
+}
 
 #endif
