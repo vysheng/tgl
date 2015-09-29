@@ -26,11 +26,11 @@
 
 #include "sha.h"
 
-unsigned char* TGLC_sha1 (const unsigned char *d, size_t n, unsigned char *md) {
-  return SHA1 (d, n, md);
+void TGLC_sha1 (const unsigned char *d, size_t n, unsigned char *md) {
+  SHA1 (d, n, md);
 }
-unsigned char* TGLC_sha256 (const unsigned char *d, size_t n, unsigned char *md) {
-  return SHA256 (d, n, md);
+void TGLC_sha256 (const unsigned char *d, size_t n, unsigned char *md) {
+  SHA256 (d, n, md);
 }
 
 #endif
