@@ -22,12 +22,49 @@
 
 #ifdef TGL_AVOID_OPENSSL_BN
 
-// #include <gcrypt/rsa.h>
-// Or similar
+#include <gcrypt.h>
 
+#include "meta.h"
 #include "rsa_pem.h"
+#include "../tools.h" /* talloc */
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-independent defines for rsa and pem
+struct TGLC_rsa {
+  TGLC_bn *n;
+  TGLC_bn *e;
+};
+
+TGLC_rsa *TGLC_rsa_new (unsigned long e, int n_bytes, const unsigned char *n) {
+  assert (n_bytes > 0 && n_bytes < 5000);
+  TGLC_rsa *ret = talloc (sizeof (TGLC_rsa));
+  ret->e = TGLC_bn_new ();
+  TGLC_bn_set_word (ret->e, e);
+  ret->n = TGLC_bn_bin2bn (n, n_bytes, NULL);
+  assert (n_bytes == TGLC_bn_num_bytes (ret->n));
+  return ret;
+}
+
+#define RSA_GETTER(M)                                                          \
+  TGLC_bn *TGLC_rsa_ ## M (TGLC_rsa *key) {                                    \
+    return key->M;                                                             \
+  }                                                                            \
+
+RSA_GETTER(n);
+RSA_GETTER(e);
+
+void TGLC_rsa_free (TGLC_rsa *key) {
+  tfree (key, sizeof (TGLC_rsa));
+}
+
+TGLC_rsa *TGLC_pem_read_RSAPublicKey (FILE *fp) {
+  /*
+   * Reading PEM format involves ASN.1 and is hard. libgcrypt doesn't support it.
+   * The dependency on oh-so-freaking-much code just to parse static data that
+   * will never change is not justified. Let the caller figure out how to resolve
+   * this (telegram-purple does so by using libpurple's built-in functions), and
+   * ignore any PEM files.
+   */
+  (void) fp;
+  return NULL;
+}
 
 #endif
