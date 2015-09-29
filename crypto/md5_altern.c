@@ -22,12 +22,17 @@
 
 #ifdef TGL_AVOID_OPENSSL_MD5
 
-// #include <gcrypt/md5.h>
-// Or similar
+/* Marginally speed up compilation */
+#define GCRYPT_NO_MPI_MACROS
+/* Fail-fast when something becomes deprecated. */
+#define GCRYPT_NO_DEPRECATED
+
+#include <gcrypt.h>
 
 #include "md5.h"
 
-/* FIXME */
-#error Not yet implemented: OpenSSL-independent defines for md5
+void TGLC_md5 (const unsigned char *d, size_t n, unsigned char *md) {
+  gcry_md_hash_buffer (GCRY_MD_MD5, md, d, n);
+}
 
 #endif
