@@ -26,8 +26,8 @@
 
 #include "md5.h"
 
-unsigned char* TGLC_md5(const unsigned char *d, size_t n, unsigned char *md) {
-  return MD5(d, n, md);
+void TGLC_md5(const unsigned char *d, size_t n, unsigned char *md) {
+  MD5(d, n, md);
 }
 
 #endif

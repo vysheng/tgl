@@ -23,6 +23,6 @@
 
 #include <stddef.h> /* size_t */
 
-unsigned char* TGLC_md5(const unsigned char *d, size_t n, unsigned char *md);
+void TGLC_md5 (const unsigned char *d, size_t n, unsigned char *md);
 
 #endif
