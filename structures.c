@@ -114,7 +114,9 @@ char *tgls_default_create_print_name (struct tgl_state *TLS, tgl_peer_id_t id, c
   char *s = buf;
   while (*s) {
     if (((unsigned char)*s) <= ' ') { *s = '_'; }
-    if (*s == '#') { *s = '@'; }
+    if (*s == '#') { *s = '_'; }
+    if (*s == '$') { *s = '_'; }
+    if (*s == '@') { *s = '_'; }
     s++;
   }
   s = buf;

@@ -1298,6 +1298,15 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q, void *
 
   int dl_size = DS_LVAL (DS_MD->dialogs->cnt);
 
+  int i;
+  for (i = 0; i < DS_LVAL (DS_MD->chats->cnt); i++) {
+    tglf_fetch_alloc_chat (TLS, DS_MD->chats->data[i]);
+  }
+
+  for (i = 0; i < DS_LVAL (DS_MD->users->cnt); i++) {
+    tglf_fetch_alloc_user (TLS, DS_MD->users->data[i]);
+  }
+
   if (E->list_offset + dl_size > E->list_size) {
     int new_list_size = E->list_size * 2;
     if (new_list_size < E->list_offset + dl_size) {
@@ -1323,10 +1332,11 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q, void *
     }
   }
 
-  int i;
   for (i = 0; i < dl_size; i++) {
     struct tl_ds_dialog *DS_D = DS_MD->dialogs->data[i];
-    E->PL[E->list_offset + i] = tglf_fetch_peer_id (TLS, DS_D->peer);
+    tgl_peer_t *P = tgl_peer_get (TLS, tglf_fetch_peer_id (TLS, DS_D->peer));
+    assert (P);
+    E->PL[E->list_offset + i] = P->id;
     E->LMD[E->list_offset + i] = tgl_peer_id_to_msg_id (E->PL[E->list_offset + i], DS_LVAL (DS_D->top_message));
     E->LM[E->list_offset + i] = &E->LMD[E->list_offset + i];
     E->UC[E->list_offset + i] = DS_LVAL (DS_D->unread_count);
@@ -1336,14 +1346,6 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q, void *
 
   for (i = 0; i < DS_LVAL (DS_MD->messages->cnt); i++) {
     tglf_fetch_alloc_message (TLS, DS_MD->messages->data[i]);
-  }
-
-  for (i = 0; i < DS_LVAL (DS_MD->chats->cnt); i++) {
-    tglf_fetch_alloc_chat (TLS, DS_MD->chats->data[i]);
-  }
-
-  for (i = 0; i < DS_LVAL (DS_MD->users->cnt); i++) {
-    tglf_fetch_alloc_user (TLS, DS_MD->users->data[i]);
   }
 
   vlogprintf (E_DEBUG, "dl_size = %d, total = %d\n", dl_size, E->list_offset);
