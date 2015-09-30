@@ -1280,14 +1280,23 @@ void tglmp_on_start (struct tgl_state *TLS) {
   int ok = 0;
   for (i = 0; i < TLS->rsa_key_num; i++) {
     char *key = TLS->rsa_key_list[i];
-    TGLC_rsa *res = rsa_load_public_key (TLS, key);
-    if (!res) {
-      vlogprintf (E_WARNING, "Can not load key %s\n", key);
-      TLS->rsa_key_loaded[i] = NULL;
-    } else {
+    if (!key) {
+      /* This key was provided using 'tgl_set_rsa_key_direct'. */
+      TGLC_rsa *rsa = TLS->rsa_key_loaded[i];
+      assert (rsa);
+      TLS->rsa_key_fingerprint[i] = tgl_do_compute_rsa_key_fingerprint (rsa);
+      vlogprintf (E_NOTICE, "'direct' public key loaded successfully\n");
       ok = 1;
-      TLS->rsa_key_loaded[i] = res;
-      TLS->rsa_key_fingerprint[i] = tgl_do_compute_rsa_key_fingerprint (res);
+    } else {
+      TGLC_rsa *res = rsa_load_public_key (TLS, key);
+      if (!res) {
+        vlogprintf (E_WARNING, "Can not load key %s\n", key);
+        TLS->rsa_key_loaded[i] = NULL;
+      } else {
+        ok = 1;
+        TLS->rsa_key_loaded[i] = res;
+        TLS->rsa_key_fingerprint[i] = tgl_do_compute_rsa_key_fingerprint (res);
+      }
     }
   }
 

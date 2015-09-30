@@ -310,6 +310,7 @@ void tgl_set_auth_file_path (struct tgl_state *TLS, const char *path);
 void tgl_set_download_directory (struct tgl_state *TLS, const char *path);
 void tgl_set_callback (struct tgl_state *TLS, struct tgl_update_callback *cb);
 void tgl_set_rsa_key (struct tgl_state *TLS, const char *key);
+void tgl_set_rsa_key_direct (struct tgl_state *TLS, unsigned long e, int n_bytes, const unsigned char *n);
 void tgl_set_app_version (struct tgl_state *TLS, const char *app_version);
 
 static inline int tgl_get_peer_type (tgl_peer_id_t id) {

@@ -22,6 +22,7 @@
 #include "config.h"
 #endif
 
+#include "crypto/rsa_pem.h"
 #include "tgl.h"
 #include "tools.h"
 #include "mtproto-client.h"
@@ -56,6 +57,13 @@ void tgl_set_callback (struct tgl_state *TLS, struct tgl_update_callback *cb) {
 void tgl_set_rsa_key (struct tgl_state *TLS, const char *key) {
   assert (TLS->rsa_key_num < TGL_MAX_RSA_KEYS_NUM);
   TLS->rsa_key_list[TLS->rsa_key_num ++] = tstrdup (key);
+}
+
+void tgl_set_rsa_key_direct (struct tgl_state *TLS, unsigned long e, int n_bytes, const unsigned char *n) {
+  assert (TLS->rsa_key_num < TGL_MAX_RSA_KEYS_NUM);
+  TLS->rsa_key_list[TLS->rsa_key_num] = NULL;
+  TLS->rsa_key_loaded[TLS->rsa_key_num] = TGLC_rsa_new (e, n_bytes, n);
+  TLS->rsa_key_num ++;
 }
 
 void tgl_init (struct tgl_state *TLS) {

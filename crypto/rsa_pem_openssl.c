@@ -27,6 +27,7 @@
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 
+#include "bn.h"
 #include "meta.h"
 #include "rsa_pem.h"
 
@@ -34,6 +35,14 @@ TGLC_WRAPPER_ASSOC(rsa,RSA)
 
 // TODO: Refactor crucial struct-identity into its own header.
 TGLC_WRAPPER_ASSOC(bn,BIGNUM)
+
+TGLC_rsa *TGLC_rsa_new (unsigned long e, int n_bytes, const unsigned char *n) {
+  RSA *ret = RSA_new ();
+  ret->e = unwrap_bn (TGLC_bn_new ());
+  TGLC_bn_set_word (wrap_bn (ret->e), e);
+  ret->n = unwrap_bn (TGLC_bn_bin2bn (n, n_bytes, NULL));
+  return wrap_rsa (ret);
+}
 
 #define RSA_GETTER(M)                                                          \
   TGLC_bn *TGLC_rsa_ ## M (TGLC_rsa *key) {                                    \
