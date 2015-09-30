@@ -18,9 +18,9 @@
     Copyright Ben Wiederhake 2015
 */
 
-#include "crypto-config.h"
+#include "../config.h"
 
-#ifndef TGL_AVOID_OPENSSL_MD5
+#ifndef TGL_AVOID_OPENSSL
 
 #include <openssl/md5.h>
 

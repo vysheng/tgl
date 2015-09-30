@@ -16,7 +16,6 @@ LDFLAGS="$LDFLAGS -L/usr/local/lib"
 
 # Checks for libraries.
 AC_CHECK_LIB([m], [sqrt])
-AC_CHECK_LIB([gcrypt], [gcry_md_open])
 AC_SEARCH_LIBS([clock_gettime], [rt])
 
 EVENT_VER=""
@@ -26,7 +25,20 @@ EXTRA_OBJECTS=""
 #     OPENSSL_LIBS to the -l directives required
 #     OPENSSL_LDFLAGS to the -L or -R flags required
 
-AX_CHECK_OPENSSL(,[AC_MSG_ERROR([No openssl found])])
+AC_ARG_ENABLE(openssl,[  --disable-openssl	  disables OpenSSL, and don't link against it
+			  (this can't read *.pub files, though.)],
+  [ 
+  if test "x$enableval" = "xno" ; then    
+	AC_DEFINE([TGL_AVOID_OPENSSL],[1],[avoid OpenSSL entirely, use libgcrypt instead (this can't read *.pub files, though.)])
+    AC_CHECK_LIB([gcrypt], [gcry_md_open])
+  else
+    # Don't be annoying, so don't inform the user about --disable-openssl
+    AX_CHECK_OPENSSL(,[AC_MSG_ERROR([No openssl found.])])
+  fi 
+  ],[
+  AX_CHECK_OPENSSL(,[AC_MSG_ERROR([No openssl found. With --disable-openssl, libtgl will use libgcrypt instead.])])
+  ])
+
 AX_CHECK_ZLIB(, [AC_MSG_ERROR([No zlib found])])
 
 AC_ARG_ENABLE(extf,[  --enable-extf		  enables extended queries system],

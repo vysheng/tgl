@@ -23,11 +23,11 @@
 
 #include <stddef.h> /* size_t */
 
-#include "crypto-config.h"
+#include "../config.h"
 
 typedef struct TGLC_aes_key {
   char _dummy[
-#ifdef TGL_AVOID_OPENSSL_AES
+#ifdef TGL_AVOID_OPENSSL
               32
 #else
               244

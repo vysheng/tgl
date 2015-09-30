@@ -18,9 +18,9 @@
     Copyright Ben Wiederhake 2015
 */
 
-#include "crypto-config.h"
+#include "../config.h"
 
-#ifdef TGL_AVOID_OPENSSL_BN
+#ifdef TGL_AVOID_OPENSSL
 
 #include <gcrypt.h>
 

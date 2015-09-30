@@ -18,9 +18,9 @@
     Copyright Ben Wiederhake 2015
 */
 
-#include "crypto-config.h"
+#include "../config.h"
 
-#ifdef TGL_AVOID_OPENSSL_MD5
+#ifdef TGL_AVOID_OPENSSL
 
 /* Marginally speed up compilation */
 #define GCRYPT_NO_MPI_MACROS
