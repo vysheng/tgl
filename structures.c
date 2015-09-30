@@ -47,18 +47,24 @@
 
 #define sha1 SHA1
 
-struct random2local {
+/*struct random2local {
   long long random_id;
-  int local_id;
-};
+  tgl_message_id_t local_id;
+};*/
 
 static int id_cmp (struct tgl_message *M1, struct tgl_message *M2);
 #define peer_cmp(a,b) (tgl_cmp_peer_id (a->id, b->id))
 #define peer_cmp_name(a,b) (strcmp (a->print_name, b->print_name))
 
-static int random_id_cmp (struct random2local *L, struct random2local *R) {
+static int random_id_cmp (struct tgl_message *L, struct tgl_message *R) {
   if (L->random_id < R->random_id) { return -1; }
   if (L->random_id > R->random_id) { return 1; }
+  return 0;
+}
+
+static int temp_id_cmp (struct tgl_message *L, struct tgl_message *R) {
+  if (L->temp_id < R->temp_id) { return -1; }
+  if (L->temp_id > R->temp_id) { return 1; }
   return 0;
 }
 
@@ -83,11 +89,14 @@ static int webpage_id_cmp (struct tgl_webpage *L, struct tgl_webpage *R) {
 DEFINE_TREE(peer,tgl_peer_t *,peer_cmp,0)
 DEFINE_TREE(peer_by_name,tgl_peer_t *,peer_cmp_name,0)
 DEFINE_TREE(message,struct tgl_message *,id_cmp,0)
-DEFINE_TREE(random_id,struct random2local *, random_id_cmp,0)
+DEFINE_TREE(random_id,struct tgl_message *, random_id_cmp,0)
+DEFINE_TREE(temp_id,struct tgl_message *, temp_id_cmp,0)
 DEFINE_TREE(photo,struct tgl_photo *,photo_id_cmp,0)
 DEFINE_TREE(document,struct tgl_document *,document_id_cmp,0)
 DEFINE_TREE(webpage,struct tgl_webpage *,webpage_id_cmp,0)
 
+
+static void increase_peer_size (struct tgl_state *TLS);
 
 char *tgls_default_create_print_name (struct tgl_state *TLS, tgl_peer_id_t id, const char *a1, const char *a2, const char *a3, const char *a4) {
   const char *d[4];
@@ -267,17 +276,29 @@ int tglf_fetch_user_status (struct tgl_state *TLS, struct tgl_user_status *S, st
   return 0;
 }
 
-int tglf_fetch_user (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_user *DS_U) {
+struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS, struct tl_ds_user *DS_U) {
   if (!DS_U) { return 0; }
-  U->id = TGL_MK_USER (DS_LVAL (DS_U->id));
   if (DS_U->magic == CODE_user_empty) {
     return 0;
+  } 
+  
+  tgl_peer_id_t user_id = TGL_MK_USER (DS_LVAL (DS_U->id));  
+  user_id.access_hash = DS_LVAL (DS_U->access_hash);
+  
+  struct tgl_user *U = (struct tgl_user *)tgl_peer_get (TLS, user_id);
+  if (!U) {
+    TLS->users_allocated ++;
+    U = talloc0 (sizeof (tgl_peer_t));
+    U->id = user_id;
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)U, lrand48 ());
+    increase_peer_size (TLS);
+    TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)U;
   }
   
   int flags = U->flags & 0xffff;
 
   if (DS_LVAL (DS_U->flags) & (1 << 10)) {
-    bl_do_set_our_id (TLS, tgl_get_peer_id (U->id));
+    bl_do_set_our_id (TLS, U->id);
     flags |= TGLUF_SELF;
   }
   
@@ -329,13 +350,14 @@ int tglf_fetch_user (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_use
     }
   }
   
-  return 0;
+  return U;
 }
 
-void tglf_fetch_user_full (struct tgl_state *TLS, struct tgl_user *U, struct tl_ds_user_full *DS_UF) {
-  if (!DS_UF) { return; }
+struct tgl_user *tglf_fetch_alloc_user_full (struct tgl_state *TLS, struct tl_ds_user_full *DS_UF) {
+  if (!DS_UF) { return NULL; }
 
-  tglf_fetch_user (TLS, U, DS_UF->user);
+  struct tgl_user *U = tglf_fetch_alloc_user (TLS, DS_UF->user);
+  if (!U) { return NULL; }
 
   int flags = U->flags & 0xffff;
   
@@ -357,6 +379,8 @@ void tglf_fetch_user_full (struct tgl_state *TLS, struct tgl_user *U, struct tl_
     DS_UF->bot_info,
     flags
   );
+
+  return U;
 }
 
 void str_to_256 (unsigned char *dst, char *src, int src_len) {
@@ -377,34 +401,47 @@ void str_to_32 (unsigned char *dst, char *src, int src_len) {
   }
 }
 
-void tglf_fetch_encrypted_chat (struct tgl_state *TLS, struct tgl_secret_chat *U, struct tl_ds_encrypted_chat *DS_EC) {
-  if (!DS_EC) { return; }
-  U->id = TGL_MK_ENCR_CHAT (DS_LVAL (DS_EC->id));
+struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS, struct tl_ds_encrypted_chat *DS_EC) {
+  if (!DS_EC) { return NULL; }
   if (DS_EC->magic == CODE_encrypted_chat_empty) {
-    return;
+    return NULL;
   }
+
+  tgl_peer_id_t chat_id = TGL_MK_ENCR_CHAT (DS_LVAL (DS_EC->id));  
+  chat_id.access_hash = DS_LVAL (DS_EC->access_hash);
+  
+  struct tgl_secret_chat *U = (void *)tgl_peer_get (TLS, chat_id);
+  if (!U) {
+    TLS->encr_chats_allocated ++;
+    U = talloc0 (sizeof (tgl_peer_t));
+    U->id = chat_id;
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)U, lrand48 ());
+    increase_peer_size (TLS);
+    TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)U;
+  }
+  
   int new = !(U->flags & TGLPF_CREATED);
  
   if (DS_EC->magic == CODE_encrypted_chat_discarded) {
     if (new) {
       vlogprintf (E_WARNING, "Unknown chat in deleted state. May be we forgot something...\n");
-      return;
+      return U;
     }
     bl_do_peer_delete (TLS, U->id);
     //write_secret_chat_file ();
-    return;
+    return U;
   }
 
   static unsigned char g_key[256];
   if (new) {
     if (DS_EC->magic != CODE_encrypted_chat_requested) {
       vlogprintf (E_WARNING, "Unknown chat. May be we forgot something...\n");
-      return;
+      return U;
     }
 
     str_to_256 (g_key, DS_STR (DS_EC->g_a));
  
-    int user_id =  DS_LVAL (DS_EC->participant_id) + DS_LVAL (DS_EC->admin_id) - TLS->our_id;
+    int user_id =  DS_LVAL (DS_EC->participant_id) + DS_LVAL (DS_EC->admin_id) - tgl_get_peer_id (TLS->our_id);
     int r = sc_request;
     bl_do_encr_chat (TLS, tgl_get_peer_id (U->id), 
       DS_EC->access_hash,
@@ -435,7 +472,7 @@ void tglf_fetch_encrypted_chat (struct tgl_state *TLS, struct tgl_secret_chat *U
         NULL, 
         TGL_FLAGS_UNCHANGED 
       );
-      return; // We needed only access hash from here
+      return U; // We needed only access hash from here
     }
     
     str_to_256 (g_key, DS_STR (DS_EC->g_a_or_b));
@@ -456,15 +493,32 @@ void tglf_fetch_encrypted_chat (struct tgl_state *TLS, struct tgl_secret_chat *U
       TGL_FLAGS_UNCHANGED 
     );
   }
+
+  return U;
 }
 
-void tglf_fetch_chat (struct tgl_state *TLS, struct tgl_chat *C, struct tl_ds_chat *DS_C) {
-  if (!DS_C) { return; }
-  
-  C->id = TGL_MK_CHAT (DS_LVAL (DS_C->id));
+struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS, struct tl_ds_chat *DS_C) {
+  if (!DS_C) { return NULL; }
   if (DS_C->magic == CODE_chat_empty) { 
-    return;
+    return NULL;
   }
+  if (DS_C->magic == CODE_channel) {
+    return (void *)tglf_fetch_alloc_channel (TLS, DS_C);
+  }
+  tgl_peer_id_t chat_id = TGL_MK_CHAT (DS_LVAL (DS_C->id));  
+  chat_id.access_hash = 0; // chats don't have access hash
+  
+  struct tgl_chat *C = (void *)tgl_peer_get (TLS, chat_id);
+  if (!C) {
+    TLS->chats_allocated ++;
+    C = talloc0 (sizeof (tgl_peer_t));
+    C->id = chat_id;
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)C, lrand48 ());
+    increase_peer_size (TLS);
+    TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)C;
+  }
+  
+  C->id = chat_id;
   
   int flags = C->flags & 0xffff;
   if (!(flags & TGLCF_CREATED)) {
@@ -483,27 +537,15 @@ void tglf_fetch_chat (struct tgl_state *TLS, struct tgl_chat *C, struct tl_ds_ch
     NULL, NULL,
     flags
   );
+  return C;
 }
 
-void tglf_fetch_chat_full (struct tgl_state *TLS, struct tgl_chat *C, struct tl_ds_messages_chat_full *DS_MCF) {
-  if (!DS_MCF) { return; }
-  struct tl_ds_chat_full *DS_CF = DS_MCF->full_chat;
-
-  C->id = TGL_MK_CHAT (DS_LVAL (DS_CF->id));
-
-  bl_do_chat (TLS, tgl_get_peer_id (C->id),
-    NULL, 0,
-    NULL, 
-    NULL,
-    DS_CF->participants->version,
-    (struct tl_ds_vector *)DS_CF->participants->participants,
-    NULL,
-    DS_CF->chat_photo,
-    DS_CF->participants->admin_id,
-    NULL, NULL,
-    C->flags & 0xffff
-  );
-  
+struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS, struct tl_ds_messages_chat_full *DS_MCF) {
+  if (!DS_MCF) { return NULL; }
+  if (DS_MCF->full_chat->magic == CODE_channel_full) {
+    return (void *)tglf_fetch_alloc_channel_full (TLS, DS_MCF);
+  }
+ 
   if (DS_MCF->users) {
     int i;
     for (i = 0; i < DS_LVAL (DS_MCF->users->cnt); i++) {
@@ -517,6 +559,8 @@ void tglf_fetch_chat_full (struct tgl_state *TLS, struct tgl_chat *C, struct tl_
       tglf_fetch_alloc_chat (TLS, DS_MCF->chats->data[i]);
     }
   }
+  
+  struct tl_ds_chat_full *DS_CF = DS_MCF->full_chat;
 
   if (DS_CF->bot_info) {
     int n = DS_LVAL (DS_CF->bot_info->cnt);
@@ -541,10 +585,44 @@ void tglf_fetch_chat_full (struct tgl_state *TLS, struct tgl_chat *C, struct tl_
       }
     }
   }
+
+  tgl_peer_id_t chat_id = TGL_MK_CHAT (DS_LVAL (DS_CF->id));  
+  struct tgl_chat *C = (void *)tgl_peer_get (TLS, chat_id);
+  assert (C);
+
+  bl_do_chat (TLS, tgl_get_peer_id (C->id),
+    NULL, 0,
+    NULL, 
+    NULL,
+    DS_CF->participants->version,
+    (struct tl_ds_vector *)DS_CF->participants->participants,
+    NULL,
+    DS_CF->chat_photo,
+    DS_CF->participants->admin_id,
+    NULL, NULL,
+    C->flags & 0xffff
+  );
+
+  return C;
 }
 
-void tglf_fetch_channel (struct tgl_state *TLS, struct tgl_channel *C, struct tl_ds_chat *DS_C) {
-  if (!DS_C) { return; }
+struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_ds_chat *DS_C) {
+  if (!DS_C) { return NULL; }
+  
+  tgl_peer_id_t chat_id = TGL_MK_CHANNEL (DS_LVAL (DS_C->id));  
+  chat_id.access_hash = DS_LVAL (DS_C->access_hash); 
+  
+  struct tgl_channel *C = (void *)tgl_peer_get (TLS, chat_id);
+  if (!C) {
+    TLS->channels_allocated ++;
+    C = talloc0 (sizeof (tgl_peer_t));
+    C->id = chat_id;
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)C, lrand48 ());
+    increase_peer_size (TLS);
+    TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)C;
+  }
+  
+  C->id = chat_id;
   
   int flags = C->flags & 0xffff;
   if (!(flags & TGLCF_CREATED)) {
@@ -563,13 +641,32 @@ void tglf_fetch_channel (struct tgl_state *TLS, struct tgl_channel *C, struct tl
     NULL, NULL, NULL, NULL,
     flags
   );
+
+  return C;
 }
 
-void tglf_fetch_channel_full (struct tgl_state *TLS, struct tgl_channel *C, struct tl_ds_messages_chat_full *DS_MCF) {
-  if (!DS_MCF) { return; }
+struct tgl_channel *tglf_fetch_alloc_channel_full (struct tgl_state *TLS, struct tl_ds_messages_chat_full *DS_MCF) {
+  if (!DS_MCF) { return NULL; }
+  
+  if (DS_MCF->users) {
+    int i;
+    for (i = 0; i < DS_LVAL (DS_MCF->users->cnt); i++) {
+      tglf_fetch_alloc_user (TLS, DS_MCF->users->data[i]);
+    }
+  }
+
+  if (DS_MCF->chats) {
+    int i;
+    for (i = 0; i < DS_LVAL (DS_MCF->chats->cnt); i++) {
+      tglf_fetch_alloc_chat (TLS, DS_MCF->chats->data[i]);
+    }
+  }
   struct tl_ds_chat_full *DS_CF = DS_MCF->full_chat;
 
-  C->id = TGL_MK_CHANNEL (DS_LVAL (DS_CF->id));
+  tgl_peer_id_t chat_id = TGL_MK_CHANNEL (DS_LVAL (DS_CF->id));
+
+  struct tgl_channel *C = (void *)tgl_peer_get (TLS, chat_id);
+  assert (C);
 
   bl_do_channel (TLS, tgl_get_peer_id (C->id),
     NULL,
@@ -586,20 +683,8 @@ void tglf_fetch_channel_full (struct tgl_state *TLS, struct tgl_channel *C, stru
     DS_CF->read_inbox_max_id,
     TGL_FLAGS_UNCHANGED
   );
-  
-  if (DS_MCF->users) {
-    int i;
-    for (i = 0; i < DS_LVAL (DS_MCF->users->cnt); i++) {
-      tglf_fetch_alloc_user (TLS, DS_MCF->users->data[i]);
-    }
-  }
 
-  if (DS_MCF->chats) {
-    int i;
-    for (i = 0; i < DS_LVAL (DS_MCF->chats->cnt); i++) {
-      tglf_fetch_alloc_chat (TLS, DS_MCF->chats->data[i]);
-    }
-  }
+  return C;
 }
 
 void tglf_fetch_photo_size (struct tgl_state *TLS, struct tgl_photo_size *S, struct tl_ds_photo_size *DS_PS) {
@@ -915,11 +1000,22 @@ void tglf_fetch_message_action (struct tgl_state *TLS, struct tgl_message_action
   }
 }
 
-void tglf_fetch_message_short (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_updates *DS_U) {
+struct tgl_message *tglf_fetch_alloc_message_short (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
   tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->user_id)));
   if (!P || !(P->flags & TGLPF_CREATED)) {
     tgl_do_get_difference (TLS, 0, 0, 0);
-    return;
+    return NULL;
+  }
+  
+  tgl_message_id_t msg_id = tgl_peer_id_to_msg_id (P->id, DS_LVAL (DS_U->id));
+  struct tgl_message *M = tgl_message_get (TLS, &msg_id);
+  if (!M) {
+    M = talloc0 (sizeof (*M));
+    M->permanent_id = msg_id;
+    tglm_message_insert_tree (TLS, M);
+    TLS->messages_allocated ++;
+
+    assert (tgl_message_get (TLS, &msg_id) == M);
   }
 
   int flags = M->flags & 0xffff;
@@ -947,8 +1043,8 @@ void tglf_fetch_message_short (struct tgl_state *TLS, struct tgl_message *M, str
   struct tl_ds_message_media A;
   A.magic = CODE_message_media_empty;
 
-  tgl_peer_id_t our_id = TGL_MK_USER (TLS->our_id);
-  tgl_peer_id_t peer_id = TGL_MK_USER (DS_LVAL (DS_U->user_id));
+  tgl_peer_id_t our_id = TLS->our_id;
+  tgl_peer_id_t peer_id = P->id;
 
   tgl_peer_id_t fwd_from_id;
   if (DS_U->fwd_from_id) {
@@ -956,7 +1052,8 @@ void tglf_fetch_message_short (struct tgl_state *TLS, struct tgl_message *M, str
   } else {
     fwd_from_id = TGL_MK_USER (0);
   }
-  bl_do_edit_message (TLS, DS_LVAL (DS_U->id), 
+
+  bl_do_edit_message (TLS, &msg_id, 
     (f & 2) ? &our_id : &peer_id,
     (f & 2) ? &peer_id : &our_id,
     DS_U->fwd_from_id ? &fwd_from_id : NULL,
@@ -969,18 +1066,28 @@ void tglf_fetch_message_short (struct tgl_state *TLS, struct tgl_message *M, str
     NULL, 
     flags
   );
+  return M;
 }
 
-void tglf_fetch_message_short_chat (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_updates *DS_U) {
-  tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->from_id)));
-  if (!P || !(P->flags & TGLPF_CREATED)) {
+struct tgl_message *tglf_fetch_alloc_message_short_chat (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
+  tgl_peer_t *F = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->from_id)));
+  if (!F || !(F->flags & TGLPF_CREATED)) {
     tgl_do_get_difference (TLS, 0, 0, 0);
-    return;
+    return NULL;
   }
-  P = tgl_peer_get (TLS, TGL_MK_CHAT (DS_LVAL (DS_U->chat_id)));
-  if (!P || !(P->flags & TGLPF_CREATED)) {
+  tgl_peer_t *T = tgl_peer_get (TLS, TGL_MK_CHAT (DS_LVAL (DS_U->chat_id)));
+  if (!T || !(T->flags & TGLPF_CREATED)) {
     tgl_do_get_difference (TLS, 0, 0, 0);
-    return;
+    return NULL;
+  }
+  
+  tgl_message_id_t msg_id = tgl_peer_id_to_msg_id (T->id, DS_LVAL (DS_U->id));
+  struct tgl_message *M = tgl_message_get (TLS, &msg_id);
+  if (!M) {
+    M = talloc0 (sizeof (*M));
+    M->permanent_id = msg_id;
+    tglm_message_insert_tree (TLS, M);
+    TLS->messages_allocated ++;
   }
 
   int flags = M->flags & 0xffff;
@@ -1008,8 +1115,8 @@ void tglf_fetch_message_short_chat (struct tgl_state *TLS, struct tgl_message *M
   struct tl_ds_message_media A;
   A.magic = CODE_message_media_empty;
 
-  tgl_peer_id_t from_id = TGL_MK_USER (DS_LVAL (DS_U->from_id));
-  tgl_peer_id_t to_id = TGL_MK_CHAT (DS_LVAL (DS_U->chat_id));
+  tgl_peer_id_t from_id = F->id;
+  tgl_peer_id_t to_id = T->id;
   tgl_peer_id_t fwd_from_id;
   if (DS_U->fwd_from_id) {
     fwd_from_id = tglf_fetch_peer_id (TLS, DS_U->fwd_from_id);
@@ -1017,7 +1124,7 @@ void tglf_fetch_message_short_chat (struct tgl_state *TLS, struct tgl_message *M
     fwd_from_id = TGL_MK_USER (0);
   }
 
-  bl_do_edit_message (TLS, DS_LVAL (DS_U->id),
+  bl_do_edit_message (TLS, &msg_id,
     &from_id,
     &to_id,
     DS_U->fwd_from_id ? &fwd_from_id : NULL,
@@ -1030,6 +1137,7 @@ void tglf_fetch_message_short_chat (struct tgl_state *TLS, struct tgl_message *M
     NULL,
     flags
   );
+  return M;
 }
 
 
@@ -1170,7 +1278,10 @@ void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_mess
       
       int i;
       for (i = 0; i < M->read_cnt; i++) {
-        struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_DMA->random_ids->data[i]));
+        tgl_message_id_t id;
+        id.peer_type = TGL_PEER_RANDOM_ID;
+        id.id = DS_LVAL (DS_DMA->random_ids->data[i]);
+        struct tgl_message *N = tgl_message_get (TLS, &id);
         if (N) {
           N->flags &= ~TGLMF_UNREAD;
         }
@@ -1237,28 +1348,57 @@ void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_mess
 }
 
 
-void tglf_fetch_message (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_message *DS_M) {
-  if (!DS_M || DS_M->magic == CODE_message_empty) { return; }
-  
-  assert (M->id == DS_LVAL (DS_M->id));
+struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_ds_message *DS_M) {
+  //assert (0);
+  if (!DS_M || DS_M->magic == CODE_message_empty) { 
+    vlogprintf (E_NOTICE, "empty message\n");
+    return NULL; 
+  }
   
   tgl_peer_id_t to_id = tglf_fetch_peer_id (TLS, DS_M->to_id);
-  {
-    tgl_peer_t *P = tgl_peer_get (TLS, to_id);
-    if (!P || !(P->flags & TGLPF_CREATED)) {
+  tgl_peer_t *T = tgl_peer_get (TLS, to_id);
+  if (!T || !(T->flags & TGLPF_CREATED)) {
+    tgl_do_get_difference (TLS, 0, 0, 0);
+    vlogprintf (E_NOTICE, "unknown to_id\n");
+    return NULL;
+  }
+  tgl_peer_t *P = T;
+
+  tgl_peer_t *F = NULL;
+  if (DS_M->from_id) {
+    F = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_M->from_id)));
+    if (!F || !(F->flags & TGLPF_CREATED)) {
       tgl_do_get_difference (TLS, 0, 0, 0);
-      return;
+      vlogprintf (E_NOTICE, "unknown from_id %d\n", DS_LVAL (DS_M->from_id));
+      return NULL;
     }
-    
-    if (DS_M->from_id) {
-      P = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_M->from_id)));
-      if (!P || !(P->flags & TGLPF_CREATED)) {
-        tgl_do_get_difference (TLS, 0, 0, 0);
-        return;
-      }
+    if (!tgl_cmp_peer_id (to_id, TLS->our_id)) {
+      P = F;
+    }
+  }
+  
+  tgl_peer_t *FF = NULL;
+
+  if (DS_M->fwd_from_id) {
+    FF = tgl_peer_get (TLS, tglf_fetch_peer_id (TLS, DS_M->fwd_from_id));
+    if (!FF) {
+      tgl_do_get_difference (TLS, 0, 0, 0);
+      vlogprintf (E_NOTICE, "unknown fwd_id\n");
+      return NULL;
     }
   }
 
+  tgl_message_id_t msg_id = tgl_peer_id_to_msg_id (P->id, DS_LVAL (DS_M->id));
+  struct tgl_message *M = tgl_message_get (TLS, &msg_id);
+
+  if (!M) {
+    M = talloc0 (sizeof (*M));
+    M->permanent_id = msg_id;
+    tglm_message_insert_tree (TLS, M);
+    TLS->messages_allocated ++;
+
+    assert (tgl_message_get (TLS, &msg_id) == M);
+  }
   int new = !(M->flags & TGLMF_CREATED);
 
   if (new) {
@@ -1275,22 +1415,21 @@ void tglf_fetch_message (struct tgl_state *TLS, struct tgl_message *M, struct tl
   
     tgl_peer_id_t from_id;
     if (DS_M->from_id) {
-      from_id = TGL_MK_USER (DS_LVAL (DS_M->from_id));
+      from_id = F->id;
     } else {
       from_id = TGL_MK_USER (0);
     }
   
-    tgl_peer_id_t to_id = tglf_fetch_peer_id (TLS, DS_M->to_id);
+    tgl_peer_id_t to_id = T->id;
 
     tgl_peer_id_t fwd_from_id;
     if (DS_M->fwd_from_id) {
-      fwd_from_id = tglf_fetch_peer_id (TLS, DS_M->fwd_from_id);
+      fwd_from_id = FF->id;
     } else {
       fwd_from_id = TGL_MK_USER (0);
     }
 
-    
-    bl_do_edit_message (TLS, DS_LVAL (DS_M->id),
+    bl_do_edit_message (TLS, &msg_id,
       DS_M->from_id ? &from_id : NULL,
       &to_id,
       DS_M->fwd_from_id ? &fwd_from_id : NULL,
@@ -1304,6 +1443,7 @@ void tglf_fetch_message (struct tgl_state *TLS, struct tgl_message *M, struct tl
       flags | TGLMF_CREATE | TGLMF_CREATED
     );
   }
+  return M;
 }
 
 static int *decr_ptr;
@@ -1368,18 +1508,28 @@ static int decrypt_encrypted_message (struct tgl_secret_chat *E) {
   return 0;
 }
 
-void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_encrypted_message *DS_EM) {
-  if (!DS_EM) { return; }
-
-  int new = !(M->flags & TGLMF_CREATED);
-  if (!new) {
-    return;
-  }
+struct tgl_message *tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tl_ds_encrypted_message *DS_EM) {
+  if (!DS_EM) { return NULL; }
   
   tgl_peer_t *P = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (DS_LVAL (DS_EM->chat_id)));
   if (!P || P->encr_chat.state != sc_ok) {
     vlogprintf (E_WARNING, "Encrypted message to unknown chat. Dropping\n");
-    return;
+    return NULL;
+  }
+
+  tgl_message_id_t msg_id = tgl_peer_id_to_msg_id (P->id, DS_LVAL (DS_EM->random_id));
+  struct tgl_message *M = tgl_message_get (TLS, &msg_id);
+  if (!M) {
+    M = talloc0 (sizeof (*M));
+    M->permanent_id = msg_id;
+    tglm_message_insert_tree (TLS, M);
+    TLS->messages_allocated ++;
+    assert (tgl_message_get (TLS, &msg_id) == M);
+  }
+
+  int new = !(M->flags & TGLMF_CREATED);
+  if (!new) {
+    return M;
   }
 
   decr_ptr = (void *)DS_EM->bytes->data;
@@ -1393,14 +1543,14 @@ void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M,
   long long key_fingerprint = P->encr_chat.exchange_state != tgl_sce_committed ? P->encr_chat.key_fingerprint : P->encr_chat.exchange_key_fingerprint;
   if (*(long long *)decr_ptr != key_fingerprint) {
     vlogprintf (E_WARNING, "Encrypted message with bad fingerprint to chat %s\n", P->print_name);
-    return;
+    return M;
   }
   
   decr_ptr += 2;
 
   if (decrypt_encrypted_message (&P->encr_chat) < 0) {
     vlogprintf (E_WARNING, "can not decrypt message\n");
-    return;
+    return M;
   }
   
   int *save_in_ptr = in_ptr;
@@ -1415,7 +1565,7 @@ void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M,
     vlogprintf (E_WARNING, "can not fetch message\n");
     in_ptr = save_in_ptr;
     in_end = save_in_end;
-    return;
+    return M;
   }
 
   in_ptr = decr_ptr;
@@ -1441,35 +1591,35 @@ void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M,
   if (in_seq_no / 2 != P->encr_chat.in_seq_no) {
     vlogprintf (E_WARNING, "Hole in seq in secret chat. in_seq_no = %d, expect_seq_no = %d\n", in_seq_no / 2, P->encr_chat.in_seq_no);
     free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
-    return;
+    return M;
   }
   
-  if ((in_seq_no & 1)  != 1 - (P->encr_chat.admin_id == TLS->our_id) || 
-      (out_seq_no & 1) != (P->encr_chat.admin_id == TLS->our_id)) {
+  if ((in_seq_no & 1)  != 1 - (P->encr_chat.admin_id == tgl_get_peer_id (TLS->our_id)) || 
+      (out_seq_no & 1) != (P->encr_chat.admin_id == tgl_get_peer_id (TLS->our_id))) {
     vlogprintf (E_WARNING, "Bad msg admin\n");
     free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
-    return;
+    return M;
   }
   if (out_seq_no / 2 > P->encr_chat.out_seq_no) {
     vlogprintf (E_WARNING, "In seq no is bigger than our's out seq no (out_seq_no = %d, our_out_seq_no = %d). Drop\n", out_seq_no / 2, P->encr_chat.out_seq_no);
     free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
-    return;
+    return M;
   }
   if (out_seq_no / 2 < P->encr_chat.last_in_seq_no) {
     vlogprintf (E_WARNING, "Clients in_seq_no decreased (out_seq_no = %d, last_out_seq_no = %d). Drop\n", out_seq_no / 2, P->encr_chat.last_in_seq_no);
     free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
-    return;
+    return M;
   }
 
   struct tl_ds_decrypted_message *DS_DM = DS_DML->message;
-  if (M->id != DS_LVAL (DS_DM->random_id)) {
-    vlogprintf (E_ERROR, "Incorrect message: id = %lld, new_id = %lld\n", M->id, DS_LVAL (DS_DM->random_id));
+  if (M->permanent_id.id != DS_LVAL (DS_DM->random_id)) {
+    vlogprintf (E_ERROR, "Incorrect message: id = %lld, new_id = %lld\n", M->permanent_id.id, DS_LVAL (DS_DM->random_id));
     free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
-    return;
+    return M;
   }
 
   tgl_peer_id_t from_id = TGL_MK_USER (P->encr_chat.user_id);
-  bl_do_edit_message_encr (TLS, M->id, &from_id, &P->id, DS_EM->date, DS_STR (DS_DM->message), DS_DM->media, DS_DM->action, DS_EM->file, TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
+  bl_do_edit_message_encr (TLS, &M->permanent_id, &from_id, &P->id, DS_EM->date, DS_STR (DS_DM->message), DS_DM->media, DS_DM->action, DS_EM->file, TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
 
   if (in_seq_no >= 0 && out_seq_no >= 0) {
     //bl_do_encr_chat_update_seq (TLS, (void *)P, in_seq_no / 2 + 1, out_seq_no / 2);
@@ -1485,6 +1635,7 @@ void tglf_fetch_encrypted_message (struct tgl_state *TLS, struct tgl_message *M,
   }
   
   free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
+  return M;
 }
 
 void tglf_fetch_encrypted_message_file (struct tgl_state *TLS, struct tgl_message_media *M, struct tl_ds_encrypted_file *DS_EF) {
@@ -1505,8 +1656,12 @@ void tglf_fetch_encrypted_message_file (struct tgl_state *TLS, struct tgl_messag
 }
 
 static int id_cmp (struct tgl_message *M1, struct tgl_message *M2) {
-  if (M1->id < M2->id) { return -1; }
-  else if (M1->id > M2->id) { return 1; }
+  if (M1->permanent_id.peer_type < M2->permanent_id.peer_type) { return -1; }
+  if (M1->permanent_id.peer_type > M2->permanent_id.peer_type) { return 1; }
+  if (M1->permanent_id.peer_id < M2->permanent_id.peer_id) { return -1; }
+  if (M1->permanent_id.peer_id > M2->permanent_id.peer_id) { return 1; }
+  if (M1->permanent_id.id < M2->permanent_id.id) { return -1; }
+  if (M1->permanent_id.id > M2->permanent_id.id) { return 1; }
   else { return 0; }
 }
 
@@ -1523,72 +1678,9 @@ static void increase_peer_size (struct tgl_state *TLS) {
   }
 }
 
-struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS, struct tl_ds_user *DS_U) {
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->id)));
-  if (!U) {
-    TLS->users_allocated ++;
-    U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_USER (DS_LVAL (DS_U->id));
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    increase_peer_size (TLS);
-    TLS->Peers[TLS->peer_num ++] = U;
-  }
-  tglf_fetch_user (TLS, &U->user, DS_U);
-  return &U->user;
-}
-
-struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS, struct tl_ds_encrypted_chat *DS_EC) {
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (DS_LVAL (DS_EC->id)));
-  if (!U) {
-    U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_ENCR_CHAT (DS_LVAL (DS_EC->id));
-    TLS->encr_chats_allocated ++;
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    increase_peer_size (TLS);
-    TLS->Peers[TLS->peer_num ++] = U;
-  }
-  tglf_fetch_encrypted_chat (TLS, &U->encr_chat, DS_EC);
-  return &U->encr_chat;
-}
-
-struct tgl_user *tglf_fetch_alloc_user_full (struct tgl_state *TLS, struct tl_ds_user_full *DS_U) {
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_U->user->id)));
-  if (U) {
-    tglf_fetch_user_full (TLS, &U->user, DS_U);
-    return &U->user;
-  } else {
-    TLS->users_allocated ++;
-    U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_USER (DS_LVAL (DS_U->user->id));
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    tglf_fetch_user_full (TLS, &U->user, DS_U);
-    increase_peer_size (TLS);
-    TLS->Peers[TLS->peer_num ++] = U;
-    return &U->user;
-  }
-}
-
-struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_ds_message *DS_M) {
-  struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_M->id));
-
-  if (!M) {
-    M = tglm_message_alloc (TLS, DS_LVAL (DS_M->id));
-  }
-  tglf_fetch_message (TLS, M, DS_M);
-  return M;
-}
-
 struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS, struct tl_ds_encrypted_message *DS_EM) {
-  struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_EM->random_id));
-
-  if (!M) {
-    M = talloc0 (sizeof (*M));
-    M->id = DS_LVAL (DS_EM->random_id);
-    tglm_message_insert_tree (TLS, M);
-    TLS->messages_allocated ++;
-    assert (tgl_message_get (TLS, M->id) == M);
-  }
-  tglf_fetch_encrypted_message (TLS, M, DS_EM);
+  struct tgl_message *M = tglf_fetch_encrypted_message (TLS, DS_EM);
+  if (!M) { return M; }
 
   if (M->flags & TGLMF_CREATED) {
     tgl_peer_t *_E = tgl_peer_get (TLS, M->to_id);
@@ -1641,102 +1733,6 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS, s
     }
   }
   return M;
-}
-
-struct tgl_message *tglf_fetch_alloc_message_short (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  int id = DS_LVAL (DS_U->id);
-  struct tgl_message *M = tgl_message_get (TLS, id);
-
-  if (!M) {
-    M = talloc0 (sizeof (*M));
-    M->id = id;
-    tglm_message_insert_tree (TLS, M);
-    TLS->messages_allocated ++;
-  }
-  tglf_fetch_message_short (TLS, M, DS_U);
-  return M;
-}
-
-struct tgl_message *tglf_fetch_alloc_message_short_chat (struct tgl_state *TLS, struct tl_ds_updates *DS_U) {
-  int id = DS_LVAL (DS_U->id);
-  struct tgl_message *M = tgl_message_get (TLS, id);
-
-  if (!M) {
-    M = talloc0 (sizeof (*M));
-    M->id = id;
-    tglm_message_insert_tree (TLS, M);
-    TLS->messages_allocated ++;
-  }
-  tglf_fetch_message_short_chat (TLS, M, DS_U);
-  return M;
-}
-
-struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_ds_chat *DS_C) {
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_CHANNEL (DS_LVAL (DS_C->id)));
-  if (!U) {
-    TLS->channels_allocated ++;
-    U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_CHANNEL (DS_LVAL (DS_C->id));
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    increase_peer_size (TLS);
-    TLS->Peers[TLS->peer_num ++] = U;
-  }
-  tglf_fetch_channel (TLS, &U->channel, DS_C);
-  return &U->channel;
-}
-
-struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS, struct tl_ds_chat *DS_C) {
-  if (DS_C->magic == CODE_channel || DS_C->magic == CODE_channel_forbidden) {
-    return (void *)tglf_fetch_alloc_channel (TLS, DS_C);
-  }
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_CHAT (DS_LVAL (DS_C->id)));
-  if (!U) {
-    TLS->chats_allocated ++;
-    U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_CHAT (DS_LVAL (DS_C->id));
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    increase_peer_size (TLS);
-    TLS->Peers[TLS->peer_num ++] = U;
-  }
-  tglf_fetch_chat (TLS, &U->chat, DS_C);
-  return &U->chat;
-}
-
-struct tgl_channel *tglf_fetch_alloc_channel_full (struct tgl_state *TLS, struct tl_ds_messages_chat_full *DS_MCF) {
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_CHANNEL (DS_LVAL (DS_MCF->full_chat->id)));
-  if (U) {
-    tglf_fetch_channel_full (TLS, &U->channel, DS_MCF);
-    return &U->channel;
-  } else {
-    TLS->channels_allocated ++;
-    U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_CHANNEL (DS_LVAL (DS_MCF->full_chat->id));
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    tglf_fetch_channel_full (TLS, &U->channel, DS_MCF);
-    increase_peer_size (TLS);
-    TLS->Peers[TLS->peer_num ++] = U;
-    return &U->channel;
-  }
-}
-
-struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS, struct tl_ds_messages_chat_full *DS_MCF) {
-  if (DS_MCF->full_chat->magic == CODE_channel_full) {
-    return (void *)tglf_fetch_alloc_channel_full (TLS, DS_MCF);
-  }
-  tgl_peer_t *U = tgl_peer_get (TLS, TGL_MK_CHAT (DS_LVAL (DS_MCF->full_chat->id)));
-  if (U) {
-    tglf_fetch_chat_full (TLS, &U->chat, DS_MCF);
-    return &U->chat;
-  } else {
-    TLS->chats_allocated ++;
-    U = talloc0 (sizeof (*U));
-    U->id = TGL_MK_CHAT (DS_LVAL (DS_MCF->full_chat->id));
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, U, lrand48 ());
-    tglf_fetch_chat_full (TLS, &U->chat, DS_MCF);
-    increase_peer_size (TLS);
-    TLS->Peers[TLS->peer_num ++] = U;
-    return &U->chat;
-  }
 }
 
 struct tgl_bot_info *tglf_fetch_alloc_bot_info (struct tgl_state *TLS, struct tl_ds_bot_info *DS_BI) {
@@ -2078,7 +2074,7 @@ void tglm_message_add_use (struct tgl_state *TLS, struct tgl_message *M) {
 
 void tglm_message_add_peer (struct tgl_state *TLS, struct tgl_message *M) {
   tgl_peer_id_t id;
-  if (!tgl_cmp_peer_id (M->to_id, TGL_MK_USER (TLS->our_id))) {
+  if (!tgl_cmp_peer_id (M->to_id, TLS->our_id)) {
     id = M->from_id;
   } else {
     id = M->to_id;
@@ -2112,12 +2108,12 @@ void tglm_message_add_peer (struct tgl_state *TLS, struct tgl_message *M) {
     if (tgl_get_peer_type (P->id) != TGL_PEER_ENCR_CHAT) {
       struct tgl_message *N = P->last;
       struct tgl_message *NP = 0;
-      while (N && N->id > M->id) {
+      while (N && N->permanent_id.id > M->permanent_id.id) {
         NP = N;
         N = N->next;
       }
       if (N) {
-        assert (N->id < M->id); 
+        assert (N->permanent_id.id < M->permanent_id.id); 
       }
       M->next = N;
       M->prev = NP;
@@ -2138,7 +2134,7 @@ void tglm_message_add_peer (struct tgl_state *TLS, struct tgl_message *M) {
 
 void tglm_message_del_peer (struct tgl_state *TLS, struct tgl_message *M) {
   tgl_peer_id_t id;
-  if (!tgl_cmp_peer_id (M->to_id, TGL_MK_USER (TLS->our_id))) {
+  if (!tgl_cmp_peer_id (M->to_id, TLS->our_id)) {
     id = M->from_id;
   } else {
     id = M->to_id;
@@ -2155,21 +2151,21 @@ void tglm_message_del_peer (struct tgl_state *TLS, struct tgl_message *M) {
   }
 }
 
-struct tgl_message *tglm_message_alloc (struct tgl_state *TLS, long long id) {
+struct tgl_message *tglm_message_alloc (struct tgl_state *TLS, tgl_message_id_t *id) {
   struct tgl_message *M = talloc0 (sizeof (*M));
-  M->id = id;
+  M->permanent_id = *id;
   tglm_message_insert_tree (TLS, M);
   TLS->messages_allocated ++;
   return M;
 }
 
 void tglm_message_insert_tree (struct tgl_state *TLS, struct tgl_message *M) {
-  assert (M->id);
+  assert (M->permanent_id.id);
   TLS->message_tree = tree_insert_message (TLS->message_tree, M, lrand48 ());
 }
 
 void tglm_message_remove_tree (struct tgl_state *TLS, struct tgl_message *M) {
-  assert (M->id);
+  assert (M->permanent_id.id);
   TLS->message_tree = tree_delete_message (TLS->message_tree, M);
 }
 
@@ -2193,7 +2189,7 @@ static void __send_msg (struct tgl_message *M, void *_TLS) {
 
   if (M->media.type != tgl_message_media_none) {
     assert (M->flags & TGLMF_ENCRYPTED);
-    bl_do_message_delete (TLS, M->id);
+    bl_do_message_delete (TLS, &M->permanent_id);
   } else {
     tgl_do_send_msg (TLS, M, 0, 0);
   }
@@ -2248,9 +2244,17 @@ tgl_peer_t *tgl_peer_get (struct tgl_state *TLS, tgl_peer_id_t id) {
   return tree_lookup_peer (TLS->peer_tree, &U);
 }
 
-struct tgl_message *tgl_message_get (struct tgl_state *TLS, long long id) {
+struct tgl_message *tgl_message_get (struct tgl_state *TLS, tgl_message_id_t *msg_id) {
   struct tgl_message M;
-  M.id = id;
+  if (msg_id->peer_type == TGL_PEER_RANDOM_ID) {
+    msg_id = tgls_get_local_by_random (TLS, msg_id->id);
+  } else if (msg_id->peer_type == TGL_PEER_TEMP_ID) {
+    msg_id = tgls_get_local_by_temp (TLS, msg_id->id);
+  }
+  if (!msg_id) {
+    return NULL;
+  }
+  M.permanent_id = *msg_id;
   return tree_lookup_message (TLS->message_tree, &M);
 }
 
@@ -2322,15 +2326,15 @@ int tgl_complete_peer_list (struct tgl_state *TLS, int index, const char *text, 
 }
 
 int tgl_secret_chat_for_user (struct tgl_state *TLS, tgl_peer_id_t user_id) {
-    int index = 0;
-    while (index < TLS->peer_num && (tgl_get_peer_type (TLS->Peers[index]->id) != TGL_PEER_ENCR_CHAT || TLS->Peers[index]->encr_chat.user_id != tgl_get_peer_id (user_id) || TLS->Peers[index]->encr_chat.state != sc_ok)) {
-        index ++;
-    }
-    if (index < TLS->peer_num) {
-        return tgl_get_peer_id (TLS->Peers[index]->encr_chat.id);
-    } else {
-        return -1;
-    }
+  int index = 0;
+  while (index < TLS->peer_num && (tgl_get_peer_type (TLS->Peers[index]->id) != TGL_PEER_ENCR_CHAT || TLS->Peers[index]->encr_chat.user_id != tgl_get_peer_id (user_id) || TLS->Peers[index]->encr_chat.state != sc_ok)) {
+    index ++;
+  }
+  if (index < TLS->peer_num) {
+    return tgl_get_peer_id (TLS->Peers[index]->encr_chat.id);
+  } else {
+    return -1;
+  }
 }
 
 void tgls_free_peer_gw (tgl_peer_t *P, void *TLS) {
@@ -2405,7 +2409,7 @@ void tglf_fetch_int_tuple (int *dst, int **src, int len) {
 
 
 void tgls_messages_mark_read (struct tgl_state *TLS, struct tgl_message *M, int out, int seq) {
-  while (M && M->id > seq) { 
+  while (M && M->permanent_id.id > seq) { 
     if ((M->flags & TGLMF_OUT) == out) {
       if (!(M->flags & TGLMF_UNREAD)) {
         return;
@@ -2425,11 +2429,12 @@ void tgls_messages_mark_read (struct tgl_state *TLS, struct tgl_message *M, int 
     M = M->next; 
   }
 }
-  
-void tgls_insert_random2local (struct tgl_state *TLS, long long random_id, int local_id) {
+ 
+/*
+void tgls_insert_random2local (struct tgl_state *TLS, long long random_id, tgl_message_id_t *msg_id) {
   struct random2local *X = talloc (sizeof (*X));
   X->random_id = random_id;
-  X->local_id = local_id;
+  X->local_id = *msg_id;
 
   struct random2local *R = tree_lookup_random_id (TLS->random_id_tree, X);
   assert (!R);
@@ -2437,16 +2442,73 @@ void tgls_insert_random2local (struct tgl_state *TLS, long long random_id, int l
   TLS->random_id_tree = tree_insert_random_id (TLS->random_id_tree, X, lrand48 ());
 }
 
-int tgls_get_local_by_random (struct tgl_state *TLS, long long random_id) {
+tgl_message_id_t *tgls_get_local_by_random (struct tgl_state *TLS, long long random_id) {
   struct random2local X;
   X.random_id = random_id;
   struct random2local *Y = tree_lookup_random_id (TLS->random_id_tree, &X);
   if (Y) { 
-    TLS->random_id_tree = tree_delete_random_id (TLS->random_id_tree, Y);
-    int y = Y->local_id;
-    tfree (Y, sizeof (*Y));
-    return y;
+    //TLS->random_id_tree = tree_delete_random_id (TLS->random_id_tree, Y);
+    return &Y->local_id;
   } else {
-    return 0;
+    return NULL;
   }
+}
+  
+void tgls_insert_temp2local (struct tgl_state *TLS, int temp_id, tgl_message_id_t *msg_id) {
+  struct random2local *X = talloc (sizeof (*X));
+  X->random_id = temp_id;
+  X->local_id = *msg_id;
+
+  struct random2local *R = tree_lookup_random_id (TLS->temp_id_tree, X);
+  assert (!R);
+  
+  TLS->temp_id_tree = tree_insert_random_id (TLS->temp_id_tree, X, lrand48 ());
+}
+}*/
+
+tgl_message_id_t *tgls_get_local_by_random (struct tgl_state *TLS, long long random_id) {
+  struct tgl_message M;
+  M.random_id = random_id;
+  struct tgl_message *N = tree_lookup_random_id (TLS->random_id_tree, &M);
+  if (N) {
+    return &N->permanent_id;
+  } else {
+    return NULL;
+  }
+}
+
+tgl_message_id_t *tgls_get_local_by_temp (struct tgl_state *TLS, int temp_id) {
+  struct tgl_message M;
+  M.temp_id = temp_id;
+  struct tgl_message *N = tree_lookup_temp_id (TLS->temp_id_tree, &M);
+  if (N) {
+    return &N->permanent_id;
+  } else {
+    return NULL;
+  }
+}
+
+tgl_message_id_t tgl_convert_temp_msg_id (struct tgl_state *TLS, tgl_message_id_t msg_id) {
+  struct tgl_message M;
+  M.temp_id = msg_id.id;
+  struct tgl_message *N = tree_lookup_temp_id (TLS->temp_id_tree, &M);
+  if (N) {
+    return N->permanent_id;
+  } else {
+    return msg_id;
+  }
+}
+
+void tgls_message_change_temp_id (struct tgl_state *TLS, struct tgl_message *M, int temp_id) {
+  if (M->temp_id == temp_id) { return; }
+  assert (!M->temp_id);
+  M->temp_id = temp_id;
+  TLS->temp_id_tree = tree_insert_temp_id (TLS->temp_id_tree, M, lrand48 ());
+}
+
+void tgls_message_change_random_id (struct tgl_state *TLS, struct tgl_message *M, long long random_id) {
+  if (M->random_id == random_id) { return; }
+  assert (!M->random_id);
+  M->random_id = random_id;
+  TLS->random_id_tree = tree_insert_random_id (TLS->random_id_tree, M, lrand48 ());
 }

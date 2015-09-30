@@ -266,9 +266,9 @@ updateReadMessagesContents#68c13933 messages:Vector<int> pts:int pts_count:int =
 updateChannelTooLong#60946422 channel_id:int = Update;
 updateChannel#b6d45656 channel_id:int = Update;
 updateChannelGroup#c36c1e3c channel_id:int group:MessageGroup = Update;
-updateNewChannelMessage#62ba04d9 message:Message pts:int pts_count:int = Update;
+updateNewChannelMessage#62ba04d9 message:Message channel_pts:int channel_pts_count:int = Update;
 updateReadChannelInbox#4214f37f channel_id:int max_id:int = Update;
-updateDeleteChannelMessages#c37521c9 channel_id:int messages:Vector<int> pts:int pts_count:int = Update;
+updateDeleteChannelMessages#c37521c9 channel_id:int messages:Vector<int> channel_pts:int channel_pts_count:int = Update;
 updateChannelMessageViews#98a12b4b channel_id:int id:int views:int = Update;
 
 updates.state#a56c2a3e pts:int qts:int date:int seq:int unread_count:int = updates.State;
@@ -481,9 +481,9 @@ messageRange#ae30253 min_id:int max_id:int = MessageRange;
 
 messageGroup#e8346f53 min_id:int max_id:int count:int date:int = MessageGroup;
 
-updates.channelDifferenceEmpty#3e11affb flags:# pts:int timeout:flags.1?int = updates.ChannelDifference;
-updates.channelDifferenceTooLong#5e167646 flags:# pts:int timeout:flags.1?int top_message:int top_important_message:int read_inbox_max_id:int unread_count:int unread_important_count:int messages:Vector<Message> chats:Vector<Chat> users:Vector<User> = updates.ChannelDifference;
-updates.channelDifference#2064674e flags:# pts:int timeout:flags.1?int new_messages:Vector<Message> other_updates:Vector<Update> chats:Vector<Chat> users:Vector<User> = updates.ChannelDifference;
+updates.channelDifferenceEmpty#3e11affb flags:# channel_pts:int timeout:flags.1?int = updates.ChannelDifference;
+updates.channelDifferenceTooLong#5e167646 flags:# channel_pts:int timeout:flags.1?int top_message:int top_important_message:int read_inbox_max_id:int unread_count:int unread_important_count:int messages:Vector<Message> chats:Vector<Chat> users:Vector<User> = updates.ChannelDifference;
+updates.channelDifference#2064674e flags:# channel_pts:int timeout:flags.1?int new_messages:Vector<Message> other_updates:Vector<Update> chats:Vector<Chat> users:Vector<User> = updates.ChannelDifference;
 
 channelMessagesFilterEmpty#94d42ee7 = ChannelMessagesFilter;
 channelMessagesFilter#cd77d957 flags:int ranges:Vector<MessageRange> = ChannelMessagesFilter;

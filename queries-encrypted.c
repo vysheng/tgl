@@ -84,11 +84,13 @@ void tgl_do_send_encr_action (struct tgl_state *TLS, struct tgl_secret_chat *E, 
   long long t;
   tglt_secure_random (&t, 8);
   int date = time (0);
-  
-  tgl_peer_id_t from_id = TGL_MK_USER (TLS->our_id);
-  bl_do_edit_message_encr (TLS, t, &from_id, &E->id, &date, NULL, 0, NULL, A, NULL, TGLMF_PENDING | TGLMF_OUT | TGLMF_UNREAD | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
 
-  struct tgl_message *M = tgl_message_get (TLS, t);
+  struct tgl_message_id id = tgl_peer_id_to_random_msg_id (E->id);
+  
+  tgl_peer_id_t from_id = TLS->our_id;
+  bl_do_edit_message_encr (TLS, &id, &from_id, &E->id, &date, NULL, 0, NULL, A, NULL, TGLMF_PENDING | TGLMF_OUT | TGLMF_UNREAD | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
+
+  struct tgl_message *M = tgl_message_get (TLS, &id);
   assert (M);
   tgl_do_send_msg (TLS, M, 0, 0);
 }
@@ -117,11 +119,11 @@ static int msg_send_encr_on_answer (struct tgl_state *TLS, struct query *q, void
   assert (M->flags & TGLMF_ENCRYPTED);
   
   if (M->flags & TGLMF_PENDING) {
-    bl_do_edit_message_encr (TLS, M->id, NULL, NULL,  
+    bl_do_edit_message_encr (TLS, &M->permanent_id, NULL, NULL,  
       &M->date,
       NULL, 0, NULL, NULL, NULL, M->flags ^ TGLMF_PENDING);
     
-    bl_do_msg_update (TLS, M->id);
+    bl_do_msg_update (TLS, &M->permanent_id);
   }
 
   if (q->callback) {
@@ -142,7 +144,7 @@ static int msg_send_encr_on_error (struct tgl_state *TLS, struct query *q, int e
     ((void (*)(struct tgl_state *TLS, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 0, M);
   }
   if (M) {
-    bl_do_message_delete (TLS, M->id);
+    bl_do_message_delete (TLS, &M->permanent_id);
   }
   return 0;
 }
@@ -168,17 +170,17 @@ void tgl_do_send_encr_msg_action (struct tgl_state *TLS, struct tgl_message *M, 
   clear_packet ();
   out_int (CODE_messages_send_encrypted_service);
   out_int (CODE_input_encrypted_chat);
-  out_int (tgl_get_peer_id (M->to_id));
-  out_long (P->encr_chat.access_hash);
-  out_long (M->id);
+  out_int (M->permanent_id.peer_id);
+  out_long (M->permanent_id.access_hash);
+  out_long (M->permanent_id.id);
   encr_start ();
   out_int (CODE_decrypted_message_layer);
   out_random (15 + 4 * (lrand48 () % 3));
   out_int (TGL_ENCRYPTED_LAYER);
-  out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != TLS->our_id));
-  out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == TLS->our_id) - 2);
+  out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != tgl_get_peer_id (TLS->our_id)));
+  out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == tgl_get_peer_id (TLS->our_id)) - 2);
   out_int (CODE_decrypted_message_service);
-  out_long (M->id);
+  out_long (M->permanent_id.id);
 
   switch (M->action.type) {
   case tgl_message_action_notify_layer:
@@ -241,15 +243,15 @@ void tgl_do_send_encr_msg (struct tgl_state *TLS, struct tgl_message *M, void (*
   out_int (CODE_input_encrypted_chat);
   out_int (tgl_get_peer_id (M->to_id));
   out_long (P->encr_chat.access_hash);
-  out_long (M->id);
+  out_long (M->permanent_id.id);
   encr_start ();
   out_int (CODE_decrypted_message_layer);
   out_random (15 + 4 * (lrand48 () % 3));
   out_int (TGL_ENCRYPTED_LAYER);
-  out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != TLS->our_id));
-  out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == TLS->our_id) - 2);
+  out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != tgl_get_peer_id (TLS->our_id)));
+  out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == tgl_get_peer_id (TLS->our_id)) - 2);
   out_int (CODE_decrypted_message);
-  out_long (M->id);
+  out_long (M->permanent_id.id);
   out_int (P->encr_chat.ttl);
   out_cstring ((void *)M->message, M->message_len);
   switch (M->media.type) {
@@ -307,9 +309,9 @@ static int send_encr_file_on_answer (struct tgl_state *TLS, struct query *q, voi
   struct tgl_message *M = q->extra;
 
   if (M->flags & TGLMF_PENDING) {
-    bl_do_edit_message_encr (TLS, M->id, NULL, NULL, DS_MSEM->date, 
+    bl_do_edit_message_encr (TLS, &M->permanent_id, NULL, NULL, DS_MSEM->date, 
     NULL, 0, NULL, NULL, DS_MSEM->file, M->flags ^ TGLMF_PENDING);   
-    bl_do_msg_update (TLS, M->id);
+    bl_do_msg_update (TLS, &M->permanent_id);
   }
   
   if (q->callback) {
@@ -338,8 +340,8 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   out_int (CODE_decrypted_message_layer);
   out_random (15 + 4 * (lrand48 () % 3));
   out_int (TGL_ENCRYPTED_LAYER);
-  out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != TLS->our_id));
-  out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == TLS->our_id));
+  out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != tgl_get_peer_id (TLS->our_id)));
+  out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == tgl_get_peer_id (TLS->our_id)));
   out_int (CODE_decrypted_message);
   out_long (r);
   out_int (P->encr_chat.ttl);
@@ -422,11 +424,13 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
 
   tfree_secure (f->iv, 32);
  
-  tgl_peer_id_t from_id = TGL_MK_USER (TLS->our_id);
-  bl_do_edit_message_encr (TLS, r, &from_id, &f->to_id, &date, NULL, 0, DS_DMM, NULL, NULL, TGLMF_OUT | TGLMF_UNREAD | TGLMF_ENCRYPTED | TGLMF_CREATE | TGLMF_CREATED);
+  tgl_peer_id_t from_id = TLS->our_id;
+  
+  struct tgl_message_id id = tgl_peer_id_to_msg_id (P->id, r);
+  bl_do_edit_message_encr (TLS, &id, &from_id, &f->to_id, &date, NULL, 0, DS_DMM, NULL, NULL, TGLMF_OUT | TGLMF_UNREAD | TGLMF_ENCRYPTED | TGLMF_CREATE | TGLMF_CREATED);
 
   free_ds_type_decrypted_message_media (DS_DMM, TYPE_TO_PARAM (decrypted_message_media));
-  struct tgl_message *M = tgl_message_get (TLS, r);
+  struct tgl_message *M = tgl_message_get (TLS, &id);
   assert (M);
       
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_encr_file_methods, M, callback, callback_extra);
@@ -436,7 +440,7 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
 
 }
 
-void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t id, double latitude, double longitude, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t peer_id, double latitude, double longitude, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   struct tl_ds_decrypted_message_media TDSM;
   TDSM.magic = CODE_decrypted_message_media_geo_point;
   TDSM.latitude = talloc (sizeof (double));
@@ -446,16 +450,17 @@ void tgl_do_send_location_encr (struct tgl_state *TLS, tgl_peer_id_t id, double 
   
   int date = time (0);
 
-  long long t;
-  tglt_secure_random (&t, 8);
+  tgl_peer_id_t from_id = TLS->our_id;
 
-  tgl_peer_id_t from_id = TGL_MK_USER (TLS->our_id);
-  bl_do_edit_message_encr (TLS, t, &from_id, &id, &date, NULL, 0, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
+  tgl_peer_t *P = tgl_peer_get (TLS, peer_id);
+  
+  struct tgl_message_id id = tgl_peer_id_to_random_msg_id (P->id);;
+  bl_do_edit_message_encr (TLS, &id, &from_id, &peer_id, &date, NULL, 0, &TDSM, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_ENCRYPTED);
 
   tfree (TDSM.latitude, sizeof (double));
   tfree (TDSM.longitude, sizeof (double));
 
-  struct tgl_message *M = tgl_message_get (TLS, t);
+  struct tgl_message *M = tgl_message_get (TLS, &id);
 
   tgl_do_send_encr_msg (TLS, M, callback, callback_extra);
 }
@@ -663,7 +668,8 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   //bl_do_encr_chat_init (TLS, t, user_id, (void *)random, (void *)g_a);
   
   int state = sc_waiting;
-  bl_do_encr_chat (TLS, t, NULL, NULL, &TLS->our_id, &user_id, random, NULL, NULL, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED);
+  int our_id = tgl_get_peer_id (TLS->our_id);
+  bl_do_encr_chat (TLS, t, NULL, NULL, &our_id, &user_id, random, NULL, NULL, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED);
 
   
   tgl_peer_t *_E = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t));

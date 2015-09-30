@@ -23,7 +23,16 @@
 #include <time.h>
 #include <openssl/err.h>
 #include <assert.h>
-#include "tgl.h"
+#include <string.h>
+//#include "tgl.h"
+
+struct tgl_allocator {
+  void *(*alloc)(size_t size);
+  void *(*realloc)(void *ptr, size_t old_size, size_t size);
+  void (*free)(void *ptr, int size);
+  void (*check)(void);
+  void (*exists)(void *ptr, int size);
+};
 
 #define talloc tgl_allocator->alloc
 #define talloc0 tgl_alloc0

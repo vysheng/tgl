@@ -115,17 +115,14 @@ void bl_do_set_auth_key (struct tgl_state *TLS, int num, unsigned char *buf) /* 
 }
 /* }}} */
 
-void bl_do_set_our_id (struct tgl_state *TLS, int id) /* {{{ */ {
-  if (TLS->our_id) {
-    assert (TLS->our_id == id);
+void bl_do_set_our_id (struct tgl_state *TLS, tgl_peer_id_t id) /* {{{ */ {
+  /*if (TLS->our_id.peer_type) {
+    assert (!tgl_cmp_peer_id (TLS->our_id, id));
     return;
-  }
+  }*/
 
-  assert (id > 0);
-  
   TLS->our_id = id;
 
-  assert (TLS->our_id > 0);
   if (TLS->callback.our_id) {
     TLS->callback.our_id (TLS, TLS->our_id);
   }
@@ -156,6 +153,15 @@ void bl_do_set_pts (struct tgl_state *TLS, int pts) /* {{{ */ {
 }
 /* }}} */
 
+void bl_do_set_channel_pts (struct tgl_state *TLS, int id, int pts) /* {{{ */ {
+  tgl_peer_t *E = tgl_peer_get (TLS, TGL_MK_CHANNEL (id));
+  if (!E || !(E->flags & TGLPF_CREATED)) { return; }
+  if (E->flags & TGLCHF_DIFF) { return ; }
+  if (E->channel.pts <= pts) { return; }
+  E->channel.pts = pts;
+}
+/* }}} */
+
 void bl_do_set_qts (struct tgl_state *TLS, int qts) /* {{{ */ {
   if (TLS->locks & TGL_LOCK_DIFF) { return; }
   if (qts <= TLS->qts) { return; }
@@ -180,12 +186,14 @@ void bl_do_set_seq (struct tgl_state *TLS, int seq) /* {{{ */ {
 }
 /* }}} */
 
-void bl_do_set_msg_id (struct tgl_state *TLS, long long old_id, int id) /* {{{ */ {
-  if (old_id == id) { return; }
+void bl_do_set_msg_id (struct tgl_state *TLS, tgl_message_id_t *old_id, tgl_message_id_t *new_id) /* {{{ */ {
+  if (!memcmp (old_id, new_id, sizeof (tgl_message_id_t))) {
+    return;
+  }
 
   struct tgl_message *M = tgl_message_get (TLS, old_id);
   assert (M);
-  assert (M->id == old_id);
+  
   
   if (M->flags & TGLMF_PENDING) {
     tglm_message_remove_unsent (TLS, M);
@@ -195,14 +203,16 @@ void bl_do_set_msg_id (struct tgl_state *TLS, long long old_id, int id) /* {{{ *
   tglm_message_remove_tree (TLS, M);
   tglm_message_del_peer (TLS, M);
   
-  M->id = id;
-  if (tgl_message_get (TLS, M->id)) {
+  M->permanent_id = *new_id;
+  if (tgl_message_get (TLS, new_id)) {
     tglm_message_del_use (TLS, M);
     tgls_free_message (TLS, M);
   } else {
     tglm_message_insert_tree (TLS, M);
     tglm_message_add_peer (TLS, M);
   }
+
+  M->server_id = new_id->id;
 }
 /* }}} */
 
@@ -262,7 +272,7 @@ void bl_do_chat_del_user (struct tgl_state *TLS, tgl_peer_id_t id, int version, 
 }
 /* }}} */
 
-void bl_do_edit_message (struct tgl_state *TLS, long long id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, tgl_peer_id_t *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, struct tl_ds_reply_markup *reply_markup, int flags) /* {{{ */ {
+void bl_do_edit_message (struct tgl_state *TLS, tgl_message_id_t *id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, tgl_peer_id_t *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, struct tl_ds_reply_markup *reply_markup, int flags) /* {{{ */ {
   assert (!(flags & 0xfffe0000));
   
   struct tgl_message *M = tgl_message_get (TLS, id);
@@ -274,6 +284,7 @@ void bl_do_edit_message (struct tgl_state *TLS, long long id, tgl_peer_id_t *fro
     if (!M) {
       M = tglm_message_alloc (TLS, id);
     }
+    M->server_id = id->id;
     assert (!(M->flags & TGLMF_CREATED));
   } else {
     assert (M->flags & TGLMF_CREATED);
@@ -298,7 +309,7 @@ void bl_do_edit_message (struct tgl_state *TLS, long long id, tgl_peer_id_t *fro
   if (from_id) {
     M->from_id = *from_id;
   } else {
-    if (!M->from_id.type) {
+    if (!M->from_id.peer_type) {
       assert (to_id);
       M->from_id = *to_id;
     }
@@ -344,16 +355,24 @@ void bl_do_edit_message (struct tgl_state *TLS, long long id, tgl_peer_id_t *fro
   }
 
   if (!(flags & TGLMF_UNREAD) && (M->flags & TGLMF_UNREAD)) {
-    tgls_messages_mark_read (TLS, M, M->flags & TGLMF_OUT, M->id);
+    tgls_messages_mark_read (TLS, M, M->flags & TGLMF_OUT, M->permanent_id.id);
   }
 
   if (reply_markup) {
     M->reply_markup = tglf_fetch_alloc_reply_markup (TLS, M->next, reply_markup);
   }
+
+  if (M->flags & TGLMF_PENDING) {
+    tgls_message_change_random_id (TLS, M, M->permanent_id.id);
+  }
+  
+  if (!M->temp_id) {
+    tgls_message_change_temp_id (TLS, M, ++TLS->last_temp_id);
+  }
 }
 /* }}} */
 
-void bl_do_edit_message_encr (struct tgl_state *TLS, long long id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, int *date, const char *message, int message_len, struct tl_ds_decrypted_message_media *media, struct tl_ds_decrypted_message_action *action, struct tl_ds_encrypted_file *file, int flags) /* {{{ */ {
+void bl_do_edit_message_encr (struct tgl_state *TLS, tgl_message_id_t *id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, int *date, const char *message, int message_len, struct tl_ds_decrypted_message_media *media, struct tl_ds_decrypted_message_action *action, struct tl_ds_encrypted_file *file, int flags) /* {{{ */ {
   clear_packet ();
   assert (!(flags & 0xfffe0000));
   
@@ -432,7 +451,7 @@ void bl_do_edit_message_encr (struct tgl_state *TLS, long long id, tgl_peer_id_t
 }
 /* }}} */
 
-void bl_do_message_delete (struct tgl_state *TLS, long long id) /* {{{ */ {
+void bl_do_message_delete (struct tgl_state *TLS, tgl_message_id_t *id) /* {{{ */ {
   struct tgl_message *M = tgl_message_get (TLS, id);
   if (!M) { return; }
   assert (M);
@@ -448,14 +467,14 @@ void bl_do_message_delete (struct tgl_state *TLS, long long id) /* {{{ */ {
 }
 /* }}} */
 
-void bl_do_msg_update (struct tgl_state *TLS, long long id) /* {{{ */ {
+void bl_do_msg_update (struct tgl_state *TLS, tgl_message_id_t *id) /* {{{ */ {
   struct tgl_message *M = tgl_message_get (TLS, id);
   if (!M) { return; }
   assert (M);
   
   if (!(M->flags & TGLMF_ENCRYPTED)) {
-    if (TLS->max_msg_id < M->id) {
-      TLS->max_msg_id = M->id;
+    if (TLS->max_msg_id < M->server_id) {
+      TLS->max_msg_id = M->server_id;
     }
   }
 
@@ -557,6 +576,7 @@ void bl_do_user (struct tgl_state *TLS, int id, long long *access_hash, const ch
 
   if (access_hash && *access_hash != U->access_hash) {
     U->access_hash = *access_hash;
+    U->id.access_hash = *access_hash;
     updates |= TGL_UPDATE_ACCESS_HASH;
   }
 
@@ -782,6 +802,7 @@ void bl_do_encr_chat (struct tgl_state *TLS, int id, long long *access_hash, int
 
   if (access_hash && *access_hash != U->access_hash) {
     U->access_hash = *access_hash;
+    U->id.access_hash = *access_hash;
     updates |= TGL_UPDATE_ACCESS_HASH;
   }
 
@@ -889,6 +910,7 @@ void bl_do_channel (struct tgl_state *TLS, int id, long long *access_hash, int *
 
   if (access_hash && *access_hash != C->access_hash) {
     C->access_hash = *access_hash;
+    C->id.access_hash = *access_hash;
     updates |= TGL_UPDATE_ACCESS_HASH;
   }
 
@@ -970,7 +992,7 @@ void bl_do_peer_delete (struct tgl_state *TLS, tgl_peer_id_t id) /* {{{ */ {
   if (P->flags & TGLPF_DELETED) { return; }
   P->flags |= TGLPF_DELETED;
 
-  switch (id.type) {
+  switch (id.peer_type) {
   case TGL_PEER_USER:
     if (TLS->callback.user_update) {
       TLS->callback.user_update (TLS, (void *)P, TGL_UPDATE_DELETED);

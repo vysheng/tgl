@@ -26,6 +26,8 @@ struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS, struct tl_ds_user
 struct tgl_user *tglf_fetch_alloc_user_full (struct tgl_state *TLS, struct tl_ds_user_full *DS_U);
 struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS, struct tl_ds_chat *DS_C);
 struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS, struct tl_ds_messages_chat_full *DS_MCF);
+struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_ds_chat *DS_C);
+struct tgl_channel *tglf_fetch_alloc_channel_full (struct tgl_state *TLS, struct tl_ds_messages_chat_full *DS_MCF);
 struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS, struct tl_ds_encrypted_chat *DS_EC);
 struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_ds_message *DS_M);
 struct tgl_message *tglf_fetch_alloc_message_short_buf (struct tgl_state *TLS);

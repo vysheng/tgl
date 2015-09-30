@@ -32,6 +32,8 @@
 
 #include <assert.h>
 
+void tgl_do_get_channel_difference (struct tgl_state *TLS, int channel_id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+
 static void fetch_dc_option (struct tgl_state *TLS, struct tl_ds_dc_option *DS_DO) {
   vlogprintf (E_DEBUG, "id = %d, name = %.*s ip = %.*s port = %d\n", DS_LVAL (DS_DO->id), DS_RSTR (DS_DO->hostname), DS_RSTR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
 
@@ -77,6 +79,30 @@ int tgl_check_qts_diff (struct tgl_state *TLS, int qts, int qts_count) {
     return -1;
   }
   vlogprintf (E_DEBUG, "Ok update. qts = %d\n", qts);
+  return 1;
+}
+
+int tgl_check_channel_pts_diff (struct tgl_state *TLS, tgl_peer_t *_E, int pts, int pts_count) {
+  struct tgl_channel *E = &_E->channel;
+  vlogprintf (E_DEBUG - 1, "pts = %d, pts_count = %d\n", pts, pts_count);
+  if (!E->pts) {
+    return 1;
+  }
+  //assert (TLS->pts);
+  if (pts < E->pts + pts_count) {
+    vlogprintf (E_NOTICE, "Duplicate message with pts=%d\n", pts);
+    return -1;
+  }
+  if (pts > E->pts + pts_count) {
+    vlogprintf (E_NOTICE, "Hole in pts (pts = %d, count = %d, cur_pts = %d)\n", pts, pts_count, E->pts);
+    tgl_do_get_channel_difference (TLS, tgl_get_peer_id (E->id), 0, 0);
+    return -1;
+  }
+  if (E->flags & TGLCHF_DIFF) {
+    vlogprintf (E_DEBUG, "Update during get_difference. pts = %d\n", pts);
+    return -1;
+  }
+  vlogprintf (E_DEBUG, "Ok update. pts = %d\n", pts);
   return 1;
 }
   
@@ -127,26 +153,52 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
     }
   }
 
+  if (DS_U->channel_pts) {
+    assert (DS_U->channel_pts_count);
+    int channel_id;
+    if (DS_U->channel_id) {
+      channel_id = DS_LVAL (DS_U->channel_id);
+    } else {
+      assert (DS_U->message);
+      assert (DS_U->message->to_id);
+      assert (DS_U->message->to_id->magic == CODE_peer_channel);
+      channel_id = DS_LVAL (DS_U->message->to_id->channel_id);
+    }    
+
+    tgl_peer_t *E = tgl_peer_get (TLS, TGL_MK_CHANNEL (channel_id));
+    if (!E) {
+      return;
+    }
+
+    if (!check_only && tgl_check_channel_pts_diff (TLS, E, DS_LVAL (DS_U->channel_pts), DS_LVAL (DS_U->channel_pts_count)) <= 0) {
+      return;
+    }
+  }
+
   if (check_only > 0 && DS_U->magic != CODE_update_message_i_d) { return; }
   switch (DS_U->magic) {
   case CODE_update_new_message:
     {
-      struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
-      int new = (!N || !(N->flags & TGLMF_CREATED));
+      //struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
+      //int new = (!N || !(N->flags & TGLMF_CREATED));
       struct tgl_message *M = tglf_fetch_alloc_message (TLS, DS_U->message);
       assert (M);
-      if (new) {
-        bl_do_msg_update (TLS, M->id);
+      if (1) {
+        bl_do_msg_update (TLS, &M->permanent_id);
       }
       break;
     };
   case CODE_update_message_i_d:
     {
-      struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->random_id));
-      if (M) {
-        tgls_insert_random2local (TLS, DS_LVAL (DS_U->random_id), DS_LVAL (DS_U->id));
-        bl_do_set_msg_id (TLS, M->id, DS_LVAL (DS_U->id));
-        bl_do_msg_update (TLS, DS_LVAL (DS_U->id));
+      tgl_message_id_t msg_id;
+      msg_id.peer_type = TGL_PEER_RANDOM_ID;
+      msg_id.id = DS_LVAL (DS_U->random_id);
+      struct tgl_message *M = tgl_message_get (TLS, &msg_id);
+      if (M && (M->flags & TGLMF_PENDING)) {
+        msg_id = M->permanent_id;
+        msg_id.id = DS_LVAL (DS_U->id);
+        bl_do_set_msg_id (TLS, &M->permanent_id, &msg_id);
+        bl_do_msg_update (TLS, &msg_id);
       }
     }
     break;
@@ -294,7 +346,9 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
   case CODE_update_new_encrypted_message:
     {
       struct tgl_message *M = tglf_fetch_alloc_encrypted_message (TLS, DS_U->encr_message);
-      bl_do_msg_update (TLS, M->id);
+      if (M) {
+        bl_do_msg_update (TLS, &M->permanent_id);
+      }
     }
     break;
   case CODE_update_encryption:
@@ -327,7 +381,7 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
         struct tgl_message *M = P->last;
         while (M && (!(M->flags & TGLMF_OUT) || (M->flags & TGLMF_UNREAD))) {
           if (M->flags & TGLMF_OUT) {
-            bl_do_edit_message_encr (TLS, M->id, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, M->flags & ~TGLMF_UNREAD);
+            bl_do_edit_message_encr (TLS, &M->permanent_id, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, M->flags & ~TGLMF_UNREAD);
           }
           M = M->next;
         }
@@ -435,23 +489,32 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
     {
     }
     break;
-  case CODE_update_msg_update:
+  /*case CODE_update_msg_update:
     {
       struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->id));
       if (M) {
         bl_do_msg_update (TLS, M->id);
       }
     }
-    break;
+    break;*/
   case CODE_update_read_messages_contents:
     break;
   case CODE_update_channel_too_long:
+    {
+      tgl_do_get_channel_difference (TLS, DS_LVAL (DS_U->channel_id), NULL, NULL);
+    }
     break;
   case CODE_update_channel:
     break;
   case CODE_update_channel_group:
     break;
   case CODE_update_new_channel_message:
+    {
+      struct tgl_message *M = tglf_fetch_alloc_message (TLS, DS_U->message);
+      if (M) {
+        bl_do_msg_update (TLS, &M->permanent_id);
+      }
+    }
     break;
   case CODE_update_read_channel_inbox:
     break;
@@ -472,6 +535,21 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
   }
   if (DS_U->qts) {
     bl_do_set_qts (TLS, DS_LVAL (DS_U->qts));
+  }
+  if (DS_U->channel_pts) {
+    assert (DS_U->channel_pts_count);
+    
+    int channel_id;
+    if (DS_U->channel_id) {
+      channel_id = DS_LVAL (DS_U->channel_id);
+    } else {
+      assert (DS_U->message);
+      assert (DS_U->message->to_id);
+      assert (DS_U->message->to_id->magic == CODE_peer_channel);
+      channel_id = DS_LVAL (DS_U->message->to_id->channel_id);
+    }    
+
+    bl_do_set_channel_pts (TLS, channel_id, DS_LVAL (DS_U->channel_pts));
   }
 }
 
@@ -541,8 +619,8 @@ void tglu_work_update_short_message (struct tgl_state *TLS, int check_only, stru
   
   if (check_only > 0) { return; }
   
-  struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
-  int new = (!N || !(N->flags & TGLMF_CREATED));
+  //struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
+  //int new = (!N || !(N->flags & TGLMF_CREATED));
   
   struct tgl_message *M = tglf_fetch_alloc_message_short (TLS, DS_U);
   assert (M);
@@ -551,8 +629,8 @@ void tglu_work_update_short_message (struct tgl_state *TLS, int check_only, stru
     return;
   }
 
-  if (new) {
-    bl_do_msg_update (TLS, M->id);
+  if (1) {
+    bl_do_msg_update (TLS, &M->permanent_id);
   }
   
   if (check_only) { return; }
@@ -570,8 +648,8 @@ void tglu_work_update_short_chat_message (struct tgl_state *TLS, int check_only,
   
   if (check_only > 0) { return; }
   
-  struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
-  int new = (!N || !(N->flags & TGLMF_CREATED));
+  //struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
+  //int new = (!N || !(N->flags & TGLMF_CREATED));
   
   struct tgl_message *M = tglf_fetch_alloc_message_short_chat (TLS, DS_U);
   assert (M);
@@ -580,15 +658,15 @@ void tglu_work_update_short_chat_message (struct tgl_state *TLS, int check_only,
     return;
   }
 
-  if (new) {
-    bl_do_msg_update (TLS, M->id);
+  if (1) {
+    bl_do_msg_update (TLS, &M->permanent_id);
   }
 
   if (check_only) { return; }
   bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
 }
 
-void tglu_work_updates_to_long (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+void tglu_work_updates_too_long (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
   if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
@@ -612,10 +690,15 @@ void tglu_work_update_short_sent_message (struct tgl_state *TLS, int check_only,
       return;
     }
   }
-  
   struct tgl_message *M = extra;
 
-  bl_do_set_msg_id (TLS, M->id, DS_LVAL (DS_U->id));
+  if (!M) { return; }
+  
+  //long long random_id = M->permanent_id.id;
+  tgl_message_id_t msg_id = M->permanent_id;
+  msg_id.id = DS_LVAL (DS_U->id);
+  bl_do_set_msg_id (TLS, &M->permanent_id, &msg_id);
+  //tgls_insert_random2local (TLS, random_id, &msg_id);
 
   int f = DS_LVAL (DS_U->flags);
 
@@ -630,7 +713,7 @@ void tglu_work_update_short_sent_message (struct tgl_state *TLS, int check_only,
     flags |= TGLMF_MENTION;
   }
 
-  bl_do_edit_message (TLS, M->id, 
+  bl_do_edit_message (TLS, &M->permanent_id, 
     NULL,
     NULL,
     NULL,
@@ -643,7 +726,7 @@ void tglu_work_update_short_sent_message (struct tgl_state *TLS, int check_only,
     NULL, 
     flags);
   
-  bl_do_msg_update (TLS, M->id);
+  bl_do_msg_update (TLS, &M->permanent_id);
   
   if (DS_U->pts) {
     bl_do_set_pts (TLS, DS_LVAL (DS_U->pts));
@@ -656,7 +739,7 @@ void tglu_work_any_updates (struct tgl_state *TLS, int check_only, struct tl_ds_
   }
   switch (DS_U->magic) {
   case CODE_updates_too_long:
-    tglu_work_updates_to_long (TLS, check_only, DS_U);
+    tglu_work_updates_too_long (TLS, check_only, DS_U);
     return;
   case CODE_update_short_message:
     tglu_work_update_short_message (TLS, check_only, DS_U);

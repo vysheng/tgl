@@ -65,14 +65,24 @@
 #define TGLECF_HAS_PHOTO TGLPF_HAS_PHOTO
 #define TGLECF_DELETED TGLPF_DELETED
 
+#define TGLCHF_CREATED TGLPF_CREATED
+#define TGLCHF_CREATE TGLPF_CREATE
+#define TGLCHF_HAS_PHOTO TGLPF_HAS_PHOTO
+#define TGLCHF_DIFF 0x80000000
+
 #define TGL_FLAGS_UNCHANGED 0xffff
 
 #define TGLDCF_AUTHORIZED 1
 #define TGLDCF_LOGGED_IN 8
 
+#define TGL_PERMANENT_ID_SIZE 24
 #pragma pack(push,4)
 
-typedef struct { int type; int id; } tgl_peer_id_t;
+typedef struct { 
+  int peer_type; 
+  int peer_id; 
+  long long access_hash;
+} tgl_peer_id_t;
 
 enum tgl_dc_state {
   st_init,
@@ -311,6 +321,8 @@ struct tgl_channel {
   int participants_count;
   int admins_count;
   int kicked_count;
+
+  int pts;
 };
 
 struct tgl_chat_user {
@@ -404,32 +416,6 @@ typedef union tgl_peer {
   struct tgl_channel channel;
   struct tgl_secret_chat encr_chat;
 } tgl_peer_t;
-/*
-struct tgl_video {
-  long long id;
-  long long access_hash;
-  int user_id;
-  int date;
-  int size;
-  int dc_id;
-  struct tgl_photo_size thumb;
-  char *caption;
-  int duration;
-  int w;
-  int h;
-  char *mime_type;
-};
-
-struct tgl_audio {
-  long long id;
-  long long access_hash;
-  int user_id;
-  int date;
-  int size;
-  int dc_id;
-  int duration;
-  char *mime_type;
-};*/
 
 struct tgl_document {
   long long id;
@@ -541,10 +527,20 @@ struct tgl_message_reply_markup {
   char **buttons;
 };
 
+typedef struct tgl_message_id {
+  unsigned peer_type;
+  unsigned peer_id;
+  long long id;
+  long long access_hash;
+} tgl_message_id_t;
+
 struct tgl_message {
   struct tgl_message *next_use, *prev_use;
   struct tgl_message *next, *prev;
-  long long id;
+  int temp_id;
+  long long server_id;
+  long long random_id;
+  struct tgl_message_id permanent_id;
   int flags;
   tgl_peer_id_t fwd_from_id;
   int fwd_date;
