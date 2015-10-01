@@ -122,7 +122,7 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
   assert (q);
   vlogprintf (E_DEBUG - 2, "Alarm query %lld\n", q->msg_id);
 
-  TLS->timer_methods->insert (q->ev, QUERY_TIMEOUT);
+  TLS->timer_methods->insert (q->ev, q->methods->timeout ? q->methods->timeout : QUERY_TIMEOUT);
 
   if (q->session && q->session_id && q->DC && q->DC->sessions[0] == q->session && q->session->session_id == q->session_id) {
     clear_packet ();
@@ -164,6 +164,32 @@ void tglq_regen_query (struct tgl_state *TLS, long long id) {
   }
   vlogprintf (E_NOTICE, "regen query %lld\n", id);
   TLS->timer_methods->insert (q->ev, 0.001);
+}
+
+struct regen_tmp_struct {
+  struct tgl_state *TLS;
+  struct tgl_dc *DC;
+  struct tgl_session *S;
+};
+
+void tglq_regen_query_from_old_session (struct query *q, void *ex) {
+  struct regen_tmp_struct *T = ex;
+  struct tgl_state *TLS = T->TLS;
+  if (q->DC == T->DC) {
+    if (!q->session || q->session_id != T->S->session_id || q->session != T->S) {
+      q->session_id = 0;
+      vlogprintf (E_NOTICE, "regen query %lld\n", q->msg_id);
+      TLS->timer_methods->insert (q->ev, 0.001);
+    }
+  }
+}
+
+void tglq_regen_queries_from_old_session (struct tgl_state *TLS, struct tgl_dc *DC, struct tgl_session *S) {
+  struct regen_tmp_struct T;
+  T.TLS = TLS;
+  T.DC = DC;
+  T.S = S;
+  tree_act_ex_query (TLS->queries_tree, tglq_regen_query_from_old_session, &T);
 }
 
 void tglq_query_restart (struct tgl_state *TLS, long long id) {
@@ -209,7 +235,7 @@ struct query *tglq_send_query_ex (struct tgl_state *TLS, struct tgl_dc *DC, int 
   TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
 
   q->ev = TLS->timer_methods->alloc (TLS, alarm_query_gateway, q);
-  TLS->timer_methods->insert (q->ev, QUERY_TIMEOUT);
+  TLS->timer_methods->insert (q->ev, q->methods->timeout ? q->methods->timeout : QUERY_TIMEOUT);  
 
   q->extra = extra;
   q->callback = callback;
@@ -560,7 +586,8 @@ static int help_get_config_on_answer (struct tgl_state *TLS, struct query *q, vo
 static struct query_methods help_get_config_methods  = {
   .on_answer = help_get_config_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(config)
+  .type = TYPE_TO_PARAM(config),
+  .timeout = 1
 };
 
 void tgl_do_help_get_config (struct tgl_state *TLS, void (*callback)(struct tgl_state *,void *, int), void *callback_extra) {
@@ -3316,7 +3343,7 @@ void tgl_do_get_channel_difference (struct tgl_state *TLS, int id, void (*callba
   out_int (CODE_updates_get_channel_difference);
   out_int (CODE_input_channel);
   out_int (tgl_get_peer_id (E->id));
-  out_int (E->channel.access_hash);
+  out_long (E->channel.access_hash);
 
   out_int (CODE_channel_messages_filter_empty);
   out_int (E->channel.pts);

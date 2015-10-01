@@ -827,6 +827,12 @@ static int work_new_session_created (struct tgl_state *TLS, struct connection *c
   fetch_long (); // first message id
   fetch_long (); // unique_id
   TLS->net_methods->get_dc (c)->server_salt = fetch_long ();
+  
+  struct tgl_session *S = TLS->net_methods->get_session (c);
+  struct tgl_dc *DC = TLS->net_methods->get_dc (c);
+
+  tglq_regen_queries_from_old_session (TLS, DC, S);
+
   if (TLS->started && !(TLS->locks & TGL_LOCK_DIFF) && (TLS->DC_working->flags & TGLDCF_LOGGED_IN)) {
     tgl_do_get_difference (TLS, 0, 0, 0);
   }
@@ -886,11 +892,11 @@ static int work_packed (struct tgl_state *TLS, struct connection *c, long long m
 static int work_bad_server_salt (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   assert (fetch_int () == (int)CODE_bad_server_salt);
   long long id = fetch_long ();
-  tglq_query_restart (TLS, id);
   fetch_int (); // seq_no
   fetch_int (); // error_code
   long long new_server_salt = fetch_long ();
   TLS->net_methods->get_dc (c)->server_salt = new_server_salt;
+  tglq_query_restart (TLS, id);
   return 0;
 }
 
@@ -931,6 +937,11 @@ static int work_bad_msg_notification (struct tgl_state *TLS, struct connection *
     break;
   // Too high msg id
   case 17:
+    tglq_regen_query (TLS, m1);
+    break;
+  // Bad container
+  case 64:
+    vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %lld, seq = %d, error = %d\n", m1, s, e);
     tglq_regen_query (TLS, m1);
     break;
   default:
