@@ -22,6 +22,8 @@
 #define __TOOLS_H__
 #include <time.h>
 #include <openssl/err.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 //#include "tgl.h"
