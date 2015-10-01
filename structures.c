@@ -956,12 +956,12 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     break;
   case CODE_message_media_video:
   case CODE_message_media_video_l27:
-    M->type = tgl_message_media_document;
+    M->type = tgl_message_media_video;
     M->document = tglf_fetch_alloc_video_new (TLS, DS_MM->video);
     M->caption = DS_STR_DUP (DS_MM->caption);
     break;
   case CODE_message_media_audio:
-    M->type = tgl_message_media_document;
+    M->type = tgl_message_media_audio;
     M->document = tglf_fetch_alloc_audio_new (TLS, DS_MM->audio);
     break;
   case CODE_message_media_document:
@@ -1763,6 +1763,8 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
     tfree_str (M->last_name);
     return;
   case tgl_message_media_document:
+  case tgl_message_media_video:
+  case tgl_message_media_audio:
     tgls_free_document (TLS, M->document);
     return;
   case tgl_message_media_unsupported:
