@@ -223,7 +223,7 @@ struct query *tglq_send_query (struct tgl_state *TLS, struct tgl_dc *DC, int int
 }
 
 static int fail_on_error (struct tgl_state *TLS, struct query *q, int error_code, int l, const char *error) {
-  fprintf (stderr, "error #%d: %.*s\n", error_code, l, error);
+  vlogprintf (E_ERROR, "error #%d: %.*s\n", error_code, l, error);
   assert (0);
   return 0;
 }
@@ -274,7 +274,7 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
   char *error = fetch_str (error_len);
   struct query *q = tglq_query_get (TLS, id);
   if (!q) {
-    vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", id, error_code, error_len, error);
+    vlogprintf (E_WARNING, "error for query '%s' #%lld: #%d :%.*s\n", q->methods->name, id, error_code, error_len, error);
     vlogprintf (E_WARNING, "No such query\n");
   } else {
     if (!(q->flags & QUERY_ACK_RECEIVED)) {
@@ -371,7 +371,7 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
     if (error_handled) {
       vlogprintf (E_DEBUG - 2, "error for query #%lld: #%d %.*s (HANDLED)\n", id, error_code, error_len, error);
     } else {
-      vlogprintf (E_WARNING, "error for query #%lld: #%d %.*s\n", id, error_code, error_len, error);
+      vlogprintf (E_WARNING, "error for query '%s' #%lld: #%d %.*s\n", q->methods->name, id, error_code, error_len, error);
       if (q->methods && q->methods->on_error) {
         res = q->methods->on_error (TLS, q, error_code, error_len, error);
       }
@@ -595,7 +595,8 @@ static int send_code_on_answer (struct tgl_state *TLS, struct query *q, void *D)
 static struct query_methods send_code_methods  = {
   .on_answer = send_code_on_answer,
   .on_error = q_list_on_error,
-  .type = TYPE_TO_PARAM(auth_sent_code)
+  .type = TYPE_TO_PARAM(auth_sent_code),
+  .name = "send code"
 };
 
 void tgl_do_send_code (struct tgl_state *TLS, const char *phone, int phone_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int registered, const char *hash), void *callback_extra) {
@@ -624,7 +625,8 @@ static int phone_call_on_answer (struct tgl_state *TLS, struct query *q, void *D
 static struct query_methods phone_call_methods  = {
   .on_answer = phone_call_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(bool)
+  .type = TYPE_TO_PARAM(bool),
+  .name = "phone call"
 };
 
 void tgl_do_phone_call (struct tgl_state *TLS, const char *phone, int phone_len, const char *hash, int hash_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -667,7 +669,8 @@ static int sign_in_on_error (struct tgl_state *TLS, struct query *q, int error_c
 static struct query_methods sign_in_methods  = {
   .on_answer = sign_in_on_answer,
   .on_error = sign_in_on_error,
-  .type = TYPE_TO_PARAM(auth_authorization)
+  .type = TYPE_TO_PARAM(auth_authorization),
+  .name = "sign in"
 };
 
 int tgl_do_send_code_result (struct tgl_state *TLS, const char *phone, int phone_len, const char *hash, int hash_len, const char *code, int code_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *Self), void *callback_extra) {
@@ -725,7 +728,8 @@ static int get_contacts_on_answer (struct tgl_state *TLS, struct query *q, void 
 static struct query_methods get_contacts_methods = {
   .on_answer = get_contacts_on_answer,
   .on_error = q_list_on_error,
-  .type = TYPE_TO_PARAM(contacts_contacts)
+  .type = TYPE_TO_PARAM(contacts_contacts),
+  .name = "get contacts"
 };
 
 
@@ -784,7 +788,8 @@ static int msg_send_on_error (struct tgl_state *TLS, struct query *q, int error_
 static struct query_methods msg_send_methods = {
   .on_answer = msg_send_on_answer,
   .on_error = msg_send_on_error,
-  .type = TYPE_TO_PARAM(updates)
+  .type = TYPE_TO_PARAM(updates),
+  .name = "send message"
 };
 
 void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
@@ -1040,13 +1045,15 @@ static int mark_read_on_error (struct tgl_state *TLS, struct query *q, int error
 static struct query_methods mark_read_methods = {
   .on_answer = mark_read_on_receive,
   .on_error = mark_read_on_error,
-  .type = TYPE_TO_PARAM(messages_affected_history)
+  .type = TYPE_TO_PARAM(messages_affected_history),
+  .name = "mark read"
 };
 
 static struct query_methods mark_read_channels_methods = {
   .on_answer = mark_read_channels_on_receive,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(bool)
+  .type = TYPE_TO_PARAM(bool),
+  .name = "mark read (channels)"
 };
 
 void tgl_do_messages_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, int max_id, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int), void *callback_extra) {
@@ -1195,7 +1202,8 @@ static int get_history_on_error (struct tgl_state *TLS, struct query *q, int err
 static struct query_methods get_history_methods = {
   .on_answer = get_history_on_answer,
   .on_error = get_history_on_error,
-  .type = TYPE_TO_PARAM(messages_messages)
+  .type = TYPE_TO_PARAM(messages_messages),
+  .name = "get history"
 };
 
 void tgl_do_get_local_history (struct tgl_state *TLS, tgl_peer_id_t id, int offset, int limit, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
@@ -1386,7 +1394,8 @@ static int get_dialogs_on_error (struct tgl_state *TLS, struct query *q, int err
 static struct query_methods get_dialogs_methods = {
   .on_answer = get_dialogs_on_answer,
   .on_error = get_dialogs_on_error,
-  .type = TYPE_TO_PARAM(messages_dialogs)
+  .type = TYPE_TO_PARAM(messages_dialogs),
+  .name = "get dialogs"
 };
 
 static void _tgl_do_get_dialog_list (struct tgl_state *TLS, struct get_dialogs_extra *E,  void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, tgl_peer_id_t peers[], tgl_message_id_t *last_msg_id[], int unread_count[]), void *callback_extra) {
@@ -1480,13 +1489,15 @@ static int send_file_part_on_error (struct tgl_state *TLS, struct query *q, int 
 static struct query_methods send_file_part_methods = {
   .on_answer = send_file_part_on_answer,
   .on_error = send_file_part_on_error,
-  .type = TYPE_TO_PARAM(bool)
+  .type = TYPE_TO_PARAM(bool),
+  .name = "send file part"
 };
 
 static struct query_methods set_photo_methods = {
   .on_answer = set_photo_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(photos_photo)
+  .type = TYPE_TO_PARAM(photos_photo),
+  .name = "set photo"
 };
 
 static void send_avatar_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
@@ -1858,7 +1869,8 @@ int set_profile_name_on_answer (struct tgl_state *TLS, struct query *q, void *D)
 static struct query_methods set_profile_name_methods = {
   .on_answer = set_profile_name_on_answer,
   .on_error = q_ptr_on_error,
-  .type = TYPE_TO_PARAM(user)
+  .type = TYPE_TO_PARAM(user),
+  .name = "set profile name"
 };
 
 void tgl_do_set_profile_name (struct tgl_state *TLS, const char *first_name, int first_name_len, const char *last_name, int last_name_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra) {
@@ -1907,7 +1919,8 @@ int contact_search_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
 static struct query_methods contact_search_methods = {
   .on_answer = contact_search_on_answer,
   .on_error = q_list_on_error,
-  .type = TYPE_TO_PARAM(contacts_resolved_peer)
+  .type = TYPE_TO_PARAM(contacts_resolved_peer),
+  .name = "contacts search"
 };
 
 void tgl_do_contact_search (struct tgl_state *TLS, const char *name, int name_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, tgl_peer_t *U), void *callback_extra) {
@@ -1988,7 +2001,8 @@ static int send_msgs_on_error (struct tgl_state *TLS, struct query *q, int error
 static struct query_methods send_msgs_methods = {
   .on_answer = send_msgs_on_answer,
   .on_error = send_msgs_on_error,
-  .type = TYPE_TO_PARAM(updates)
+  .type = TYPE_TO_PARAM(updates),
+  .name = "forward messages"
 };
 
 void tgl_do_forward_messages (struct tgl_state *TLS, tgl_peer_id_t id, int n, const tgl_message_id_t *_ids[], unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int count, struct tgl_message *ML[]), void *callback_extra) {
@@ -2335,7 +2349,8 @@ static int chat_info_on_answer (struct tgl_state *TLS, struct query *q, void *D)
 static struct query_methods chat_info_methods = {
   .on_answer = chat_info_on_answer,
   .on_error = q_ptr_on_error,
-  .type = TYPE_TO_PARAM(messages_chat_full)
+  .type = TYPE_TO_PARAM(messages_chat_full),
+  .name = "chat info"
 };
 
 void tgl_do_get_chat_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_chat *C), void *callback_extra) {
@@ -2361,6 +2376,49 @@ void tgl_do_get_chat_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_
 }
 /* }}} */
 
+/* {{{ Channel info */
+
+static int channel_info_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
+  struct tgl_channel *C = tglf_fetch_alloc_channel_full (TLS, D);
+  //print_chat_info (C);
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, struct tgl_channel *))q->callback) (TLS, q->callback_extra, 1, C);
+  }
+  return 0;
+}
+
+static struct query_methods channel_info_methods = {
+  .on_answer = channel_info_on_answer,
+  .on_error = q_ptr_on_error,
+  .type = TYPE_TO_PARAM(messages_chat_full),
+  .name = "channel info"
+};
+
+void tgl_do_get_channel_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_channel *C), void *callback_extra) {
+  if (offline_mode) {
+    tgl_peer_t *C = tgl_peer_get (TLS, id);
+    if (!C) {
+      tgl_set_query_error (TLS, EINVAL, "unknown chat id");
+      if (callback) {
+        callback (TLS, callback_extra, 0, 0);
+      }
+    } else {
+      if (callback) {
+        callback (TLS, callback_extra, 1, &C->channel);
+      }
+    }
+    return;
+  }
+  clear_packet ();
+  out_int (CODE_channels_get_full_channel);
+  assert (tgl_get_peer_type (id) == TGL_PEER_CHANNEL);
+  out_int (CODE_input_channel);
+  out_int (id.peer_id);
+  out_long (id.access_hash);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &channel_info_methods, 0, callback, callback_extra);
+}
+/* }}} */
+
 /* {{{ User info */
 
 static int user_info_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
@@ -2374,7 +2432,8 @@ static int user_info_on_answer (struct tgl_state *TLS, struct query *q, void *D)
 static struct query_methods user_info_methods = {
   .on_answer = user_info_on_answer,
   .on_error = q_ptr_on_error,
-  .type = TYPE_TO_PARAM(user_full)
+  .type = TYPE_TO_PARAM(user_full),
+  .name = "user info"
 };
 
 void tgl_do_get_user_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra) {
@@ -2550,7 +2609,8 @@ static int download_on_error (struct tgl_state *TLS, struct query *q, int error_
 static struct query_methods download_methods = {
   .on_answer = download_on_answer,
   .on_error = download_on_error,
-  .type = TYPE_TO_PARAM(upload_file)
+  .type = TYPE_TO_PARAM(upload_file),
+  .name = "download part"
 };
 
 static void load_next_part (struct tgl_state *TLS, struct download *D, void *callback, void *callback_extra) {
@@ -2753,7 +2813,8 @@ static int import_auth_on_answer (struct tgl_state *TLS, struct query *q, void *
 static struct query_methods import_auth_methods = {
   .on_answer = import_auth_on_answer,
   .on_error = fail_on_error,
-  .type = TYPE_TO_PARAM(auth_authorization)
+  .type = TYPE_TO_PARAM(auth_authorization),
+  .name = "import authorization"
 };
 
 static int export_auth_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
@@ -2774,7 +2835,8 @@ static int export_auth_on_answer (struct tgl_state *TLS, struct query *q, void *
 static struct query_methods export_auth_methods = {
   .on_answer = export_auth_on_answer,
   .on_error = fail_on_error,
-  .type = TYPE_TO_PARAM(auth_exported_authorization)
+  .type = TYPE_TO_PARAM(auth_exported_authorization),
+  .name = "export authorization"
 };
 
 void tgl_do_export_auth (struct tgl_state *TLS, int num, void (*callback) (struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -2813,7 +2875,8 @@ static int add_contact_on_answer (struct tgl_state *TLS, struct query *q, void *
 static struct query_methods add_contact_methods = {
   .on_answer = add_contact_on_answer,
   .on_error = q_list_on_error,
-  .type = TYPE_TO_PARAM(contacts_imported_contacts)
+  .type = TYPE_TO_PARAM(contacts_imported_contacts),
+  .name = "add contact"
 };
 
 void tgl_do_add_contact (struct tgl_state *TLS, const char *phone, int phone_len, const char *first_name, int first_name_len, const char *last_name, int last_name_len, int force, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_user *users[]), void *callback_extra) {
@@ -2844,7 +2907,8 @@ static int del_contact_on_answer (struct tgl_state *TLS, struct query *q, void *
 static struct query_methods del_contact_methods = {
   .on_answer = del_contact_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(contacts_link)
+  .type = TYPE_TO_PARAM(contacts_link),
+  .name = "del contact"
 };
 
 void tgl_do_del_contact (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -2951,7 +3015,8 @@ static int msg_search_on_error (struct tgl_state *TLS, struct query *q, int erro
 static struct query_methods msg_search_methods = {
   .on_answer = msg_search_on_answer,
   .on_error = msg_search_on_error,
-  .type = TYPE_TO_PARAM(messages_messages)
+  .type = TYPE_TO_PARAM(messages_messages),
+  .name = "messages search"
 };
 
 static void _tgl_do_msg_search (struct tgl_state *TLS, struct msg_search_extra *E, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
@@ -3104,19 +3169,22 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, voi
 static struct query_methods lookup_state_methods = {
   .on_answer = lookup_state_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(updates_state)
+  .type = TYPE_TO_PARAM(updates_state),
+  .name = "lookup state"
 };
 
 static struct query_methods get_state_methods = {
   .on_answer = get_state_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(updates_state)
+  .type = TYPE_TO_PARAM(updates_state),
+  .name = "get state"
 };
 
 static struct query_methods get_difference_methods = {
   .on_answer = get_difference_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(updates_difference)
+  .type = TYPE_TO_PARAM(updates_difference),
+  .name = "get difference"
 };
 
 void tgl_do_lookup_state (struct tgl_state *TLS) {
@@ -3220,7 +3288,8 @@ static int get_channel_difference_on_answer (struct tgl_state *TLS, struct query
 static struct query_methods get_channel_difference_methods = {
   .on_answer = get_channel_difference_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(updates_channel_difference)
+  .type = TYPE_TO_PARAM(updates_channel_difference),
+  .name = "get channel difference"
 };
 
 void tgl_do_get_channel_difference (struct tgl_state *TLS, int id, void (*callback)(struct tgl_state *tls, void *callback_extra, int success), void *callback_extra) {
@@ -3384,7 +3453,8 @@ static int delete_msg_on_error (struct tgl_state *TLS, struct query *q, int erro
 static struct query_methods delete_msg_methods = {
   .on_answer = delete_msg_on_answer,
   .on_error = delete_msg_on_error,
-  .type = TYPE_TO_PARAM(messages_affected_messages)
+  .type = TYPE_TO_PARAM(messages_affected_messages),
+  .name = "delete message"
 };
 
 void tgl_do_delete_msg (struct tgl_state *TLS, tgl_message_id_t *_msg_id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -3434,7 +3504,8 @@ static int export_card_on_answer (struct tgl_state *TLS, struct query *q, void *
 static struct query_methods export_card_methods = {
   .on_answer = export_card_on_answer,
   .on_error = q_list_on_error,
-  .type = TYPE_TO_PARAM_1(vector, TYPE_TO_PARAM (bare_int))
+  .type = TYPE_TO_PARAM_1(vector, TYPE_TO_PARAM (bare_int)),
+  .name = "export card"
 };
 
 void tgl_do_export_card (struct tgl_state *TLS, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, int *card), void *callback_extra) {
@@ -3458,7 +3529,8 @@ static int import_card_on_answer (struct tgl_state *TLS, struct query *q, void *
 static struct query_methods import_card_methods = {
   .on_answer = import_card_on_answer,
   .on_error = q_ptr_on_error,
-  .type = TYPE_TO_PARAM (user)
+  .type = TYPE_TO_PARAM (user),
+  .name = "import card"
 };
 
 void tgl_do_import_card (struct tgl_state *TLS, int size, int *card, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra) {
@@ -3496,7 +3568,8 @@ static int send_typing_on_answer (struct tgl_state *TLS, struct query *q, void *
 static struct query_methods send_typing_methods = {
   .on_answer = send_typing_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(bool)
+  .type = TYPE_TO_PARAM(bool),
+  .name = "send typing"
 };
 
 void tgl_do_send_typing (struct tgl_state *TLS, tgl_peer_id_t id, enum tgl_typing_status status, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -3563,7 +3636,8 @@ static int ext_query_on_answer (struct tgl_state *TLS, struct query *q, void *D)
 
 static struct query_methods ext_query_methods = {
   .on_answer = ext_query_on_answer,
-  .on_error = q_list_on_error
+  .on_error = q_list_on_error,
+  .name = "ext query"
 };
 
 void tgl_do_send_extf (struct tgl_state *TLS, const char *data, int data_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *buf), void *callback_extra) {
@@ -3630,7 +3704,8 @@ static int get_messages_on_answer (struct tgl_state *TLS, struct query *q, void 
 static struct query_methods get_messages_methods = {
   .on_answer = get_messages_on_answer,
   .on_error = q_ptr_on_error,
-  .type = TYPE_TO_PARAM (messages_messages)
+  .type = TYPE_TO_PARAM (messages_messages),
+  .name = "get messages"
 };
 
 void tgl_do_get_message (struct tgl_state *TLS, tgl_message_id_t *_msg_id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
@@ -3684,7 +3759,8 @@ static int export_chat_link_on_answer (struct tgl_state *TLS, struct query *q, v
 static struct query_methods export_chat_link_methods = {
   .on_answer = export_chat_link_on_answer,
   .on_error = q_ptr_on_error,
-  .type = TYPE_TO_PARAM(exported_chat_invite)
+  .type = TYPE_TO_PARAM(exported_chat_invite),
+  .name = "export chat link"
 };
 
 void tgl_do_export_chat_link (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *link), void *callback_extra) {
@@ -3761,7 +3837,8 @@ static int set_password_on_error (struct tgl_state *TLS, struct query *q, int er
 static struct query_methods set_password_methods = {
   .on_answer = set_password_on_answer,
   .on_error = set_password_on_error,
-  .type = TYPE_TO_PARAM(bool)
+  .type = TYPE_TO_PARAM(bool),
+  .name = "set password"
 };
 
 static void tgl_do_act_set_password (struct tgl_state *TLS, const char *current_password, int current_password_len, const char *new_password, int new_password_len, const char *current_salt, int current_salt_len, const char *new_salt, int new_salt_len, const char *hint, int hint_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -3907,7 +3984,8 @@ static int set_get_password_on_answer (struct tgl_state *TLS, struct query *q, v
 static struct query_methods set_get_password_methods = {
   .on_answer = set_get_password_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(account_password)
+  .type = TYPE_TO_PARAM(account_password),
+  .name = "get password"
 };
 
 void tgl_do_set_password (struct tgl_state *TLS, const char *hint, int hint_len, void (*callback)(struct tgl_state *TLS, void *extra, int success), void *callback_extra) {
@@ -3944,7 +4022,8 @@ static int check_password_on_answer (struct tgl_state *TLS, struct query *q, voi
 static struct query_methods check_password_methods = {
   .on_answer = check_password_on_answer,
   .on_error = check_password_on_error,
-  .type = TYPE_TO_PARAM(auth_authorization)
+  .type = TYPE_TO_PARAM(auth_authorization),
+  .name = "check password"
 };
 
 
@@ -4024,7 +4103,8 @@ static int check_get_password_on_answer (struct tgl_state *TLS, struct query *q,
 static struct query_methods check_get_password_methods = {
   .on_answer = check_get_password_on_answer,
   .on_error = check_get_password_on_error,
-  .type = TYPE_TO_PARAM(account_password)
+  .type = TYPE_TO_PARAM(account_password),
+  .name = "get password"
 };
 
 void tgl_do_check_password (struct tgl_state *TLS, void (*callback)(struct tgl_state *TLS, void *extra, int success), void *callback_extra) {
@@ -4104,7 +4184,8 @@ static int block_user_on_answer (struct tgl_state *TLS, struct query *q, void *D
 static struct query_methods block_user_methods = {
   .on_answer = block_user_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM (bool)
+  .type = TYPE_TO_PARAM (bool),
+  .name = "block user"
 };
 
 void tgl_do_block_user (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
@@ -4174,7 +4255,8 @@ static int send_bind_on_error (struct tgl_state *TLS, struct query *q, int error
 static struct query_methods send_bind_temp_methods = {
   .on_answer = send_bind_temp_on_answer,
   .on_error = send_bind_on_error,
-  .type = TYPE_TO_PARAM (bool)
+  .type = TYPE_TO_PARAM (bool),
+  .name = "bind temp auth key"
 };
 
 void tgl_do_send_bind_temp_key (struct tgl_state *TLS, struct tgl_dc *D, long long nonce, int expires_at, void *data, int len, long long msg_id) {
@@ -4198,7 +4280,8 @@ static int update_status_on_answer (struct tgl_state *TLS, struct query *q, void
 static struct query_methods update_status_methods = {
   .on_answer = update_status_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(bool)
+  .type = TYPE_TO_PARAM(bool),
+  .name = "update status"
 };
 
 void tgl_do_update_status (struct tgl_state *TLS, int online, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {

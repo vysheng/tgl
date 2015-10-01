@@ -45,8 +45,7 @@
 #define TG_SERVER_TEST_IPV6_3 "2001:b28:f23d:f003::e"
 #define TG_SERVER_TEST_DEFAULT 2
 
-// JUST RANDOM STRING
-#define TGL_VERSION "2.0.3"
+#define TGL_VERSION "2.1.0"
 
 #define TGL_ENCRYPTED_LAYER 17
 #define TGL_SCHEME_LAYER 38
@@ -284,6 +283,7 @@ int tgl_complete_user_list (struct tgl_state *TLS, int index, const char *text, 
 int tgl_complete_chat_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_complete_encr_chat_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_complete_peer_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
+int tgl_complete_channel_list (struct tgl_state *TLS, int index, const char *text, int len, char **R);
 int tgl_secret_chat_for_user (struct tgl_state *TLS, tgl_peer_id_t user_id);
 int tgl_do_send_bot_auth (struct tgl_state *TLS, const char *code, int code_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *Self), void *callback_extra);
 

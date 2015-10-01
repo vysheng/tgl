@@ -33,6 +33,7 @@ struct query_methods {
   int (*on_error)(struct tgl_state *TLS, struct query *q, int error_code, int len, const char *error);
   int (*on_timeout)(struct tgl_state *TLS, struct query *q);
   struct paramed_type *type;
+  char *name;
 };
 
 struct query {

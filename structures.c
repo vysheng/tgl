@@ -2299,6 +2299,20 @@ int tgl_complete_chat_list (struct tgl_state *TLS, int index, const char *text, 
   }
 }
 
+int tgl_complete_channel_list (struct tgl_state *TLS, int index, const char *text, int len, char **R) {
+  index ++;
+  while (index < TLS->peer_num && (!TLS->Peers[index]->print_name || strncmp (TLS->Peers[index]->print_name, text, len) || tgl_get_peer_type (TLS->Peers[index]->id) != TGL_PEER_CHANNEL)) {
+    index ++;
+  }
+  if (index < TLS->peer_num) {
+    *R = strdup (TLS->Peers[index]->print_name);
+    assert (*R);
+    return index;
+  } else {
+    return -1;
+  }
+}
+
 int tgl_complete_encr_chat_list (struct tgl_state *TLS, int index, const char *text, int len, char **R) {
   index ++;
   while (index < TLS->peer_num && (!TLS->Peers[index]->print_name || strncmp (TLS->Peers[index]->print_name, text, len) || tgl_get_peer_type (TLS->Peers[index]->id) != TGL_PEER_ENCR_CHAT)) {

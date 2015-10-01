@@ -164,6 +164,8 @@ void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_user_id_t id, void (*
 
 /* {{{ WORKING WITH CHANNELS */
 void tgl_do_get_channels_dialog_list (struct tgl_state *TLS, int limit, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, tgl_peer_id_t peers[], tgl_message_id_t *last_msg_id[], int unread_count[]), void *callback_extra);
+
+void tgl_do_get_channel_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_channel *C), void *callback_extra);
 /* }}} */
 
 /* {{{ WORKING WITH DIALOG LIST */

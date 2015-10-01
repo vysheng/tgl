@@ -279,6 +279,7 @@ struct tgl_user {
   int flags;
   struct tgl_message *last;
   char *print_name;
+  char *username;
   int structure_version;
   struct tgl_file_location photo_big;
   struct tgl_file_location photo_small;
@@ -294,7 +295,6 @@ struct tgl_user {
   int blocked;
   char *real_first_name;
   char *real_last_name;
-  char *username;
 
   struct tgl_bot_info *bot_info;
 };
@@ -304,6 +304,7 @@ struct tgl_channel {
   int flags;
   struct tgl_message *last;
   char *print_title;
+  char *username;
   int structure_version;
   struct tgl_file_location photo_big;
   struct tgl_file_location photo_small;
@@ -315,7 +316,6 @@ struct tgl_channel {
   long long access_hash;
   int date;
   char *title;
-  char *username;
   int version;
   char *about;
   int participants_count;
@@ -336,6 +336,7 @@ struct tgl_chat {
   int flags;
   struct tgl_message *last;
   char *print_title;
+  char *username;
   int structure_version;
   struct tgl_file_location photo_big;
   struct tgl_file_location photo_small;
@@ -374,6 +375,7 @@ struct tgl_secret_chat {
   int flags;
   struct tgl_message *last;
   char *print_name;
+  char *username;
   int structure_version;
   struct tgl_file_location photo_big;
   struct tgl_file_location photo_small;
@@ -406,6 +408,7 @@ typedef union tgl_peer {
     int flags;
     struct tgl_message *last;
     char *print_name;
+    char *username;
     int structure_version;
     struct tgl_file_location photo_big;
     struct tgl_file_location photo_small;
