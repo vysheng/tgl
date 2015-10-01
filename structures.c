@@ -1351,7 +1351,10 @@ void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_mess
 }
 
 
-struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_ds_message *DS_M) {
+struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_ds_message *DS_M, int *new_msg) {
+  if (new_msg) {
+    *new_msg = 0;
+  }
   //assert (0);
   if (!DS_M || DS_M->magic == CODE_message_empty) { 
     vlogprintf (E_NOTICE, "empty message\n");
@@ -1404,6 +1407,9 @@ struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_d
   }
   int new = !(M->flags & TGLMF_CREATED);
 
+  if (new_msg) {
+    *new_msg = new;
+  }
   if (new) {
     int flags = 0;
     if (DS_LVAL (DS_M->flags) & 1) {

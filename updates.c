@@ -84,7 +84,7 @@ int tgl_check_qts_diff (struct tgl_state *TLS, int qts, int qts_count) {
 
 int tgl_check_channel_pts_diff (struct tgl_state *TLS, tgl_peer_t *_E, int pts, int pts_count) {
   struct tgl_channel *E = &_E->channel;
-  vlogprintf (E_DEBUG - 1, "pts = %d, pts_count = %d\n", pts, pts_count);
+  vlogprintf (E_DEBUG - 1, "channel %d: pts = %d, pts_count = %d, current_pts = %d\n", tgl_get_peer_id (E->id), pts, pts_count, E->pts);
   if (!E->pts) {
     return 1;
   }
@@ -175,15 +175,17 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
     }
   }
 
+  vlogprintf (E_WARNING, "update 0x%08x (check=%d)\n", DS_U->magic, check_only);
   if (check_only > 0 && DS_U->magic != CODE_update_message_i_d) { return; }
   switch (DS_U->magic) {
   case CODE_update_new_message:
     {
       //struct tgl_message *N = tgl_message_get (TLS, DS_LVAL (DS_U->id));
       //int new = (!N || !(N->flags & TGLMF_CREATED));
-      struct tgl_message *M = tglf_fetch_alloc_message (TLS, DS_U->message);
+      int new_msg = 0;
+      struct tgl_message *M = tglf_fetch_alloc_message (TLS, DS_U->message, &new_msg);
       assert (M);
-      if (1) {
+      if (new_msg) {
         bl_do_msg_update (TLS, &M->permanent_id);
       }
       break;
@@ -510,8 +512,9 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
     break;
   case CODE_update_new_channel_message:
     {
-      struct tgl_message *M = tglf_fetch_alloc_message (TLS, DS_U->message);
-      if (M) {
+      int new_msg = 0;
+      struct tgl_message *M = tglf_fetch_alloc_message (TLS, DS_U->message, &new_msg);
+      if (M && new_msg) {
         bl_do_msg_update (TLS, &M->permanent_id);
       }
     }

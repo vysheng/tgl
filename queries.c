@@ -1191,7 +1191,7 @@ static int get_history_on_answer (struct tgl_state *TLS, struct query *q, void *
   }
 
   for (i = 0; i < n; i++) {
-    E->ML[i + E->list_offset] = tglf_fetch_alloc_message (TLS, DS_MM->messages->data[i]);
+    E->ML[i + E->list_offset] = tglf_fetch_alloc_message (TLS, DS_MM->messages->data[i], NULL);
   }
   E->list_offset += n;
   E->offset += n;
@@ -1390,7 +1390,7 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q, void *
   E->list_offset += dl_size;
 
   for (i = 0; i < DS_LVAL (DS_MD->messages->cnt); i++) {
-    tglf_fetch_alloc_message (TLS, DS_MD->messages->data[i]);
+    tglf_fetch_alloc_message (TLS, DS_MD->messages->data[i], NULL);
   }
 
   vlogprintf (E_DEBUG, "dl_size = %d, total = %d\n", dl_size, E->list_offset);
@@ -3030,7 +3030,7 @@ static int msg_search_on_answer (struct tgl_state *TLS, struct query *q, void *D
   }
 
   for (i = 0; i < n; i++) {
-    E->ML[i + E->list_offset] = tglf_fetch_alloc_message (TLS, DS_MM->messages->data[i]);
+    E->ML[i + E->list_offset] = tglf_fetch_alloc_message (TLS, DS_MM->messages->data[i], NULL);
   }
   E->list_offset += n;
   E->offset += n;
@@ -3177,7 +3177,7 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, voi
     int ml_pos = DS_LVAL (DS_UD->new_messages->cnt);
     struct tgl_message **ML = talloc (ml_pos * sizeof (void *));
     for (i = 0; i < ml_pos; i++) {
-      ML[i] = tglf_fetch_alloc_message (TLS, DS_UD->new_messages->data[i]);
+      ML[i] = tglf_fetch_alloc_message (TLS, DS_UD->new_messages->data[i], NULL);
     }
 
     int el_pos = DS_LVAL (DS_UD->new_encrypted_messages->cnt);
@@ -3314,7 +3314,7 @@ static int get_channel_difference_on_answer (struct tgl_state *TLS, struct query
     int ml_pos = DS_LVAL (DS_UD->new_messages->cnt);
     struct tgl_message **ML = talloc (ml_pos * sizeof (void *));
     for (i = 0; i < ml_pos; i++) {
-      ML[i] = tglf_fetch_alloc_message (TLS, DS_UD->new_messages->data[i]);
+      ML[i] = tglf_fetch_alloc_message (TLS, DS_UD->new_messages->data[i], NULL);
     }
 
     for (i = 0; i < DS_LVAL (DS_UD->other_updates->cnt); i++) {
@@ -3739,7 +3739,7 @@ static int get_messages_on_answer (struct tgl_state *TLS, struct query *q, void 
     assert (DS_LVAL (DS_MM->messages->cnt) <= 1);
   }
   for (i = 0; i < DS_LVAL (DS_MM->messages->cnt); i++) {
-    ML[i] = tglf_fetch_alloc_message (TLS, DS_MM->messages->data[i]);
+    ML[i] = tglf_fetch_alloc_message (TLS, DS_MM->messages->data[i], NULL);
   }
   if (q->callback) {
     if (q->extra) {
