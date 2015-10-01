@@ -147,8 +147,6 @@ struct tgl_dc {
 enum tgl_message_media_type {
   tgl_message_media_none,
   tgl_message_media_photo,
-  //tgl_message_media_video,
-  //tgl_message_media_audio,
   tgl_message_media_document,
   tgl_message_media_geo,
   tgl_message_media_contact,
@@ -158,7 +156,9 @@ enum tgl_message_media_type {
   //tgl_message_media_audio_encr,
   tgl_message_media_document_encr,
   tgl_message_media_webpage,
-  tgl_message_media_venue
+  tgl_message_media_venue,
+  tgl_message_media_video,
+  tgl_message_media_audio
 };
 
 enum tgl_message_action_type {

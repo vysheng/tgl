@@ -380,6 +380,7 @@ struct tgl_state *tgl_state_alloc (void);
 
 void tgl_disable_link_preview (struct tgl_state *TLS);
 void tgl_do_lookup_state (struct tgl_state *TLS);
+
 #ifdef __cplusplus
 }
 #endif
