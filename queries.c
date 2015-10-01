@@ -120,7 +120,7 @@ struct query *tglq_query_get (struct tgl_state *TLS, long long id) {
 
 static int alarm_query (struct tgl_state *TLS, struct query *q) {
   assert (q);
-  vlogprintf (E_DEBUG - 2, "Alarm query %lld\n", q->msg_id);
+  vlogprintf (E_DEBUG - 2, "Alarm query %lld (type '%s')\n", q->msg_id, q->methods->name);
 
   TLS->timer_methods->insert (q->ev, q->methods->timeout ? q->methods->timeout : QUERY_TIMEOUT);
 
@@ -140,7 +140,9 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
       TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     }
     q->session = q->DC->sessions[0];
+    long long old_id = q->msg_id;
     q->msg_id = tglmp_encrypt_send_message (TLS, q->session->c, q->data, q->data_len, (q->flags & QUERY_FORCE_SEND) | 1);
+    vlogprintf (E_NOTICE, "Resent query #%lld as #%lld of size %d to DC %d\n", old_id, q->msg_id, 4 * q->data_len, q->DC->id);
     TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
     q->session_id = q->session->session_id;
     if (!(q->session->dc->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
@@ -178,8 +180,8 @@ void tglq_regen_query_from_old_session (struct query *q, void *ex) {
   if (q->DC == T->DC) {
     if (!q->session || q->session_id != T->S->session_id || q->session != T->S) {
       q->session_id = 0;
-      vlogprintf (E_NOTICE, "regen query %lld\n", q->msg_id);
-      TLS->timer_methods->insert (q->ev, 0.001);
+      vlogprintf (E_NOTICE, "regen query from old session %lld\n", q->msg_id);
+      TLS->timer_methods->insert (q->ev, q->methods->timeout ? 0.001 : 0.1);
     }
   }
 }
@@ -225,6 +227,7 @@ struct query *tglq_send_query_ex (struct tgl_state *TLS, struct tgl_dc *DC, int 
     q->session_id = 0;
   }
   vlogprintf (E_DEBUG, "Msg_id is %lld %p\n", q->msg_id, q);
+  vlogprintf (E_NOTICE, "Sent query #%lld of size %d to DC %d\n", q->msg_id, 4 * ints, DC->id);
   q->methods = methods;
   q->type = methods->type;
   q->DC = DC;
@@ -587,6 +590,7 @@ static struct query_methods help_get_config_methods  = {
   .on_answer = help_get_config_on_answer,
   .on_error = q_void_on_error,
   .type = TYPE_TO_PARAM(config),
+  .name = "get config",
   .timeout = 1
 };
 

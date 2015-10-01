@@ -822,14 +822,14 @@ static int work_container (struct tgl_state *TLS, struct connection *c, long lon
 }
 
 static int work_new_session_created (struct tgl_state *TLS, struct connection *c, long long msg_id) {
-  vlogprintf (E_DEBUG, "work_new_session_created: msg_id = %lld\n", msg_id);
+  struct tgl_session *S = TLS->net_methods->get_session (c);
+  struct tgl_dc *DC = TLS->net_methods->get_dc (c);
+  
+  vlogprintf (E_NOTICE, "work_new_session_created: msg_id = %lld, dc = %d\n", msg_id, DC->id);
   assert (fetch_int () == (int)CODE_new_session_created);
   fetch_long (); // first message id
   fetch_long (); // unique_id
   TLS->net_methods->get_dc (c)->server_salt = fetch_long ();
-  
-  struct tgl_session *S = TLS->net_methods->get_session (c);
-  struct tgl_dc *DC = TLS->net_methods->get_dc (c);
 
   tglq_regen_queries_from_old_session (TLS, DC, S);
 
