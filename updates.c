@@ -725,7 +725,8 @@ void tglu_work_update_short_sent_message (struct tgl_state *TLS, int check_only,
     NULL,
     NULL, 
     flags);
-  
+ 
+  if (check_only) { return; }
   bl_do_msg_update (TLS, &M->permanent_id);
   
   if (DS_U->pts) {
