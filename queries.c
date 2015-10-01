@@ -2264,7 +2264,7 @@ void tgl_do_forward_media (struct tgl_state *TLS, tgl_peer_id_t peer_id, tgl_mes
     }
     return;
   }
-  if (M->media.type != tgl_message_media_photo && M->media.type != tgl_message_media_document) {
+  if (M->media.type != tgl_message_media_photo && M->media.type != tgl_message_media_document && M->media.type != tgl_message_media_audio && M->media.type != tgl_message_media_video) {
     tgl_set_query_error (TLS, EINVAL, "can only forward photo/document");
     if (callback) {
       callback (TLS, callback_extra, 0, 0);
@@ -2289,6 +2289,8 @@ void tgl_do_forward_media (struct tgl_state *TLS, tgl_peer_id_t peer_id, tgl_mes
     out_string ("");
     break;
   case tgl_message_media_document:
+  case tgl_message_media_audio:
+  case tgl_message_media_video:
     assert (M->media.document);
     out_int (CODE_input_media_document);
     out_int (CODE_input_document);
