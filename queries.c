@@ -3529,6 +3529,34 @@ void tgl_do_create_group_chat (struct tgl_state *TLS, int users_num, tgl_peer_id
 }
 /* }}} */
 
+/* {{{ Create channel */
+
+void tgl_do_create_channel (struct tgl_state *TLS, int users_num, tgl_peer_id_t ids[], const char *chat_topic, int chat_topic_len, const char *about, int about_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_create_channel);
+  out_int (flags); // looks like 2 is disable non-admin messages
+  out_cstring (chat_topic, chat_topic_len);
+  out_cstring (about, about_len);
+  out_int (CODE_vector);
+  out_int (users_num); 
+  int i;
+  for (i = 0; i < users_num; i++) {
+    tgl_peer_id_t id = ids[i];
+    if (tgl_get_peer_type (id) != TGL_PEER_USER) {
+      tgl_set_query_error (TLS, EINVAL, "Can not create chat with unknown user");
+      if (callback) {
+        callback (TLS, callback_extra, 0);
+      }
+      return;
+    }
+    out_int (CODE_input_user);
+    out_int (tgl_get_peer_id (id));
+    out_long (id.access_hash);
+  }
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+/* }}} */
+
 /* {{{ Delete msg */
 
 static int delete_msg_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
