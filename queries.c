@@ -2472,6 +2472,33 @@ void tgl_do_channel_set_username (struct tgl_state *TLS, tgl_peer_id_t id, const
 }
 /* }}} */
 
+/* {{{ Channel set admin */
+void tgl_do_channel_set_admin (struct tgl_state *TLS, tgl_peer_id_t channel_id, tgl_peer_id_t user_id, int type, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_edit_admin);
+  assert (tgl_get_peer_type (channel_id) == TGL_PEER_CHANNEL);
+  assert (tgl_get_peer_type (user_id) == TGL_PEER_USER);
+  out_int (CODE_input_channel);
+  out_int (tgl_get_peer_id (channel_id));
+  out_long (channel_id.access_hash);
+  out_int (CODE_input_user);
+  out_int (tgl_get_peer_id (user_id));
+  out_long (user_id.access_hash);
+  switch (type) {
+  case 1:
+    out_int (CODE_channel_role_moderator);
+    break;
+  case 2:
+    out_int (CODE_channel_role_editor);
+    break;
+  default:
+    out_int (CODE_channel_role_empty);
+    break;
+  }
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &channels_set_about_methods, 0, callback, callback_extra);
+}
+/* }}} */
+
 /* {{{ Chat info */
 
 static int chat_info_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
