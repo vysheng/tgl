@@ -152,7 +152,9 @@ static int msg_send_encr_on_error (struct tgl_state *TLS, struct query *q, int e
 static struct query_methods msg_send_encr_methods = {
   .on_answer = msg_send_encr_on_answer,
   .on_error = msg_send_encr_on_error,
-  .type = TYPE_TO_PARAM(messages_sent_encrypted_message)
+  .type = TYPE_TO_PARAM(messages_sent_encrypted_message),
+  .name = "send encrypted (message)",
+  .timeout = 0,
 };
 /* }}} */
 
@@ -291,7 +293,9 @@ static int mark_read_encr_on_error (struct tgl_state *TLS, struct query *q, int 
 static struct query_methods mark_read_encr_methods = {
   .on_answer = mark_read_encr_on_receive,
   .on_error = mark_read_encr_on_error,
-  .type = TYPE_TO_PARAM(bool)
+  .type = TYPE_TO_PARAM(bool),
+  .name = "read encrypted",
+  .timeout = 0,
 };
 
 void tgl_do_messages_mark_read_encr (struct tgl_state *TLS, tgl_peer_id_t id, long long access_hash, int last_time, void (*callback)(struct tgl_state *TLS, void *callback_extra, int), void *callback_extra) {
@@ -323,7 +327,9 @@ static int send_encr_file_on_answer (struct tgl_state *TLS, struct query *q, voi
 static struct query_methods send_encr_file_methods = {
   .on_answer = send_encr_file_on_answer,
   .on_error = msg_send_encr_on_error,
-  .type = TYPE_TO_PARAM(messages_sent_encrypted_message)
+  .type = TYPE_TO_PARAM(messages_sent_encrypted_message),
+  .name = "send encrypted (file)",
+  .timeout = 0,
 };
 
 static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
@@ -503,13 +509,17 @@ static int encr_accept_on_error (struct tgl_state *TLS, struct query *q, int err
 static struct query_methods send_encr_accept_methods  = {
   .on_answer = send_encr_accept_on_answer,
   .on_error = encr_accept_on_error,
-  .type = TYPE_TO_PARAM(encrypted_chat)
+  .type = TYPE_TO_PARAM(encrypted_chat),
+  .name = "send encrypted (chat accept)",
+  .timeout = 0,
 };
 
 static struct query_methods send_encr_request_methods  = {
   .on_answer = send_encr_request_on_answer,
   .on_error = q_ptr_on_error,
-  .type = TYPE_TO_PARAM(encrypted_chat)
+  .type = TYPE_TO_PARAM(encrypted_chat),
+  .name = "send encrypted (chat request)",
+  .timeout = 0,
 };
 
 //int encr_root;
@@ -723,7 +733,9 @@ static int get_dh_config_on_answer (struct tgl_state *TLS, struct query *q, void
 static struct query_methods get_dh_config_methods  = {
   .on_answer = get_dh_config_on_answer,
   .on_error = q_void_on_error,
-  .type = TYPE_TO_PARAM(messages_dh_config)
+  .type = TYPE_TO_PARAM(messages_dh_config),
+  .name = "dh config",
+  .timeout = 0,
 };
 
 void tgl_do_accept_encr_chat_request (struct tgl_state *TLS, struct tgl_secret_chat *E, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra) {
