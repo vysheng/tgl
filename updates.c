@@ -175,7 +175,7 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
     }
   }
 
-  vlogprintf (E_WARNING, "update 0x%08x (check=%d)\n", DS_U->magic, check_only);
+  vlogprintf (E_NOTICE, "update 0x%08x (check=%d)\n", DS_U->magic, check_only);
   if (check_only > 0 && DS_U->magic != CODE_update_message_i_d) { return; }
   switch (DS_U->magic) {
   case CODE_update_new_message:
