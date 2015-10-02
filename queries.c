@@ -4012,6 +4012,28 @@ void tgl_do_import_chat_link (struct tgl_state *TLS, const char *link, int len, 
 
 /* }}} */
 
+/* {{{ Export/import channel link */
+
+void tgl_do_export_channel_link (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *link), void *callback_extra) {
+  if (tgl_get_peer_type (id) != TGL_PEER_CHANNEL) {
+    tgl_set_query_error (TLS, EINVAL, "Can only export chat link for chat");
+    if (callback) {
+      callback (TLS, callback_extra, 0, NULL);
+    }
+    return;
+  }
+
+  clear_packet ();
+  out_int (CODE_channels_export_invite);
+  out_int (CODE_input_channel);
+  out_int (tgl_get_peer_id (id));
+  out_long (id.access_hash);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &export_chat_link_methods, 0, callback, callback_extra);
+}
+
+/* }}} */
+
 /* {{{ set password */
 static int set_password_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   if (q->callback) {
