@@ -655,11 +655,12 @@ void tglu_work_update_short_chat_message (struct tgl_state *TLS, int check_only,
   //int new = (!N || !(N->flags & TGLMF_CREATED));
   
   struct tgl_message *M = tglf_fetch_alloc_message_short_chat (TLS, DS_U);
-  assert (M);
   
   if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
+  
+  assert (M);
 
   if (1) {
     bl_do_msg_update (TLS, &M->permanent_id);
