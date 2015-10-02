@@ -26,13 +26,14 @@
  * most compilers: http://stackoverflow.com/a/8702750/3070326
  */
 #define TGLC_WRAPPER_ASSOC(NAME,CORE)                                          \
-  static TGLC_ ## NAME *wrap_ ## NAME (const CORE *p);                         \
+  static TGLC_ ## NAME *wrap_ ## NAME (const CORE *p)                          \
+                              __attribute__ ((unused));                        \
+  static TGLC_ ## NAME *wrap_ ## NAME (const CORE *p)                          \
+                              __attribute__ ((unused));                        \
   static CORE *unwrap_ ## NAME (const TGLC_ ## NAME *p) {                      \
-    assert (wrap_ ## NAME);                                                    \
     return (CORE *)p;                                                          \
   }                                                                            \
   static TGLC_ ## NAME *wrap_ ## NAME (const CORE *p) {                        \
-    assert (unwrap_ ## NAME);                                                  \
     return (TGLC_ ## NAME *)p;                                                 \
   }
 
