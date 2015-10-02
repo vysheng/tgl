@@ -53,7 +53,8 @@ void TGLC_aes_set_decrypt_key (const unsigned char *userKey, const int bits, TGL
 // TODO: Try to use gcrypt's internal buf_xor?
 static void do_xor_block (const unsigned char *in, const unsigned char *with, unsigned char *out) {
   /* TODO: Referencing them as "size_t" (or whatever biggest numerical type available) is probably faster, but also more error-prone. */
-  for (int i = 0; i < 16; ++i) {
+  int i;
+  for (i = 0; i < 16; ++i) {
     *out++ = *in++ ^ *with++;
   }
 }
@@ -75,7 +76,8 @@ static gcry_error_t do_ige_encrypt (const unsigned char *in, unsigned char *out,
   /* gcrypt doesn't allow overlapping buffers. Kudos to "reubensammut" for
    * noticing this. Note that this also works if in == out. */
   unsigned char tmp[16];
-  for (unsigned long i = 0; i < n_blocks; ++i) {
+  unsigned long i;
+  for (i = 0; i < n_blocks; ++i) {
     memcpy (cur_x, in, 16);
     /* Might overwrite 'in'. */
     do_xor_block (in, prev_y, out);
@@ -113,7 +115,8 @@ static gcry_error_t do_ige_decrypt (const unsigned char *in, unsigned char *out,
   /* gcrypt doesn't allow overlapping buffers. Kudos to "reubensammut" for
    * noticing this. Note that this also works if in == out. */
   unsigned char tmp[16];
-  for (unsigned long i = 0; i < n_blocks; ++i) {
+  unsigned long i;
+  for (i = 0; i < n_blocks; ++i) {
     memcpy (cur_y, in, 16);
     /* Might overwrite 'in'. */
     do_xor_block (in, prev_x, out);

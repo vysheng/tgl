@@ -115,7 +115,8 @@ unsigned long TGLC_bn_get_word (const TGLC_bn *a) {
   /* Inefficient, but runs a total of three times per connection. */
   /* TODO: Optimize? */
   unsigned long ret = 0;
-  for (unsigned int i = 0; i < sizeof (unsigned long); ++i) {
+  unsigned int i;
+  for (i = 0; i < sizeof (unsigned long); ++i) {
       ret <<= 8;
       ret |= tmp[i];
   }

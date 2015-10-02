@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <string.h>
 //#include "tgl.h"
+#include "crypto/err.h"
 
 struct tgl_allocator {
   void *(*alloc)(size_t size);

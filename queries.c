@@ -4359,11 +4359,6 @@ void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, l
   exit (2);
 }
 
-void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, long long exchange_id, unsigned char ga[]) {
-    assert (0);
-    exit (2);
-}
-
 void tgl_do_confirm_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, int sen_nop) {
     assert (0);
     exit (2);
