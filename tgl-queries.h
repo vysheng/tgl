@@ -180,6 +180,10 @@ void tgl_do_channel_set_username (struct tgl_state *TLS, tgl_peer_id_t id, const
 void tgl_do_join_channel (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 
 void tgl_do_leave_channel (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+
+void tgl_do_channel_invite_user (struct tgl_state *TLS, tgl_peer_id_t channel_id, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+
+void tgl_do_channel_kick_user (struct tgl_state *TLS, tgl_peer_id_t channel_id, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 /* }}} */
 
 /* {{{ WORKING WITH DIALOG LIST */

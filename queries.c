@@ -3525,6 +3525,41 @@ void tgl_do_del_user_from_chat (struct tgl_state *TLS, tgl_peer_id_t chat_id, tg
 
 /* }}} */
 
+/* {{{ Add user to channel */
+
+void tgl_do_channel_invite_user (struct tgl_state *TLS, tgl_peer_id_t channel_id, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_invite_to_channel);
+  out_int (CODE_input_channel);
+  out_int (channel_id.peer_id);
+  out_long (channel_id.access_hash);
+
+  out_int (CODE_vector);
+  out_int (1);
+  out_int (CODE_input_user);
+  out_int (tgl_get_peer_id (id));
+  out_long (id.access_hash);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+
+void tgl_do_channel_kick_user (struct tgl_state *TLS, tgl_peer_id_t channel_id, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_kick_from_channel);
+  out_int (CODE_input_channel);
+  out_int (channel_id.peer_id);
+  out_long (channel_id.access_hash);
+
+  out_int (CODE_input_user);
+  out_int (tgl_get_peer_id (id));
+  out_long (id.access_hash);
+
+  out_int (CODE_bool_true);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+
+/* }}} */
+
 /* {{{ Create secret chat */
 
 void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra) {
