@@ -961,6 +961,13 @@ void bl_do_channel (struct tgl_state *TLS, int id, long long *access_hash, int *
       updates |= TGL_UPDATE_USERNAME;
     }
   }
+  
+  if (about) {
+    if (!C->about || mystreq1 (C->about, about, about_len)) {
+      tfree_str (C->about);
+    }
+    C->about = tstrndup (about, about_len);
+  }
 
   if (admins_count) {
     C->admins_count = *admins_count;

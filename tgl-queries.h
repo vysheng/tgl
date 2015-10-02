@@ -166,6 +166,12 @@ void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_user_id_t id, void (*
 void tgl_do_get_channels_dialog_list (struct tgl_state *TLS, int limit, int offset, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, tgl_peer_id_t peers[], tgl_message_id_t *last_msg_id[], int unread_count[]), void *callback_extra);
 
 void tgl_do_get_channel_info (struct tgl_state *TLS, tgl_peer_id_t id, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_channel *C), void *callback_extra);
+
+void tgl_do_rename_channel (struct tgl_state *TLS, tgl_peer_id_t id, const char *name, int name_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+
+void tgl_do_set_channel_photo (struct tgl_state *TLS, tgl_peer_id_t chat_id, const char *file_name, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success), void *callback_extra);
+
+void tgl_do_channel_set_about (struct tgl_state *TLS, tgl_peer_id_t id, const char *about, int about_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 /* }}} */
 
 /* {{{ WORKING WITH DIALOG LIST */

@@ -97,7 +97,8 @@ struct send_file {
   int flags;
   char *file_name;
   int encr;
-  int avatar;
+  //int avatar;
+  tgl_peer_id_t avatar;
   int reply;
   unsigned char *iv;
   unsigned char *init_iv;
@@ -1509,7 +1510,7 @@ static int send_file_part_on_error (struct tgl_state *TLS, struct query *q, int 
   struct send_file *f = q->extra;
   tfree_str (f->file_name);
   tfree_str (f->caption);
-  if (!f->avatar) {
+  if (!f->avatar.peer_type) {
     if (q->callback) {
       ((void (*)(struct tgl_state *, void *, int, struct tgl_message *))q->callback) (TLS, q->callback_extra, 0, 0);
     }
@@ -1537,38 +1538,46 @@ static struct query_methods set_photo_methods = {
 };
 
 static void send_avatar_end (struct tgl_state *TLS, struct send_file *f, void *callback, void *callback_extra) {
-  if (f->avatar > 0) {
+  switch (tgl_get_peer_type (f->avatar)) {
+  case TGL_PEER_CHAT:
     out_int (CODE_messages_edit_chat_photo);
-    out_int (f->avatar);
+    out_int (f->avatar.peer_id);
     out_int (CODE_input_chat_uploaded_photo);
-    if (f->size < (16 << 20)) {
-      out_int (CODE_input_file);
-    } else {
-      out_int (CODE_input_file_big);
-    }
-    out_long (f->id);
-    out_int (f->part_num);
+    break;
+  case TGL_PEER_USER:
+    out_int (CODE_photos_upload_profile_photo);
+    out_int (CODE_photos_upload_profile_photo);
+    break;
+  case TGL_PEER_CHANNEL:
+    out_int (CODE_channels_edit_photo);
+    out_int (CODE_input_channel);
+    out_int (f->avatar.peer_id);
+    out_long (f->avatar.access_hash);
+    out_int (CODE_input_chat_uploaded_photo);
+    break;
+  default:
+    assert (0);
+  }
+
+  if (f->size < (16 << 20)) {
+    out_int (CODE_input_file);
+  } else {
+    out_int (CODE_input_file_big);
+  }
+  out_long (f->id);
+  out_int (f->part_num);
+
+  char *s = f->file_name + strlen (f->file_name);
+  while (s >= f->file_name && *s != '/') { s --;}
+  out_string (s + 1);
+  if (f->size < (16 << 20)) {
     out_string ("");
-    if (f->size < (16 << 20)) {
-      out_string ("");
-    }
+  }
+
+  if (f->avatar.peer_type != TGL_PEER_USER) {
     out_int (CODE_input_photo_crop_auto);
     tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, NULL, callback, callback_extra);
   } else {
-    out_int (CODE_photos_upload_profile_photo);
-    if (f->size < (16 << 20)) {
-      out_int (CODE_input_file);
-    } else {
-      out_int (CODE_input_file_big);
-    }
-    out_long (f->id);
-    out_int (f->part_num);
-    char *s = f->file_name + strlen (f->file_name);
-    while (s >= f->file_name && *s != '/') { s --;}
-    out_string (s + 1);
-    if (f->size < (16 << 20)) {
-      out_string ("");
-    }
     out_string ("profile photo");
     out_int (CODE_input_geo_point_empty);
     out_int (CODE_input_photo_crop_auto);
@@ -1678,7 +1687,7 @@ static void send_file_end (struct tgl_state *TLS, struct send_file *f, void *cal
   TLS->cur_uploading_bytes -= f->size;
   clear_packet ();
 
-  if (f->avatar) {
+  if (f->avatar.peer_id) {
     send_avatar_end (TLS, f, callback, callback_extra);
     return;
   }
@@ -1750,11 +1759,11 @@ static void send_file_thumb (struct tgl_state *TLS, struct send_file *f, const v
 }
 
 
-static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, const char *file_name, int avatar, int w, int h, int duration, const void *thumb_data, int thumb_len, const char *caption, int caption_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, const char *file_name, tgl_peer_id_t avatar, int w, int h, int duration, const void *thumb_data, int thumb_len, const char *caption, int caption_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
   int fd = open (file_name, O_RDONLY);
   if (fd < 0) {
     tgl_set_query_error (TLS, EBADF, "Can not open file: %m");
-    if (!avatar) {
+    if (!avatar.peer_id) {
       if (callback) {
         callback (TLS, callback_extra, 0, 0);
       }
@@ -1771,7 +1780,7 @@ static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, cons
   if (size <= 0) {
     tgl_set_query_error (TLS, EBADF, "File is empty");
     close (fd);
-    if (!avatar) {
+    if (!avatar.peer_id) {
       if (callback) {
         callback (TLS, callback_extra, 0, 0);
       }
@@ -1804,7 +1813,7 @@ static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, cons
     close (fd);
     tgl_set_query_error (TLS, E2BIG, "File is too big");
     tfree (f, sizeof (*f));
-    if (!avatar) {
+    if (!avatar.peer_id) {
       if (callback) {
         callback (TLS, callback_extra, 0, 0);
       }
@@ -1855,7 +1864,9 @@ void tgl_do_send_document (struct tgl_state *TLS, tgl_peer_id_t to_id, const cha
       flags |= TGLDF_AUDIO;
     }
   }
-  _tgl_do_send_photo (TLS, to_id, file_name, 0, 100, 100, 100, 0, 0, caption, caption_len, flags, callback, callback_extra);
+  tgl_peer_id_t x;
+  x.peer_id = 0;
+  _tgl_do_send_photo (TLS, to_id, file_name, x, 100, 100, 100, 0, 0, caption, caption_len, flags, callback, callback_extra);
 }
 
 void tgl_do_reply_document (struct tgl_state *TLS, tgl_message_id_t *_reply_id, const char *file_name, const char *caption, int caption_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
@@ -1885,11 +1896,16 @@ void tgl_do_reply_document (struct tgl_state *TLS, tgl_message_id_t *_reply_id, 
 
 void tgl_do_set_chat_photo (struct tgl_state *TLS, tgl_peer_id_t chat_id, const char *file_name, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success), void *callback_extra) {
   assert (tgl_get_peer_type (chat_id) == TGL_PEER_CHAT);
-  _tgl_do_send_photo (TLS, chat_id, file_name, tgl_get_peer_id (chat_id), 0, 0, 0, 0, 0, NULL, 0, TGL_SEND_MSG_FLAG_DOCUMENT_PHOTO, (void *)callback, callback_extra);
+  _tgl_do_send_photo (TLS, chat_id, file_name, chat_id, 0, 0, 0, 0, 0, NULL, 0, TGL_SEND_MSG_FLAG_DOCUMENT_PHOTO, (void *)callback, callback_extra);
+}
+
+void tgl_do_set_channel_photo (struct tgl_state *TLS, tgl_peer_id_t chat_id, const char *file_name, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success), void *callback_extra) {
+  assert (tgl_get_peer_type (chat_id) == TGL_PEER_CHANNEL);
+  _tgl_do_send_photo (TLS, chat_id, file_name, chat_id, 0, 0, 0, 0, 0, NULL, 0, TGL_SEND_MSG_FLAG_DOCUMENT_PHOTO, (void *)callback, callback_extra);
 }
 
 void tgl_do_set_profile_photo (struct tgl_state *TLS, const char *file_name, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
-  _tgl_do_send_photo (TLS, TLS->our_id, file_name, -1, 0, 0, 0, 0, 0, NULL, 0, TGL_SEND_MSG_FLAG_DOCUMENT_PHOTO, (void *)callback, callback_extra);
+  _tgl_do_send_photo (TLS, TLS->our_id, file_name, TLS->our_id, 0, 0, 0, 0, 0, NULL, 0, TGL_SEND_MSG_FLAG_DOCUMENT_PHOTO, (void *)callback, callback_extra);
 }
 /* }}} */
 
@@ -2372,6 +2388,48 @@ void tgl_do_rename_chat (struct tgl_state *TLS, tgl_peer_id_t id, const char *na
   out_int (tgl_get_peer_id (id));
   out_cstring (name, name_len);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+/* }}} */
+
+ /* {{{ Rename channel */
+
+void tgl_do_rename_channel (struct tgl_state *TLS, tgl_peer_id_t id, const char *name, int name_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_edit_title);
+  assert (tgl_get_peer_type (id) == TGL_PEER_CHANNEL);
+  out_int (CODE_input_channel);
+  out_int (tgl_get_peer_id (id));
+  out_long (id.access_hash);
+  out_cstring (name, name_len);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+/* }}} */
+
+/* {{{ channel change about */
+
+static int channels_set_about_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int))q->callback)(TLS, q->callback_extra, 1);
+  }
+  return 0;
+}
+
+static struct query_methods channels_set_about_methods = {
+  .on_answer = channels_set_about_on_answer,
+  .on_error = q_void_on_error,
+  .type = TYPE_TO_PARAM(bool),
+  .name = "channels set about"
+};
+
+void tgl_do_channel_set_about (struct tgl_state *TLS, tgl_peer_id_t id, const char *about, int about_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_edit_about);
+  assert (tgl_get_peer_type (id) == TGL_PEER_CHANNEL);
+  out_int (CODE_input_channel);
+  out_int (tgl_get_peer_id (id));
+  out_long (id.access_hash);
+  out_cstring (about, about_len);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &channels_set_about_methods, 0, callback, callback_extra);
 }
 /* }}} */
 
