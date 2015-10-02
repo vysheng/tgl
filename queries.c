@@ -2433,6 +2433,19 @@ void tgl_do_channel_set_about (struct tgl_state *TLS, tgl_peer_id_t id, const ch
 }
 /* }}} */
 
+/* {{{ Channel set username */
+void tgl_do_channel_set_username (struct tgl_state *TLS, tgl_peer_id_t id, const char *username, int username_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_update_username);
+  assert (tgl_get_peer_type (id) == TGL_PEER_CHANNEL);
+  out_int (CODE_input_channel);
+  out_int (tgl_get_peer_id (id));
+  out_long (id.access_hash);
+  out_cstring (username, username_len);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &channels_set_about_methods, 0, callback, callback_extra);
+}
+/* }}} */
+
 /* {{{ Chat info */
 
 static int chat_info_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
