@@ -28,7 +28,7 @@
 #define TGLC_WRAPPER_ASSOC(NAME,CORE)                                          \
   static TGLC_ ## NAME *wrap_ ## NAME (const CORE *p)                          \
                               __attribute__ ((unused));                        \
-  static TGLC_ ## NAME *wrap_ ## NAME (const CORE *p)                          \
+  static CORE *unwrap_ ## NAME (const TGLC_ ## NAME *p)                        \
                               __attribute__ ((unused));                        \
   static CORE *unwrap_ ## NAME (const TGLC_ ## NAME *p) {                      \
     return (CORE *)p;                                                          \
