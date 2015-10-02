@@ -3352,7 +3352,7 @@ static struct query_methods get_channel_difference_methods = {
 void tgl_do_get_channel_difference (struct tgl_state *TLS, int id, void (*callback)(struct tgl_state *tls, void *callback_extra, int success), void *callback_extra) {
   tgl_peer_t *E = tgl_peer_get (TLS, TGL_MK_CHANNEL (id));
 
-  if (!E || !(E->flags & TGLPF_CREATED)) { 
+  if (!E || !(E->flags & TGLPF_CREATED) || !E->channel.pts) { 
     if (callback) {
       callback (TLS, callback_extra, 0);
     }
