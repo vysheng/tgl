@@ -176,6 +176,10 @@ void tgl_do_channel_set_about (struct tgl_state *TLS, tgl_peer_id_t id, const ch
 void tgl_do_create_channel (struct tgl_state *TLS, int users_num, tgl_peer_id_t ids[], const char *chat_topic, int chat_topic_len, const char *about, int about_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 
 void tgl_do_channel_set_username (struct tgl_state *TLS, tgl_peer_id_t id, const char *username, int username_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+
+void tgl_do_join_channel (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+
+void tgl_do_leave_channel (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 /* }}} */
 
 /* {{{ WORKING WITH DIALOG LIST */

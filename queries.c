@@ -2405,6 +2405,32 @@ void tgl_do_rename_channel (struct tgl_state *TLS, tgl_peer_id_t id, const char 
 }
 /* }}} */
 
+ /* {{{ Join channel */
+
+void tgl_do_join_channel (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_join_channel);
+  assert (tgl_get_peer_type (id) == TGL_PEER_CHANNEL);
+  out_int (CODE_input_channel);
+  out_int (tgl_get_peer_id (id));
+  out_long (id.access_hash);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+/* }}} */
+
+/* {{{ Leave channel */
+
+void tgl_do_leave_channel (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_leave_channel);
+  assert (tgl_get_peer_type (id) == TGL_PEER_CHANNEL);
+  out_int (CODE_input_channel);
+  out_int (tgl_get_peer_id (id));
+  out_long (id.access_hash);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
+}
+/* }}} */
+
 /* {{{ channel change about */
 
 static int channels_set_about_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
