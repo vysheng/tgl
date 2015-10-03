@@ -1,4 +1,24 @@
-unsigned char _mtproto_default_key[] = {
+/*
+    This file is part of tgl-library
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+    Copyright Vitaly Valtman 2015
+*/
+
+const unsigned char _mtproto_default_key[] = {
   0xc1, 0x50, 0x02, 0x3e, 0x2f, 0x70, 0xdb, 0x79, 0x85, 0xde, 0xd0, 0x64,
   0x75, 0x9c, 0xfe, 0xcf, 0x0a, 0xf3, 0x28, 0xe6, 0x9a, 0x41, 0xda, 0xf4,
   0xd6, 0xf0, 0x1b, 0x53, 0x81, 0x35, 0xa6, 0xf9, 0x1f, 0x8f, 0x8b, 0x2a,
@@ -22,5 +42,15 @@ unsigned char _mtproto_default_key[] = {
   0x5c, 0x75, 0x50, 0x63, 0x73, 0xe7, 0x13, 0x0f, 0x90, 0x42, 0xda, 0x92,
   0x21, 0x79, 0x25, 0x1f
 };
-unsigned int _mtproto_default_key_len = 256;
+const unsigned int _mtproto_default_key_len = sizeof (_mtproto_default_key);
 const long long _mtproto_default_e = 65537;
+
+const unsigned char *tglmp_get_default_key () {
+  return _mtproto_default_key;
+}
+const unsigned int tglmp_get_default_key_len () {
+  return _mtproto_default_key_len;
+}
+const long long tglmp_get_default_e () {
+  return _mtproto_default_e;
+}
