@@ -21,8 +21,8 @@
 #ifndef __MTPROTO_KEY_H__
 #define __MTPROTO_KEY_H__
 
-const unsigned char *tglmp_get_default_key ();
-const unsigned int tglmp_get_default_key_len ();
-const long long tglmp_get_default_e ();
+const unsigned char *tglmp_get_default_key (void);
+unsigned int tglmp_get_default_key_len (void);
+long long tglmp_get_default_e (void);
 
 #endif

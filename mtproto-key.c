@@ -42,15 +42,15 @@ const unsigned char _mtproto_default_key[] = {
   0x5c, 0x75, 0x50, 0x63, 0x73, 0xe7, 0x13, 0x0f, 0x90, 0x42, 0xda, 0x92,
   0x21, 0x79, 0x25, 0x1f
 };
-const unsigned int _mtproto_default_key_len = sizeof (_mtproto_default_key);
+const unsigned int _mtproto_default_key_len = 256;
 const long long _mtproto_default_e = 65537;
 
-const unsigned char *tglmp_get_default_key () {
+const unsigned char *tglmp_get_default_key (void) {
   return _mtproto_default_key;
 }
-const unsigned int tglmp_get_default_key_len () {
+unsigned int tglmp_get_default_key_len (void) {
   return _mtproto_default_key_len;
 }
-const long long tglmp_get_default_e () {
+long long tglmp_get_default_e (void) {
   return _mtproto_default_e;
 }
