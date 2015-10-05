@@ -2036,6 +2036,15 @@ void tgls_free_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   tfree (U, sizeof (*U));
 }
 
+void tgls_free_channel (struct tgl_state *TLS, struct tgl_channel *U) {
+  if (U->print_title) { tfree_str (U->print_title); }
+  if (U->username) { tfree_str (U->username); }
+  if (U->title) { tfree_str (U->title); }
+  if (U->about) { tfree_str (U->about); }
+  if (U->photo) { tgls_free_photo (TLS, U->photo); }
+  tfree (U, sizeof (*U));
+}
+
 void tgls_free_peer (struct tgl_state *TLS, tgl_peer_t *P) {
   if (tgl_get_peer_type (P->id) == TGL_PEER_USER) {
     tgls_free_user (TLS, (void *)P);
@@ -2043,6 +2052,8 @@ void tgls_free_peer (struct tgl_state *TLS, tgl_peer_t *P) {
     tgls_free_chat (TLS, (void *)P);
   } else if (tgl_get_peer_type (P->id) == TGL_PEER_ENCR_CHAT) {
     tgls_free_encr_chat (TLS, (void *)P);
+  } else if (tgl_get_peer_type (P->id) == TGL_PEER_CHANNEL) {
+    tgls_free_channel (TLS, (void *)P);
   } else {
     assert (0);
   }
