@@ -344,7 +344,7 @@ void tgl_set_ev_base (struct tgl_state *TLS, void *ev_base);
 int tgl_authorized_dc (struct tgl_state *TLS, struct tgl_dc *DC);
 int tgl_signed_dc (struct tgl_state *TLS, struct tgl_dc *DC);
 
-void tgl_init (struct tgl_state *TLS);
+int tgl_init (struct tgl_state *TLS);
 void tgl_dc_authorize (struct tgl_state *TLS, struct tgl_dc *DC);
 
 void tgl_dc_iterator (struct tgl_state *TLS, void (*iterator)(struct tgl_dc *DC));

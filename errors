@@ -9,3 +9,5 @@ ENOENT: tgl received empty response from server. For example when user tried to 
 EBADF: tgl can not open file on disk or file is empty
 
 E2BIG: supplied file is too big
+
+ENOTCONN: no public keys available

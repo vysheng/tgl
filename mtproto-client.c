@@ -26,6 +26,7 @@
 #define        _FILE_OFFSET_BITS        64
 
 #include <assert.h>
+#include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1273,7 +1274,7 @@ static int rpc_close (struct tgl_state *TLS, struct connection *c) {
 
 #define RANDSEED_PASSWORD_FILENAME     NULL
 #define RANDSEED_PASSWORD_LENGTH       0
-void tglmp_on_start (struct tgl_state *TLS) {
+int tglmp_on_start (struct tgl_state *TLS) {
   tgl_prng_seed (TLS, RANDSEED_PASSWORD_FILENAME, RANDSEED_PASSWORD_LENGTH);
 
   int i;
@@ -1302,8 +1303,11 @@ void tglmp_on_start (struct tgl_state *TLS) {
 
   if (!ok) {
     vlogprintf (E_ERROR, "No public keys found\n");
-    exit (1);
+    TLS->error = tstrdup ("No public keys found");
+    TLS->error_code = ENOTCONN;
+    return -1;
   }
+  return 0;
 }
 
 void tgl_dc_authorize (struct tgl_state *TLS, struct tgl_dc *DC) {
