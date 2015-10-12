@@ -95,6 +95,10 @@ int tgl_asprintf (char **res, const char *format, ...) {
 }
 
 void tgl_free_debug (void *ptr, int size __attribute__ ((unused))) {
+  if (!ptr) {
+    assert (!size);
+    return;
+  }
   total_allocated_bytes -= size;
   ptr -= RES_PRE;
   if (size != (int)((*(int *)ptr) ^ 0xbedabeda)) {
@@ -121,6 +125,7 @@ void tgl_free_debug (void *ptr, int size __attribute__ ((unused))) {
 }
 
 void tgl_free_release (void *ptr, int size) {
+  total_allocated_bytes -= size;
   memset (ptr, 0, size);
   free (ptr);
 }
@@ -130,11 +135,16 @@ void tgl_free_release (void *ptr, int size) {
 void *tgl_realloc_debug (void *ptr, size_t old_size __attribute__ ((unused)), size_t size) {
   void *p = talloc (size);
   memcpy (p, ptr, size >= old_size ? old_size : size); 
-  tfree (ptr, old_size);
+  if (ptr) {
+    tfree (ptr, old_size);
+  } else {
+    assert (!old_size);
+  }
   return p;
 }
 
 void *tgl_realloc_release (void *ptr, size_t old_size __attribute__ ((unused)), size_t size) {
+  total_allocated_bytes += (size - old_size);
   void *p = realloc (ptr, size);
   ensure_ptr (p);
   return p;
@@ -155,6 +165,7 @@ void *tgl_alloc_debug (size_t size) {
 }
 
 void *tgl_alloc_release (size_t size) {
+  total_allocated_bytes += size;
   void *p = malloc (size);
   ensure_ptr (p);
   return p;
@@ -306,4 +317,7 @@ struct tgl_allocator tgl_allocator_release = {
   .exists = tgl_exists_release
 };
 
+long long tgl_get_allocated_bytes (void) {
+  return total_allocated_bytes;
+}
 struct tgl_allocator *tgl_allocator = &tgl_allocator_release;

@@ -1898,6 +1898,7 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
     return;
   case tgl_message_media_photo:
     tgls_free_photo (TLS, M->photo);
+    if (M->caption) { tfree_str (M->caption); }
     M->photo = NULL;
     return;
   case tgl_message_media_contact:
@@ -1909,6 +1910,7 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
   case tgl_message_media_video:
   case tgl_message_media_audio:
     tgls_free_document (TLS, M->document);
+    if (M->caption) { tfree_str (M->caption); }
     return;
   case tgl_message_media_unsupported:
     tfree (M->data, M->data_size);
@@ -1992,6 +1994,10 @@ void tgls_clear_message (struct tgl_state *TLS, struct tgl_message *M) {
 
 void tgls_free_reply_markup (struct tgl_state *TLS, struct tgl_message_reply_markup *R) { 
   if (!--R->refcnt) {
+    int i;
+    for (i = 0; i < R->row_start[R->rows]; i++) {
+      tfree_str (R->buttons[i]);
+    }
     tfree (R->buttons, R->row_start[R->rows] * sizeof (void *));
     tfree (R->row_start, 4 * (R->rows + 1));
     tfree (R, sizeof (*R));
@@ -2015,7 +2021,7 @@ void tgls_free_chat (struct tgl_state *TLS, struct tgl_chat *U) {
     tfree (U->user_list, U->user_list_size * 12);
   }
   if (U->photo) { tgls_free_photo (TLS, U->photo); }
-  tfree (U, sizeof (*U));
+  tfree (U, sizeof (tgl_peer_t));
 }
 
 void tgls_free_user (struct tgl_state *TLS, struct tgl_user *U) {
@@ -2023,17 +2029,19 @@ void tgls_free_user (struct tgl_state *TLS, struct tgl_user *U) {
   if (U->last_name) { tfree_str (U->last_name); }
   if (U->print_name) { tfree_str (U->print_name); }
   if (U->phone) { tfree_str (U->phone); }
+  if (U->username) { tfree_str (U->username); }
   if (U->real_first_name) { tfree_str (U->real_first_name); }
   if (U->real_last_name) { tfree_str (U->real_last_name); }
   if (U->status.ev) { tgl_remove_status_expire (TLS, U); }
   if (U->photo) { tgls_free_photo (TLS, U->photo); }
-  tfree (U, sizeof (*U));
+  if (U->bot_info) { tgls_free_bot_info (TLS, U->bot_info); }
+  tfree (U, sizeof (tgl_peer_t));
 }
 
 void tgls_free_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   if (U->print_name) { tfree_str (U->print_name); }
   if (U->g_key) { tfree (U->g_key, 256); } 
-  tfree (U, sizeof (*U));
+  tfree (U, sizeof (tgl_peer_t));
 }
 
 void tgls_free_channel (struct tgl_state *TLS, struct tgl_channel *U) {
@@ -2042,7 +2050,7 @@ void tgls_free_channel (struct tgl_state *TLS, struct tgl_channel *U) {
   if (U->title) { tfree_str (U->title); }
   if (U->about) { tfree_str (U->about); }
   if (U->photo) { tgls_free_photo (TLS, U->photo); }
-  tfree (U, sizeof (*U));
+  tfree (U, sizeof (tgl_peer_t));
 }
 
 void tgls_free_peer (struct tgl_state *TLS, tgl_peer_t *P) {
@@ -2383,6 +2391,8 @@ void tgl_free_all (struct tgl_state *TLS) {
   tree_act_ex_message (TLS->message_unsent_tree, tgls_free_message_gw, TLS);
   TLS->message_unsent_tree = tree_clear_message (TLS->message_unsent_tree);
   tglq_query_free_all (TLS);
+  TLS->random_id_tree = tree_clear_random_id (TLS->random_id_tree);
+  TLS->temp_id_tree = tree_clear_temp_id (TLS->temp_id_tree);
 
   if (TLS->encr_prime) { tfree (TLS->encr_prime, 256); }
 
@@ -2390,10 +2400,16 @@ void tgl_free_all (struct tgl_state *TLS) {
   if (TLS->binlog_name) { tfree_str (TLS->binlog_name); }
   if (TLS->auth_file) { tfree_str (TLS->auth_file); }
   if (TLS->downloads_directory) { tfree_str (TLS->downloads_directory); }
+  if (TLS->app_hash) { tfree_str (TLS->app_hash); }
 
+  if (TLS->error) {
+    tfree_str (TLS->error);
+  }
   int i;
   for (i = 0; i < TLS->rsa_key_num; i++) {
-    tfree_str (TLS->rsa_key_list[i]);
+    if (TLS->rsa_key_list[i]) {
+      tfree_str (TLS->rsa_key_list[i]);
+    }
   }
 
   for (i = 0; i <= TLS->max_dc_num; i++) if (TLS->DC_list[i]) {
@@ -2404,6 +2420,9 @@ void tgl_free_all (struct tgl_state *TLS) {
 
   if (TLS->ev_login) { TLS->timer_methods->free (TLS->ev_login); }
   if (TLS->online_updates_timer) { TLS->timer_methods->free (TLS->online_updates_timer); }
+
+  tfree (TLS->Peers, TLS->peer_size * sizeof (void *));
+  tfree (TLS, sizeof (*TLS));
 }
 
 int tgl_print_stat (struct tgl_state *TLS, char *s, int len) {

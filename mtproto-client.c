@@ -1475,6 +1475,17 @@ void tgls_free_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
 
   struct tgl_session *S = DC->sessions[0];
   if (S) { tgls_free_session (TLS, S); }
+  
+  int i;
+  for (i = 0; i < 4; i++) {
+    struct tgl_dc_option *O = DC->options[i];
+    while (O) {
+      struct tgl_dc_option *N = O->next;
+      tfree_str (O->ip);
+      tfree (O, sizeof (*O));
+      O = N;
+    }
+  }
 
   if (DC->ev) { TLS->timer_methods->free (DC->ev); }
   tfree (DC, sizeof (*DC));

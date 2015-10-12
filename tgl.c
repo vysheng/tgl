@@ -106,10 +106,7 @@ void tgl_register_app_id (struct tgl_state *TLS, int app_id, const char *app_has
 }
 
 struct tgl_state *tgl_state_alloc (void) {
-  struct tgl_state *TLS = (struct tgl_state *)malloc (sizeof (*TLS));
-  if (!TLS) { return NULL; }
-  memset (TLS, 0, sizeof (*TLS));
-  return TLS;
+  return (struct tgl_state *)talloc0 (sizeof (struct tgl_state));
 }
 
 void tgl_incr_verbosity (struct tgl_state *TLS) {

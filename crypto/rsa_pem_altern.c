@@ -52,6 +52,12 @@ RSA_GETTER(n);
 RSA_GETTER(e);
 
 void TGLC_rsa_free (TGLC_rsa *key) {
+  if (key->e) {
+    TGLC_bn_free (key->e);
+  }
+  if (key->n) {
+    TGLC_bn_free (key->n);
+  }
   tfree (key, sizeof (TGLC_rsa));
 }
 
