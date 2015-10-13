@@ -78,10 +78,10 @@ ${AUTO}/auto.c: ${AUTO}/scheme.tlo ${EXE}/generate
 	${EXE}/generate ${AUTO}/scheme.tlo > $@
 
 ${AUTO}/auto-%.c: ${AUTO}/scheme.tlo ${EXE}/generate auto/constants.h ${AUTO}/auto-%.h | create_dirs_and_headers
-	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.c,%,$@) ${AUTO}/scheme.tlo > $@ || rm $@
+	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.c,%,$@) ${AUTO}/scheme.tlo > $@ || ( rm $@ && false )
 
 ${AUTO}/auto-%.h: ${AUTO}/scheme.tlo ${EXE}/generate
-	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.h,%-header,$@) ${AUTO}/scheme.tlo > $@ || rm $@
+	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.h,%-header,$@) ${AUTO}/scheme.tlo > $@ || ( rm $@ && false )
 
 
 ${AUTO}/constants.h: ${AUTO}/scheme2.tl ${srcdir}/gen_constants_h.awk
