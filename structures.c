@@ -2401,6 +2401,7 @@ void tgl_free_all (struct tgl_state *TLS) {
   if (TLS->auth_file) { tfree_str (TLS->auth_file); }
   if (TLS->downloads_directory) { tfree_str (TLS->downloads_directory); }
   if (TLS->app_hash) { tfree_str (TLS->app_hash); }
+  if (TLS->app_version) { tfree_str (TLS->app_version); }
 
   if (TLS->error) {
     tfree_str (TLS->error);

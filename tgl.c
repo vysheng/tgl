@@ -47,6 +47,9 @@ void tgl_set_auth_file_path (struct tgl_state *TLS, const char *path) {
 }
 
 void tgl_set_download_directory (struct tgl_state *TLS, const char *path) {
+  if (TLS->downloads_directory) {
+    tfree_str (TLS->downloads_directory);
+  }
   TLS->downloads_directory = tstrdup (path);
 }
 
