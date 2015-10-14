@@ -2499,6 +2499,106 @@ void tgl_do_channel_set_admin (struct tgl_state *TLS, tgl_peer_id_t channel_id, 
 }
 /* }}} */
 
+/* {{{ Channel members */
+struct channel_get_members_extra {
+  int size;
+  int count;
+  struct tgl_user **UL;
+  int type;
+  int offset;
+  int limit;
+  tgl_peer_id_t id;
+};
+
+void _tgl_do_channel_get_members  (struct tgl_state *TLS, struct channel_get_members_extra *E, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_user *UL[]), void *callback_extra);
+
+static int channels_get_members_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
+  struct tl_ds_channels_channel_participants *DS_CP = D;
+  
+  int count = DS_LVAL (DS_CP->participants->cnt);
+
+  struct channel_get_members_extra *E = q->extra;
+
+
+  if (E->count + count > E->size) {
+    E->UL = trealloc (E->UL, E->size * sizeof (void *), (E->count + count) * sizeof (void *));
+    E->size = E->count + count;
+  }
+  int i;
+  for (i = 0; i < DS_LVAL (DS_CP->users->cnt); i++) {
+    tglf_fetch_alloc_user (TLS, DS_CP->users->data[i]);
+  }
+  for (i = 0; i < count; i++) {
+    E->UL[E->count ++] = (void *)tgl_peer_get (TLS, TGL_MK_USER (DS_LVAL (DS_CP->participants->data[i]->user_id)));
+  }
+  E->offset += count;
+  
+  if (!count || E->count == E->limit) {
+    ((void (*)(struct tgl_state *, void *, int, int, struct tgl_user **))q->callback)(TLS, q->callback_extra, 1, E->count, E->UL);
+    tfree (E->UL, E->size * sizeof (void *));
+    tfree (E, sizeof (*E));    
+    return 0;
+  }
+  _tgl_do_channel_get_members (TLS, E, q->callback, q->callback_extra);
+  return 0;
+}
+
+static int channels_get_members_on_error (struct tgl_state *TLS, struct query *q, int error_code, int error_len, const char *error) {
+  tgl_set_query_error (TLS, EPROTO, "RPC_CALL_FAIL %d: %.*s", error_code, error_len, error);
+  if (q->callback) {
+    ((void (*)(struct tgl_state *,void *, int, int, void *))(q->callback))(TLS, q->callback_extra, 0, 0, NULL);
+  }
+  
+  struct channel_get_members_extra *E = q->extra;
+  tfree (E->UL, E->size * sizeof (void *));
+  tfree (E, sizeof (*E));    
+
+  return 0;
+}
+
+static struct query_methods channels_get_members_methods = {
+  .on_answer = channels_get_members_on_answer,
+  .on_error = channels_get_members_on_error,
+  .type = TYPE_TO_PARAM(channels_channel_participants),
+  .name = "channels get members"
+};
+
+void _tgl_do_channel_get_members  (struct tgl_state *TLS, struct channel_get_members_extra *E, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_user *UL[]), void *callback_extra) {
+  clear_packet ();
+  out_int (CODE_channels_get_participants);
+  assert (tgl_get_peer_type (E->id) == TGL_PEER_CHANNEL);
+  out_int (CODE_input_channel);
+  out_int (E->id.peer_id);
+  out_long (E->id.access_hash);
+
+  switch (E->type) {
+  case 1:
+  case 2:
+    out_int (CODE_channel_participants_admins);
+    break;
+  case 3:
+    out_int (CODE_channel_participants_kicked);
+    break;
+  default:
+    out_int (CODE_channel_participants_recent);
+    break;
+  }
+  out_int (E->offset);
+  out_int (E->limit);
+  
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &channels_get_members_methods, E, callback, callback_extra);
+}
+
+void tgl_do_channel_get_members  (struct tgl_state *TLS, tgl_peer_id_t channel_id, int limit, int offset, int type, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_user *UL[]), void *callback_extra) {
+  struct channel_get_members_extra *E = talloc0 (sizeof (*E));
+  E->type = type;
+  E->id = channel_id;
+  E->limit = limit;
+  E->offset = offset;
+  _tgl_do_channel_get_members (TLS, E, callback, callback_extra);
+}
+/* }}} */
+
 /* {{{ Chat info */
 
 static int chat_info_on_answer (struct tgl_state *TLS, struct query *q, void *D) {

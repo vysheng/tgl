@@ -191,7 +191,10 @@ void tgl_do_export_channel_link (struct tgl_state *TLS, tgl_peer_id_t id, void (
 //   0 - none
 //   1 - moderator
 //   2 - editor
+//   3 - kicked
 void tgl_do_channel_set_admin (struct tgl_state *TLS, tgl_peer_id_t channel_id, tgl_peer_id_t user_id, int type, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
+
+void tgl_do_channel_get_members  (struct tgl_state *TLS, tgl_peer_id_t channel_id, int limit, int offset, int type, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_user *UL[]), void *callback_extra);
 /* }}} */
 
 /* {{{ WORKING WITH DIALOG LIST */
