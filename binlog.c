@@ -206,6 +206,8 @@ void bl_do_set_msg_id (struct tgl_state *TLS, tgl_message_id_t *old_id, tgl_mess
   M->permanent_id = *new_id;
   if (tgl_message_get (TLS, new_id)) {
     tglm_message_del_use (TLS, M);
+    tglm_message_del_temp_id (TLS, M);
+    tglm_message_del_random_id (TLS, M);
     tgls_free_message (TLS, M);
   } else {
     tglm_message_insert_tree (TLS, M);
@@ -463,6 +465,8 @@ void bl_do_message_delete (struct tgl_state *TLS, tgl_message_id_t *id) /* {{{ *
   tglm_message_remove_tree (TLS, M);
   tglm_message_del_peer (TLS, M);
   tglm_message_del_use (TLS, M);
+  tglm_message_del_temp_id (TLS, M);
+  tglm_message_del_random_id (TLS, M);
   tgls_free_message (TLS, M);
 }
 /* }}} */

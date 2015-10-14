@@ -47,6 +47,8 @@ void tglm_message_add_peer (struct tgl_state *TLS, struct tgl_message *M);
 void tglm_message_del_peer (struct tgl_state *TLS, struct tgl_message *M);
 void tglm_message_del_use (struct tgl_state *TLS, struct tgl_message *M);
 void tglm_message_add_use (struct tgl_state *TLS, struct tgl_message *M);
+void tglm_message_del_temp_id (struct tgl_state *TLS, struct tgl_message *M);
+void tglm_message_del_random_id (struct tgl_state *TLS, struct tgl_message *M);
 
 void tglp_peer_insert_name (struct tgl_state *TLS, tgl_peer_t *P);
 void tglp_peer_delete_name (struct tgl_state *TLS, tgl_peer_t *P);

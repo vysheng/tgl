@@ -2560,3 +2560,15 @@ void tgls_message_change_random_id (struct tgl_state *TLS, struct tgl_message *M
   M->random_id = random_id;
   TLS->random_id_tree = tree_insert_random_id (TLS->random_id_tree, M, lrand48 ());
 }
+
+void tglm_message_del_temp_id (struct tgl_state *TLS, struct tgl_message *M) {
+  if (M->temp_id) {
+    TLS->temp_id_tree = tree_delete_temp_id (TLS->temp_id_tree, M);
+  }
+}
+
+void tglm_message_del_random_id (struct tgl_state *TLS, struct tgl_message *M) {
+  if (M->random_id) {
+    TLS->random_id_tree = tree_delete_random_id (TLS->random_id_tree, M);
+  }
+}
