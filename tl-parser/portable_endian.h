@@ -4,6 +4,10 @@
 // be "dual licensed" under the BSD, MIT and Apache licenses, if you want to. This code is trivial anyway. Consider it
 // an example on how to get the endian conversion functions on different platforms.
 
+/* Originally cloned from https://gist.github.com/PkmX/63dd23f28ba885be53a5
+ * Commit was: 1eca2ab34f2301b9641aa73d1016b951fff3fc39
+ * Re-published at https://github.com/BenWiederhake/portable-endian.h to provide a means to submit patches and report issues. */
+
 #ifndef PORTABLE_ENDIAN_H__
 #define PORTABLE_ENDIAN_H__
 
