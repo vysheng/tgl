@@ -4669,22 +4669,30 @@ void tgl_do_accept_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, l
 }
 
 void tgl_do_confirm_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, int sen_nop) {
-    assert (0);
-    exit (2);
+  assert (0);
+  exit (2);
 }
 
 void tgl_do_commit_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E, unsigned char gb[]) {
-    assert (0);
-    exit (2);
+  assert (0);
+  exit (2);
 }
 
 void tgl_do_abort_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E) {
-    assert (0);
-    exit (2);
+  assert (0);
+  exit (2);
 }
 
 void tgl_started_cb (struct tgl_state *TLS, void *arg, int success) {
-  assert (success);
+  if (!success) {
+    vlogprintf (E_ERROR, "login problem: error #%d (%s)\n", TLS->error_code, TLS->error);
+    if (TLS->callback.on_failed_login) {
+      TLS->callback.on_failed_login (TLS);
+    } else {
+      assert (success);
+    }
+    return;
+  }
   TLS->started = 1;
   if (TLS->callback.started) {
     TLS->callback.started (TLS);
@@ -4692,7 +4700,15 @@ void tgl_started_cb (struct tgl_state *TLS, void *arg, int success) {
 }
 
 void tgl_export_auth_callback (struct tgl_state *TLS, void *arg, int success) {
-  assert (success);
+  if (!success) {
+    vlogprintf (E_ERROR, "login problem: error #%d (%s)\n", TLS->error_code, TLS->error);
+    if (TLS->callback.on_failed_login) {
+      TLS->callback.on_failed_login (TLS);
+    } else {
+      assert (success);
+    }
+    return;
+  }
   int i;
   for (i = 0; i <= TLS->max_dc_num; i++) if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i])) {
     return;

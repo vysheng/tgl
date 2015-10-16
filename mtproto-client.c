@@ -630,6 +630,7 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
   } else {
     DC->flags |= 1;
     if (TLS->enable_pfs) {
+      assert (TLS->enable_pfs);
       create_temp_auth_key (TLS, c);
     } else {
       DC->temp_auth_key_id = DC->auth_key_id;
@@ -1246,6 +1247,7 @@ static int tc_becomes_ready (struct tgl_state *TLS, struct connection *c) {
       assert (TLS->enable_pfs);
       if (!DC->temp_auth_key_id) {
         assert (!DC->temp_auth_key_id);
+        assert (TLS->enable_pfs);
         create_temp_auth_key (TLS, c);
       } else {
         bind_temp_auth_key (TLS, c);
@@ -1367,8 +1369,10 @@ struct tgl_dc *tglmp_alloc_dc (struct tgl_state *TLS, int flags, int id, char *i
     if (id > TLS->max_dc_num) {
       TLS->max_dc_num = id;
     }
-    DC->ev = TLS->timer_methods->alloc (TLS, regen_temp_key_gw, DC);
-    TLS->timer_methods->insert (DC->ev, 0);
+    if (TLS->enable_pfs) {
+      DC->ev = TLS->timer_methods->alloc (TLS, regen_temp_key_gw, DC);
+      TLS->timer_methods->insert (DC->ev, 0);
+    }
   }
 
   struct tgl_dc *DC = TLS->DC_list[id];
@@ -1444,7 +1448,6 @@ void tglmp_regenerate_temp_auth_key (struct tgl_state *TLS, struct tgl_dc *DC) {
     return;
   }
 
-
   struct tgl_session *S = DC->sessions[0];
   tglt_secure_random (&S->session_id, 8);
   S->seq_no = 0;
@@ -1456,7 +1459,12 @@ void tglmp_regenerate_temp_auth_key (struct tgl_state *TLS, struct tgl_dc *DC) {
     return;
   }
 
+  if (!TLS->enable_pfs) {
+    return;
+  }
+
   if (S->c) {
+    assert (TLS->enable_pfs);
     create_temp_auth_key (TLS, S->c);
   }
 }

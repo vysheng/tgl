@@ -119,6 +119,7 @@ struct tgl_update_callback {
   void (*notification)(struct tgl_state *TLS, const char *type, const char *message);
   void (*user_status_update)(struct tgl_state *TLS, struct tgl_user *U);
   char *(*create_print_name) (struct tgl_state *TLS, tgl_peer_id_t id, const char *a1, const char *a2, const char *a3, const char *a4);
+  void (*on_failed_login) (struct tgl_state *TLS);
 };
 
 struct tgl_net_methods {

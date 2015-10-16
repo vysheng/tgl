@@ -606,7 +606,7 @@ struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_d
   
   tgl_peer_id_t chat_id = TGL_MK_CHANNEL (DS_LVAL (DS_C->id));  
   chat_id.access_hash = DS_LVAL (DS_C->access_hash); 
-  
+
   struct tgl_channel *C = (void *)tgl_peer_get (TLS, chat_id);
   if (!C) {
     TLS->channels_allocated ++;
@@ -622,6 +622,11 @@ struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_d
   int flags = C->flags & 0xffff;
   if (!(flags & TGLCF_CREATED)) {
     flags |= TGLCF_CREATE | TGLCF_CREATED;
+  }
+  if (DS_LVAL (DS_C->flags) & 0x80) {
+    flags |= TGLCHF_OFFICIAL;
+  } else {
+    flags &= ~TGLCHF_OFFICIAL;
   }
 
   bl_do_channel (TLS, tgl_get_peer_id (C->id),
