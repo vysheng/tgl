@@ -1,3 +1,23 @@
+/* 
+    This file is part of tgl-library
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+    Copyright Ben Wiederhake 2015
+*/
+
 #ifndef CRYPTO_META_H_
 #define CRYPTO_META_H_
 
@@ -23,7 +43,7 @@
  *
  * The standard doesn't explicitly allow it, but there's a pretty good argument
  * that casting ptr-to-some-struct to ptr-to-other-struct is *probably* okay for
- * most compilers: http://stackoverflow.com/a/8702750/3070326
+ * most compilers: https://stackoverflow.com/a/8702750/3070326
  */
 #define TGLC_WRAPPER_ASSOC(NAME,CORE)                                          \
   static TGLC_ ## NAME *wrap_ ## NAME (const CORE *p)                          \

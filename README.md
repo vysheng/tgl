@@ -2,9 +2,9 @@ This is library that handles telegram api and protocol.
 
 ### API, Protocol documentation
 
-Documentation for Telegram API is available here: http://core.telegram.org/api
+Documentation for Telegram API is available here: https://core.telegram.org/api
 
-Documentation for MTproto protocol is available here: http://core.telegram.org/mtproto
+Documentation for MTproto protocol is available here: https://core.telegram.org/mtproto
 
 ### Installation
 
