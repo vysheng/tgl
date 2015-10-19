@@ -2,9 +2,9 @@ This is library that handles telegram api and protocol.
 
 ### API, Protocol documentation
 
-Documentation for Telegram API is available here: http://core.telegram.org/api
+Documentation for Telegram API is available here: https://core.telegram.org/api
 
-Documentation for MTproto protocol is available here: http://core.telegram.org/mtproto
+Documentation for MTproto protocol is available here: https://core.telegram.org/mtproto
 
 ### Installation
 
@@ -17,10 +17,10 @@ Clone GitHub Repository
 Install libs: openssl, zlib
 if you want to use provided net/timers then install libevent and add --enable-libevent key to configure
 
+You can also avoid the OpenSSL dependency: Install gcrypt (>= 1.60, Debian derivates know it as "libgcrypt20-dev"), and add --disable-openssl to openssl.
+
 Then,
 
-     autoheader
-     autoconf
      ./configure
      make
 
