@@ -3273,7 +3273,7 @@ if test "${enable_openssl+set}" = set; then :
 
 $as_echo "#define TGL_AVOID_OPENSSL 1" >>confdefs.h
 
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for gcry_mpi_snatch in -lgcrypt" >&5
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for gcry_mpi_snatch in -lgcrypt" >&5
 $as_echo_n "checking for gcry_mpi_snatch in -lgcrypt... " >&6; }
 if ${ac_cv_lib_gcrypt_gcry_mpi_snatch+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -3317,10 +3317,7 @@ _ACEOF
   LIBS="-lgcrypt $LIBS"
 
 else
-
-      echo "Need libgcrypt >= 1.60"
-      exit -1
-
+  as_fn_error $? "\"Need libgcrypt >= 1.60\"" "$LINENO" 5
 fi
 
   else
