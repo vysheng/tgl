@@ -177,7 +177,7 @@ void tgl_do_send_encr_msg_action (struct tgl_state *TLS, struct tgl_message *M, 
   out_long (M->permanent_id.id);
   encr_start ();
   out_int (CODE_decrypted_message_layer);
-  out_random (15 + 4 * (lrand48 () % 3));
+  out_random (15 + 4 * (rand () % 3));
   out_int (TGL_ENCRYPTED_LAYER);
   out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != tgl_get_peer_id (TLS->our_id)));
   out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == tgl_get_peer_id (TLS->our_id)) - 2);
@@ -248,7 +248,7 @@ void tgl_do_send_encr_msg (struct tgl_state *TLS, struct tgl_message *M, void (*
   out_long (M->permanent_id.id);
   encr_start ();
   out_int (CODE_decrypted_message_layer);
-  out_random (15 + 4 * (lrand48 () % 3));
+  out_random (15 + 4 * (rand () % 3));
   out_int (TGL_ENCRYPTED_LAYER);
   out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != tgl_get_peer_id (TLS->our_id)));
   out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == tgl_get_peer_id (TLS->our_id)) - 2);
@@ -344,7 +344,7 @@ static void send_file_encrypted_end (struct tgl_state *TLS, struct send_file *f,
   out_long (r);
   encr_start ();
   out_int (CODE_decrypted_message_layer);
-  out_random (15 + 4 * (lrand48 () % 3));
+  out_random (15 + 4 * (rand () % 3));
   out_int (TGL_ENCRYPTED_LAYER);
   out_int (2 * P->encr_chat.in_seq_no + (P->encr_chat.admin_id != tgl_get_peer_id (TLS->our_id)));
   out_int (2 * P->encr_chat.out_seq_no + (P->encr_chat.admin_id == tgl_get_peer_id (TLS->our_id)));
@@ -628,7 +628,7 @@ void tgl_do_create_keys_end (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   TGLC_sha1 ((void *)U->key, 256, sha_buffer);
   long long k = *(long long *)(sha_buffer + 12);
   if (k != U->key_fingerprint) {
-    vlogprintf (E_WARNING, "Key fingerprint mismatch (my 0x%llx 0x%llx)\n", (unsigned long long)k, (unsigned long long)U->key_fingerprint);
+    vlogprintf (E_WARNING, "Key fingerprint mismatch (my 0x%" INT64_PRINTF_MODIFIER "x 0x%" INT64_PRINTF_MODIFIER "x)\n", (unsigned long long)k, (unsigned long long)U->key_fingerprint);
     U->state = sc_deleted;
   }
 
@@ -670,9 +670,9 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
 
   TGLC_bn_bn2bin (r, (void *)(g_a + (256 - TGLC_bn_num_bytes (r))));
   
-  int t = lrand48 ();
+  int t = rand ();
   while (tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t))) {
-    t = lrand48 ();
+    t = rand ();
   }
 
   //bl_do_encr_chat_init (TLS, t, user_id, (void *)random, (void *)g_a);

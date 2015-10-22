@@ -285,7 +285,7 @@ struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS, struct tl_ds_user
     TLS->users_allocated ++;
     U = talloc0 (sizeof (tgl_peer_t));
     U->id = user_id;
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)U, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)U, rand ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)U;
   }
@@ -382,7 +382,7 @@ void str_to_256 (unsigned char *dst, char *src, int src_len) {
   if (src_len >= 256) {
     memcpy (dst, src + src_len - 256, 256);
   } else {
-    bzero (dst, 256 - src_len);
+	memset(dst, 0, 256 - src_len);
     memcpy (dst + 256 - src_len, src, src_len);
   }
 }
@@ -391,7 +391,7 @@ void str_to_32 (unsigned char *dst, char *src, int src_len) {
   if (src_len >= 32) {
     memcpy (dst, src + src_len - 32, 32);
   } else {
-    bzero (dst, 32 - src_len);
+	memset(dst, 0, 32 - src_len);
     memcpy (dst + 32 - src_len, src, src_len);
   }
 }
@@ -410,7 +410,7 @@ struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS, 
     TLS->encr_chats_allocated ++;
     U = talloc0 (sizeof (tgl_peer_t));
     U->id = chat_id;
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)U, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)U, rand ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)U;
   }
@@ -508,7 +508,7 @@ struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS, struct tl_ds_chat
     TLS->chats_allocated ++;
     C = talloc0 (sizeof (tgl_peer_t));
     C->id = chat_id;
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)C, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)C, rand ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)C;
   }
@@ -612,7 +612,7 @@ struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_d
     TLS->channels_allocated ++;
     C = talloc0 (sizeof (tgl_peer_t));
     C->id = chat_id;
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)C, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, (tgl_peer_t *)C, rand ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)C;
   }
@@ -1620,7 +1620,7 @@ struct tgl_message *tglf_fetch_encrypted_message (struct tgl_state *TLS, struct 
 
   struct tl_ds_decrypted_message *DS_DM = DS_DML->message;
   if (M->permanent_id.id != DS_LVAL (DS_DM->random_id)) {
-    vlogprintf (E_ERROR, "Incorrect message: id = %lld, new_id = %lld\n", M->permanent_id.id, DS_LVAL (DS_DM->random_id));
+    vlogprintf (E_ERROR, "Incorrect message: id = %" INT64_PRINTF_MODIFIER "d, new_id = %" INT64_PRINTF_MODIFIER "d\n", M->permanent_id.id, DS_LVAL (DS_DM->random_id));
     free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
     return M;
   }
@@ -1795,28 +1795,28 @@ struct tgl_message_reply_markup *tglf_fetch_alloc_reply_markup (struct tgl_state
 
 void tglp_insert_encrypted_chat (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->encr_chats_allocated ++;
-  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, rand ());
   increase_peer_size (TLS);
   TLS->Peers[TLS->peer_num ++] = P;
 }
 
 void tglp_insert_user (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->users_allocated ++;
-  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, rand ());
   increase_peer_size (TLS);
   TLS->Peers[TLS->peer_num ++] = P;
 }
 
 void tglp_insert_chat (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->chats_allocated ++;
-  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, rand ());
   increase_peer_size (TLS);
   TLS->Peers[TLS->peer_num ++] = P;
 }
 
 void tglp_insert_channel (struct tgl_state *TLS, tgl_peer_t *P) {
   TLS->channels_allocated ++;
-  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+  TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, rand ());
   increase_peer_size (TLS);
   TLS->Peers[TLS->peer_num ++] = P;
 }
@@ -2125,7 +2125,7 @@ void tglm_message_add_peer (struct tgl_state *TLS, struct tgl_message *M) {
       TLS->encr_chats_allocated ++;
       break;
     }
-    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, lrand48 ());
+    TLS->peer_tree = tree_insert_peer (TLS->peer_tree, P, rand ());
     increase_peer_size (TLS);
     TLS->Peers[TLS->peer_num ++] = P;
   }
@@ -2189,7 +2189,7 @@ struct tgl_message *tglm_message_alloc (struct tgl_state *TLS, tgl_message_id_t 
 
 void tglm_message_insert_tree (struct tgl_state *TLS, struct tgl_message *M) {
   assert (M->permanent_id.id);
-  TLS->message_tree = tree_insert_message (TLS->message_tree, M, lrand48 ());
+  TLS->message_tree = tree_insert_message (TLS->message_tree, M, rand ());
 }
 
 void tglm_message_remove_tree (struct tgl_state *TLS, struct tgl_message *M) {
@@ -2203,7 +2203,7 @@ void tglm_message_insert (struct tgl_state *TLS, struct tgl_message *M) {
 }
 
 void tglm_message_insert_unsent (struct tgl_state *TLS, struct tgl_message *M) {
-  TLS->message_unsent_tree = tree_insert_message (TLS->message_unsent_tree, M, lrand48 ());
+  TLS->message_unsent_tree = tree_insert_message (TLS->message_unsent_tree, M, rand ());
 }
 
 void tglm_message_remove_unsent (struct tgl_state *TLS, struct tgl_message *M) {
@@ -2235,7 +2235,7 @@ struct tgl_photo *tgl_photo_get (struct tgl_state *TLS, long long id) {
 }
 
 void tgl_photo_insert (struct tgl_state *TLS, struct tgl_photo *P) {
-  TLS->photo_tree = tree_insert_photo (TLS->photo_tree, P, lrand48 ());
+  TLS->photo_tree = tree_insert_photo (TLS->photo_tree, P, rand ());
 }
 
 struct tgl_document *tgl_document_get (struct tgl_state *TLS, long long id) {
@@ -2245,7 +2245,7 @@ struct tgl_document *tgl_document_get (struct tgl_state *TLS, long long id) {
 }
 
 void tgl_document_insert (struct tgl_state *TLS, struct tgl_document *P) {
-  TLS->document_tree = tree_insert_document (TLS->document_tree, P, lrand48 ());
+  TLS->document_tree = tree_insert_document (TLS->document_tree, P, rand ());
 }
 
 struct tgl_webpage *tgl_webpage_get (struct tgl_state *TLS, long long id) {
@@ -2255,11 +2255,11 @@ struct tgl_webpage *tgl_webpage_get (struct tgl_state *TLS, long long id) {
 }
 
 void tgl_webpage_insert (struct tgl_state *TLS, struct tgl_webpage *P) {
-  TLS->webpage_tree = tree_insert_webpage (TLS->webpage_tree, P, lrand48 ());
+  TLS->webpage_tree = tree_insert_webpage (TLS->webpage_tree, P, rand ());
 }
 
 void tglp_peer_insert_name (struct tgl_state *TLS, tgl_peer_t *P) {
-  TLS->peer_by_name_tree = tree_insert_peer_by_name (TLS->peer_by_name_tree, P, lrand48 ());
+  TLS->peer_by_name_tree = tree_insert_peer_by_name (TLS->peer_by_name_tree, P, rand ());
 }
 
 void tglp_peer_delete_name (struct tgl_state *TLS, tgl_peer_t *P) {
@@ -2493,7 +2493,7 @@ void tgls_insert_random2local (struct tgl_state *TLS, long long random_id, tgl_m
   struct random2local *R = tree_lookup_random_id (TLS->random_id_tree, X);
   assert (!R);
   
-  TLS->random_id_tree = tree_insert_random_id (TLS->random_id_tree, X, lrand48 ());
+  TLS->random_id_tree = tree_insert_random_id (TLS->random_id_tree, X, rand ());
 }
 
 tgl_message_id_t *tgls_get_local_by_random (struct tgl_state *TLS, long long random_id) {
@@ -2516,7 +2516,7 @@ void tgls_insert_temp2local (struct tgl_state *TLS, int temp_id, tgl_message_id_
   struct random2local *R = tree_lookup_random_id (TLS->temp_id_tree, X);
   assert (!R);
   
-  TLS->temp_id_tree = tree_insert_random_id (TLS->temp_id_tree, X, lrand48 ());
+  TLS->temp_id_tree = tree_insert_random_id (TLS->temp_id_tree, X, rand ());
 }
 }*/
 
@@ -2557,14 +2557,14 @@ void tgls_message_change_temp_id (struct tgl_state *TLS, struct tgl_message *M, 
   if (M->temp_id == temp_id) { return; }
   assert (!M->temp_id);
   M->temp_id = temp_id;
-  TLS->temp_id_tree = tree_insert_temp_id (TLS->temp_id_tree, M, lrand48 ());
+  TLS->temp_id_tree = tree_insert_temp_id (TLS->temp_id_tree, M, rand ());
 }
 
 void tgls_message_change_random_id (struct tgl_state *TLS, struct tgl_message *M, long long random_id) {
   if (M->random_id == random_id) { return; }
   assert (!M->random_id);
   M->random_id = random_id;
-  TLS->random_id_tree = tree_insert_random_id (TLS->random_id_tree, M, lrand48 ());
+  TLS->random_id_tree = tree_insert_random_id (TLS->random_id_tree, M, rand ());
 }
 
 void tglm_message_del_temp_id (struct tgl_state *TLS, struct tgl_message *M) {

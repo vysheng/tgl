@@ -27,6 +27,13 @@
 #include <stdio.h>
 #include <assert.h>
 
+
+#if defined(_MSC_VER) || defined(__MINGW32__)
+#define INT64_PRINTF_MODIFIER "I64"
+#else
+#define INT64_PRINTF_MODIFIER "ll"
+#endif
+
 //#include "interface.h"
 #include "tools.h"
 #include "auto/constants.h"
@@ -377,7 +384,7 @@ static inline void hexdump_out (void) {
   hexdump (packet_buffer, packet_ptr);
 }*/
 
-#ifdef __MACH__
+#ifndef CLOCK_REALTIME
 #define CLOCK_REALTIME 0
 #define CLOCK_MONOTONIC 1
 #endif

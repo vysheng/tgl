@@ -27,6 +27,7 @@
 #include <string.h>
 //#include "tgl.h"
 #include "crypto/err.h"
+#include "crypto/rand.h"
 
 struct tgl_allocator {
   void *(*alloc)(size_t size);
@@ -99,8 +100,8 @@ void tgl_exists_release (void *ptr, int size);
 
 void *tgl_memdup (const void *s, size_t n);
 
-int tgl_snprintf (char *buf, int len, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
-int tgl_asprintf (char **res, const char *format, ...) __attribute__ ((format (printf, 2, 3)));
+int tgl_snprintf (char *buf, int len, const char *format, ...) __attribute__ ((format (__printf__, 3, 4)));
+int tgl_asprintf (char **res, const char *format, ...) __attribute__ ((format (__printf__, 2, 3)));
 
 void tglt_secure_random (void *s, int l);
 void tgl_my_clock_gettime (int clock_id, struct timespec *T);

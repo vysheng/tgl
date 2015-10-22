@@ -98,7 +98,7 @@ enum tgl_value_type {
 struct tgl_update_callback {
   void (*new_msg)(struct tgl_state *TLS, struct tgl_message *M);
   void (*marked_read)(struct tgl_state *TLS, int num, struct tgl_message *list[]);
-  void (*logprintf)(const char *format, ...)  __attribute__ ((format (printf, 1, 2)));
+  void (*logprintf)(const char *format, ...)  __attribute__ ((format (__printf__, 1, 2)));
   void (*get_values)(struct tgl_state *TLS, enum tgl_value_type type, const char *prompt, int num_values,
           void (*callback)(struct tgl_state *TLS, const char *string[], void *arg), void *arg);
   void (*logged_in)(struct tgl_state *TLS);
