@@ -1,3 +1,8 @@
+#include "config.h"
+#ifdef DISABLE_EXTF
+#error "EXTF disabled, so nothing uses auto-print anymore."
+#endif
+
 static int multiline_output = 1;
 static int multiline_offset;
 static int multiline_offset_size = 2;
