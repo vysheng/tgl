@@ -1,5 +1,10 @@
 This is library that handles telegram api and protocol.
 
+Current versions:
+
+- scheme.tl: Layer 38
+- encrypted_scheme.tl: Layer 23
+
 ### API, Protocol documentation
 
 Documentation for Telegram API is available here: https://core.telegram.org/api
