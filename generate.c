@@ -2586,7 +2586,6 @@ void gen_fetch_ds_source (void) {
   printf ("#include \"auto/auto-fetch-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
-  printf ("#include \"auto-static-fetch-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
   int i, j;
   for (i = 0; i < tn; i++) {
@@ -2638,7 +2637,6 @@ void gen_free_ds_source (void) {
   printf ("#include \"auto/auto-free-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
-  printf ("#include \"auto-static-free-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
   int i, j;
   for (i = 0; i < tn; i++) {
@@ -2691,7 +2689,6 @@ void gen_store_ds_source (void) {
   printf ("#include \"auto/auto-store-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
-  printf ("#include \"auto-static-store-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
   int i, j;
   for (i = 0; i < tn; i++) {
