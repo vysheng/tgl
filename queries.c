@@ -4169,8 +4169,6 @@ void tgl_do_send_typing (struct tgl_state *TLS, tgl_peer_id_t id, enum tgl_typin
 
 /* {{{ Extd query */
 #ifndef DISABLE_EXTF
-
-
 char *tglf_extf_print_ds (struct tgl_state *TLS, void *DS, struct paramed_type *T);
 
 static int ext_query_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
@@ -4198,10 +4196,8 @@ void tgl_do_send_extf (struct tgl_state *TLS, const char *data, int data_len, vo
   }
 }
 #else
-void tgl_do_send_extf (struct tgl_state *TLS, char *data, int data_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, char *buf), void *callback_extra) {
-  if (callback) {
-    callback (TLS, callback_extra, 0, 0);
-  }
+void tgl_do_send_extf (struct tgl_state *TLS, const char *data, int data_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *buf), void *callback_extra) {
+  assert (0);
 }
 #endif
 /* }}} */
