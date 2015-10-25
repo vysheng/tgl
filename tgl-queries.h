@@ -268,13 +268,15 @@ void tgl_do_get_message (struct tgl_state *TLS, tgl_message_id_t *msg_id, void (
 
 
 /* {{{ EXTENDED QUERIES USE WITH CAUTION */
+//#ifndef DISABLE_EXTF
 // sends query with extended text syntax
 // use only for debug or when you known what are you doing
-// since answer is not interpretated by library in any way
+// since answer is not interpreted by library in any way
 void tgl_do_send_extf (struct tgl_state *TLS, const char *data, int data_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *data), void *callback_extra);
 int tglf_extf_autocomplete (struct tgl_state *TLS, const char *text, int text_len, int index, char **R, char *data, int data_len);
 struct paramed_type *tglf_extf_store (struct tgl_state *TLS, const char *data, int data_len);
 char *tglf_extf_fetch (struct tgl_state *TLS, struct paramed_type *T);
+//#endif
 /* }}} */
 
 /* {{{ BOT */
