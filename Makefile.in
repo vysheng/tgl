@@ -96,3 +96,7 @@ clean:
 distclean:
 	rm -rf ${DIR_LIST} config.h config.log config.status
 
+mime-types.c: mime.types
+	@echo "// DO NOT EDIT! SEE MAKE-TARGET 'gen-mime-types'" > mime-types.c
+# xxd is usually packaged with vim-common
+	xxd -i mime.types >> mime-types.c
