@@ -147,7 +147,7 @@ void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int pa
   }
   memset (rb, 0, sizeof (rb));
   if (password_filename && password_length > 0) {
-    int fd = open (password_filename, O_RDONLY);
+    int fd = open (password_filename, O_RDONLY | O_BINARY);
     if (fd < 0) {
       vlogprintf (E_WARNING, "Warning: fail to open password file - \"%s\", %s.\n", password_filename, strerror(errno));
     } else {

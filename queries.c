@@ -970,7 +970,7 @@ void tgl_do_reply_message (struct tgl_state *TLS, tgl_message_id_t *_reply_id, c
 
 /* {{{ Send text file */
 void tgl_do_send_text (struct tgl_state *TLS, tgl_peer_id_t id, const char *file_name, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
-  int fd = open (file_name, O_RDONLY);
+  int fd = open (file_name, O_RDONLY | O_BINARY);
   if (fd < 0) {
     tgl_set_query_error (TLS, EBADF, "Can not open file: %s", strerror(errno));
     if (callback) {
@@ -1770,7 +1770,7 @@ static void send_file_thumb (struct tgl_state *TLS, struct send_file *f, const v
 
 
 static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, const char *file_name, tgl_peer_id_t avatar, int w, int h, int duration, const void *thumb_data, int thumb_len, const char *caption, int caption_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
-  int fd = open (file_name, O_RDONLY);
+  int fd = open (file_name, O_RDONLY | O_BINARY);
   if (fd < 0) {
     tgl_set_query_error (TLS, EBADF, "Can not open file: %s", strerror(errno));
     if (!avatar.peer_id) {
@@ -2805,7 +2805,7 @@ static int download_on_answer (struct tgl_state *TLS, struct query *q, void *DD)
 
   struct download *D = q->extra;
   if (D->fd == -1) {
-    D->fd = open (D->name, O_CREAT | O_WRONLY, 0640);
+    D->fd = open (D->name, O_CREAT | O_WRONLY | O_BINARY, 0640);
     if (D->fd < 0) {
       tgl_set_query_error (TLS, EBADF, "Can not open file for writing: %s", strerror(errno));
       if (q->callback) {
