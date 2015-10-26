@@ -728,6 +728,7 @@ void tglu_work_update_short_sent_message (struct tgl_state *TLS, int check_only,
     NULL,
     NULL,
     NULL, 
+    NULL,
     flags);
  
   if (check_only) { return; }

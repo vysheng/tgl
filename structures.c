@@ -1064,6 +1064,7 @@ struct tgl_message *tglf_fetch_alloc_message_short (struct tgl_state *TLS, struc
     NULL,
     DS_U->reply_to_msg_id,
     NULL, 
+    (void *)DS_U->entities,
     flags
   );
   return M;
@@ -1134,6 +1135,7 @@ struct tgl_message *tglf_fetch_alloc_message_short_chat (struct tgl_state *TLS, 
     &A,
     NULL,
     DS_U->reply_to_msg_id,
+    NULL,
     NULL,
     flags
   );
@@ -1348,6 +1350,57 @@ void tglf_fetch_message_action_encrypted (struct tgl_state *TLS, struct tgl_mess
   }
 }
 
+void tglf_fetch_message_entity (struct tgl_state *TLS, struct tgl_message_entity *E, struct tl_ds_message_entity *DS_ME) {
+  E->start = DS_LVAL (DS_ME->offset);
+  E->length = DS_LVAL (DS_ME->length);
+  switch (DS_ME->magic) {
+  case CODE_message_entity_unknown:
+    E->type = tgl_message_entity_unknown;
+    break;
+  case CODE_message_entity_mention:
+    E->type = tgl_message_entity_mention;
+    break;
+  case CODE_message_entity_hashtag:
+    E->type = tgl_message_entity_hashtag;
+    break;
+  case CODE_message_entity_bot_command:
+    E->type = tgl_message_entity_bot_command;
+    break;
+  case CODE_message_entity_url:
+    E->type = tgl_message_entity_url;
+    break;
+  case CODE_message_entity_email:
+    E->type = tgl_message_entity_email;
+    break;
+  case CODE_message_entity_bold:
+    E->type = tgl_message_entity_bold;
+    break;
+  case CODE_message_entity_italic:
+    E->type = tgl_message_entity_italic;
+    break;
+  case CODE_message_entity_code:
+    E->type = tgl_message_entity_code;
+    break;
+  case CODE_message_entity_pre:
+    E->type = tgl_message_entity_pre;
+    break;
+  case CODE_message_entity_text_url:
+    E->type = tgl_message_entity_text_url;
+    break;
+  default:
+    assert (0);
+  }
+}
+
+void tglf_fetch_message_entities (struct tgl_state *TLS, struct tgl_message *M, struct tl_ds_vector *DS) {
+  M->entities_num = DS_LVAL (DS->f1);
+  M->entities = talloc0 (M->entities_num * sizeof (struct tgl_message_entity));
+  int i;
+  for (i = 0; i < M->entities_num; i++) {
+    struct tl_ds_message_entity *D = DS->f2[i];
+    tglf_fetch_message_entity (TLS, &M->entities[i], D);
+  }
+}
 
 struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_ds_message *DS_M, int *new_msg) {
   if (new_msg) {
@@ -1447,6 +1500,7 @@ struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_d
       DS_M->action,
       DS_M->reply_to_msg_id,
       DS_M->reply_markup,
+      (void *)DS_M->entities,
       flags | TGLMF_CREATE | TGLMF_CREATED
     );
   }
@@ -1988,6 +2042,12 @@ void tgls_free_message_action (struct tgl_state *TLS, struct tgl_message_action 
   assert (0);
 }
 
+void tgls_free_message_entity (struct tgl_state *TLS, struct tgl_message_entity *E) {
+  if (E->extra) {
+    tfree_str (E->extra);
+  }
+}
+
 void tgls_clear_message (struct tgl_state *TLS, struct tgl_message *M) {
   if (!(M->flags & TGLMF_SERVICE)) {
     if (M->message) { tfree (M->message, M->message_len + 1); }
@@ -1995,6 +2055,11 @@ void tgls_clear_message (struct tgl_state *TLS, struct tgl_message *M) {
   } else {
     tgls_free_message_action (TLS, &M->action);
   }
+  int i;
+  for (i = 0; i < M->entities_num; i++) {
+    tgls_free_message_entity (TLS, &M->entities[i]);
+  }
+  tfree (M->entities, M->entities_num * sizeof (struct tgl_message_entity));
 }
 
 void tgls_free_reply_markup (struct tgl_state *TLS, struct tgl_message_reply_markup *R) { 

@@ -568,6 +568,141 @@ static int q_list_on_error (struct tgl_state *TLS, struct query *q, int error_co
 
 #include "queries-encrypted.c"
 
+static void increase_ent (int *ent_size, int **ent, int s) {
+  *ent = trealloc (*ent, (*ent_size) * 4, (*ent_size) * 4 + 4 * s);
+  (*ent_size) +=s;
+}
+
+static char *process_html_text (struct tgl_state *TLS, const char *text, int text_len, int *ent_size, int **ent) {
+  char *new_text = talloc (text_len + 1);
+  int stpos[100];
+  int sttype[100];
+  int stp = 0;
+  int p;
+  int cur_p = 0;
+  *ent = talloc (8);
+  *ent_size = 2;
+  (*ent)[0] = CODE_vector;
+  (*ent)[1] = 0;
+  for (p = 0; p < text_len; p++) {
+    if (text[p] == '<') {
+      if (stp == 99) {
+        tgl_set_query_error (TLS, EINVAL, "Too nested tags...");
+        tfree (new_text, text_len + 1);
+        return NULL;
+      }
+      int old_p = *ent_size;
+      if (text_len - p >= 3 && !memcmp (text + p, "<b>", 3)) {
+        increase_ent (ent_size, ent, 3);
+        (*ent)[old_p] = CODE_message_entity_bold;
+        (*ent)[old_p + 1] = cur_p;
+        stpos[stp] = old_p + 2;
+        sttype[stp] = 0;
+        stp ++;
+        p += 2;
+        continue;
+      }
+      if (text_len - p >= 4 && !memcmp (text + p, "</b>", 4)) {
+        if (stp == 0 || sttype[stp - 1]  != 0) {
+          tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
+          tfree (new_text, text_len + 1);
+          return NULL;
+        }
+        (*ent)[stpos[stp - 1]] = cur_p;
+        stp --;
+        p += 3;
+        continue;
+      }
+      if (text_len - p >= 3 && !memcmp (text + p, "<i>", 3)) {
+        increase_ent (ent_size, ent, 3);
+        (*ent)[old_p] = CODE_message_entity_italic;
+        (*ent)[old_p + 1] = cur_p;
+        stpos[stp] = old_p + 2;
+        sttype[stp] = 1;
+        stp ++;
+        p += 2;
+        continue;
+      }
+      if (text_len - p >= 4 && !memcmp (text + p, "</i>", 4)) {
+        if (stp == 0 || sttype[stp - 1]  != 1) {
+          tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
+          tfree (new_text, text_len + 1);
+          return NULL;
+        }
+        (*ent)[stpos[stp - 1]] = cur_p;
+        stp --;
+        p += 3;
+        continue;
+      }
+      if (text_len - p >= 6 && !memcmp (text + p, "<code>", 6)) {
+        increase_ent (ent_size, ent, 3);
+        (*ent)[old_p] = CODE_message_entity_code;
+        (*ent)[old_p + 1] = cur_p;
+        stpos[stp] = old_p + 2;
+        sttype[stp] = 2;
+        stp ++;
+        p += 5;
+        continue;
+      }
+      if (text_len - p >= 7 && !memcmp (text + p, "</code>", 7)) {
+        if (stp == 0 || sttype[stp - 1]  != 2) {
+          tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
+          tfree (new_text, text_len + 1);
+          return NULL;
+        }
+        (*ent)[stpos[stp - 1]] = cur_p;
+        stp --;
+        p += 6;
+        continue;
+      }
+      if (text_len - p >= 4 && !memcmp (text + p, "<br>", 4)) {
+        new_text[cur_p ++] = '\n';
+        p += 3;
+        continue;
+      }
+      tgl_set_query_error (TLS, EINVAL, "Unknown tag");
+      tfree (new_text, text_len + 1);
+      return NULL;
+    } else if (p >= 3 && text[p] == '&' && text[p + 1] == '#') {
+      p += 2;
+      int num = 0;
+      while (p < text_len) {
+        if (text[p] >= '0' && text[p] <= '9') {
+          num = num * 10 + text[p] - '0';
+          if (num >= 127) {
+            tgl_set_query_error (TLS, EINVAL, "Too big number in &-sequence");
+            tfree (new_text, text_len + 1);
+            return NULL;
+          }
+        } else if (text[p] == ';') {
+          new_text[cur_p ++] =  num;
+          continue;
+        } else {
+          tgl_set_query_error (TLS, EINVAL, "Bad &-sequence");
+          tfree (new_text, text_len + 1);
+          return NULL;
+        }
+      }
+      tgl_set_query_error (TLS, EINVAL, "Unterminated &-sequence");
+      tfree (new_text, text_len + 1);
+      return NULL;
+    } else {
+      new_text[cur_p ++] = text[p];
+    }
+  }
+  if (stp != 0) {
+    tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
+    tfree (new_text, text_len + 1);
+    return NULL;
+  }
+  (*ent)[1] = ((*ent_size) - 2) / 3;
+  char *n = talloc (cur_p + 1);
+  memcpy (n, new_text, cur_p);
+  n[cur_p] = 0;
+  tfree (new_text, text_len);
+  return n;
+}
+
 /* {{{ Get config */
 
 static void fetch_dc_option (struct tgl_state *TLS, struct tl_ds_dc_option *DS_DO) {
@@ -837,7 +972,7 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
   clear_packet ();
   out_int (CODE_messages_send_message);
 
-  unsigned f = ((M->flags & TGLMF_DISABLE_PREVIEW) ? 2 : 0) | (M->reply_id ? 1 : 0) | (M->reply_markup ? 4 : 0);
+  unsigned f = ((M->flags & TGLMF_DISABLE_PREVIEW) ? 2 : 0) | (M->reply_id ? 1 : 0) | (M->reply_markup ? 4 : 0) | (M->entities_num > 0 ? 8 : 0);
   if (tgl_get_peer_type (M->from_id) == TGL_PEER_CHANNEL) {
     f |= 16;
   }
@@ -870,6 +1005,34 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
       }
     } else {
       out_int (CODE_reply_keyboard_hide);
+    }
+  }
+
+  if (M->entities_num > 0) {
+    out_int (CODE_vector);
+    out_int (M->entities_num);
+    int i;
+    for (i = 0; i < M->entities_num; i++) {
+      struct tgl_message_entity *E = &M->entities[i];
+      switch (E->type) {
+      case tgl_message_entity_bold:
+        out_int (CODE_message_entity_bold);
+        out_int (E->start);
+        out_int (E->length);
+        break;
+      case tgl_message_entity_italic:
+        out_int (CODE_message_entity_italic);
+        out_int (E->start);
+        out_int (E->length);
+        break;
+      case tgl_message_entity_code:
+        out_int (CODE_message_entity_code);
+        out_int (E->start);
+        out_int (E->length);
+        break;
+      default:
+        assert (0);
+      }
     }
   }
 
@@ -917,8 +1080,42 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t peer_id, const ch
     } else {
       from_id = TLS->our_id;
     }
+
+    struct tl_ds_vector *EN = NULL;
+    char *new_text = NULL;
+
+    if (flags & TGLMF_HTML) {
+      int ent_size = 0;
+      int *ent = NULL;
+      text = new_text = process_html_text (TLS, text, text_len, &ent_size, &ent);
+      if (!text) {
+        tfree (ent, ent_size);
+        if (callback) {
+          callback (TLS, callback_extra, 0, 0);
+        }
+        return;    
+      }
+      text_len = strlen (new_text);
+      int *save_ptr = in_ptr;
+      int *save_end = in_end;
+      in_ptr = ent;
+      in_end = ent + ent_size;
+      EN = fetch_ds_type_any (TYPE_TO_PARAM_1 (vector, TYPE_TO_PARAM (message_entity)));
+      assert (EN);
+      vlogprintf (0, "in_ptr = %p, in_end = %p\n", in_ptr, in_end);
+      assert (in_ptr == in_end);
+      in_ptr = save_ptr;
+      in_end = save_end;
+      tfree (ent, 4 * ent_size);
+    }
+
       
-    bl_do_edit_message (TLS, &id, &from_id, &peer_id, NULL, NULL, &date, text, text_len, &TDSM, NULL, reply ? &reply : NULL, reply_markup, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_SESSION_OUTBOUND | disable_preview);
+    bl_do_edit_message (TLS, &id, &from_id, &peer_id, NULL, NULL, &date, text, text_len, &TDSM, NULL, reply ? &reply : NULL, reply_markup, EN, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | TGLMF_SESSION_OUTBOUND | disable_preview);
+    
+    if (flags & TGLMF_HTML) {
+      tfree_str (new_text);
+      free_ds_type_any (EN, TYPE_TO_PARAM_1 (vector, TYPE_TO_PARAM (message_entity)));
+    }
   } else {
     struct tl_ds_decrypted_message_media TDSM;
     TDSM.magic = CODE_decrypted_message_media_empty;
@@ -4511,7 +4708,7 @@ void tgl_do_send_broadcast (struct tgl_state *TLS, int num, tgl_peer_id_t peer_i
     E->list[i] = id;
 
     tgl_peer_id_t from_id = TLS->our_id;
-    bl_do_edit_message (TLS, &id, &from_id, &peer_id[i], NULL, NULL, &date, text, text_len, &TDSM, NULL, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | disable_preview);
+    bl_do_edit_message (TLS, &id, &from_id, &peer_id[i], NULL, NULL, &date, text, text_len, &TDSM, NULL, NULL, NULL, NULL, TGLMF_UNREAD | TGLMF_OUT | TGLMF_PENDING | TGLMF_CREATE | TGLMF_CREATED | disable_preview);
   }
 
   clear_packet ();
@@ -4903,6 +5100,11 @@ void tgl_sign_in (struct tgl_state *TLS) {
 static void check_authorized (struct tgl_state *TLS, void *arg) {
   int i;
   int ok = 1;
+  for (i = 0; i <= TLS->max_dc_num; i++) {
+    if (TLS->DC_list[i]) {
+      tgl_dc_authorize (TLS, TLS->DC_list[i]);
+    }
+  }
   for (i = 0; i <= TLS->max_dc_num; i++) {
     if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i]) && !tgl_authorized_dc (TLS, TLS->DC_list[i])) {
       ok = 0;

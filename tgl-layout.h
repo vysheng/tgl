@@ -38,6 +38,7 @@
 #define TGLMF_SERVICE (1 << 13)
 #define TGLMF_SESSION_OUTBOUND (1 << 14)
 #define TGLMF_POST_AS_CHANNEL (1 << 8)
+#define TGLMF_HTML (1 << 9)
 
 #define TGLMF_CREATE 0x10000
 
@@ -145,6 +146,27 @@ struct tgl_dc {
 
   // ipv4, ipv6, ipv4_media, ipv6_media
   struct tgl_dc_option *options[4];
+};
+
+enum tgl_message_entity_type {
+tgl_message_entity_unknown,
+tgl_message_entity_mention,
+tgl_message_entity_hashtag,
+tgl_message_entity_bot_command,
+tgl_message_entity_url,
+tgl_message_entity_email,
+tgl_message_entity_bold,
+tgl_message_entity_italic,
+tgl_message_entity_code,
+tgl_message_entity_pre,
+tgl_message_entity_text_url
+};
+
+struct tgl_message_entity {
+  enum tgl_message_entity_type type;
+  int start;
+  int length;
+  char *extra;
 };
 
 enum tgl_message_media_type {
@@ -555,6 +577,8 @@ struct tgl_message {
   tgl_peer_id_t to_id;
   int date;
   struct tgl_message_reply_markup *reply_markup;
+  int entities_num;
+  struct tgl_message_entity *entities;
   union {
     struct tgl_message_action action;
     struct {

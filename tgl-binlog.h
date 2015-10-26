@@ -55,7 +55,7 @@ void bl_do_msg_update (struct tgl_state *TLS, struct tgl_message_id *id);
 void bl_do_reset_authorization (struct tgl_state *TLS);
 
 
-void bl_do_edit_message (struct tgl_state *TLS, struct tgl_message_id *id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, tgl_peer_id_t *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, struct tl_ds_reply_markup *reply_markup, int flags);
+void bl_do_edit_message (struct tgl_state *TLS, struct tgl_message_id *id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, tgl_peer_id_t *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, struct tl_ds_reply_markup *reply_markup, struct tl_ds_vector *entities, int flags);
 void bl_do_edit_message_encr (struct tgl_state *TLS, struct tgl_message_id *id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, int *date, const char *message, int message_len, struct tl_ds_decrypted_message_media *media, struct tl_ds_decrypted_message_action *action, struct tl_ds_encrypted_file *file, int flags);
 void bl_do_encr_chat_exchange (struct tgl_state *TLS, tgl_peer_id_t id, long long *exchange_id, const void *key, int *state);
 void bl_do_user (struct tgl_state *TLS, int id, long long *access_hash, const char *first_name, int first_name_len, const char *last_name, int last_name_len, const char *phone, int phone_len, const char *username, int username_len, struct tl_ds_photo *photo, struct tl_ds_user_profile_photo *profile_photo, int *last_read_in, int *last_read_out, struct tl_ds_bot_info *bot_info, int flags);

@@ -274,7 +274,7 @@ void bl_do_chat_del_user (struct tgl_state *TLS, tgl_peer_id_t id, int version, 
 }
 /* }}} */
 
-void bl_do_edit_message (struct tgl_state *TLS, tgl_message_id_t *id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, tgl_peer_id_t *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, struct tl_ds_reply_markup *reply_markup, int flags) /* {{{ */ {
+void bl_do_edit_message (struct tgl_state *TLS, tgl_message_id_t *id, tgl_peer_id_t *from_id, tgl_peer_id_t *to_id, tgl_peer_id_t *fwd_from_id, int *fwd_date, int *date, const char *message, int message_len, struct tl_ds_message_media *media, struct tl_ds_message_action *action, int *reply_id, struct tl_ds_reply_markup *reply_markup, struct tl_ds_vector *entities, int flags) /* {{{ */ {
   assert (!(flags & 0xfffe0000));
   
   struct tgl_message *M = tgl_message_get (TLS, id);
@@ -346,6 +346,10 @@ void bl_do_edit_message (struct tgl_state *TLS, tgl_message_id_t *id, tgl_peer_i
   if (media) {
     tglf_fetch_message_media (TLS, &M->media, media);
     assert (!(M->flags & TGLMF_SERVICE));
+  }
+
+  if (entities) {
+    tglf_fetch_message_entities (TLS, M, entities);
   }
 
   if (reply_id) {
