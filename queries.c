@@ -608,7 +608,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
           tfree (new_text, text_len + 1);
           return NULL;
         }
-        (*ent)[stpos[stp - 1]] = cur_p;
+        (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
         stp --;
         p += 3;
         continue;
@@ -629,7 +629,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
           tfree (new_text, text_len + 1);
           return NULL;
         }
-        (*ent)[stpos[stp - 1]] = cur_p;
+        (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
         stp --;
         p += 3;
         continue;
@@ -650,7 +650,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
           tfree (new_text, text_len + 1);
           return NULL;
         }
-        (*ent)[stpos[stp - 1]] = cur_p;
+        (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
         stp --;
         p += 6;
         continue;
@@ -663,9 +663,10 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       tgl_set_query_error (TLS, EINVAL, "Unknown tag");
       tfree (new_text, text_len + 1);
       return NULL;
-    } else if (p >= 3 && text[p] == '&' && text[p + 1] == '#') {
+    } else if (text_len - p >= 3  && text[p] == '&' && text[p + 1] == '#') {
       p += 2;
       int num = 0;
+      int ok = 0;
       while (p < text_len) {
         if (text[p] >= '0' && text[p] <= '9') {
           num = num * 10 + text[p] - '0';
@@ -674,15 +675,18 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
             tfree (new_text, text_len + 1);
             return NULL;
           }
+          p ++;
         } else if (text[p] == ';') {
           new_text[cur_p ++] =  num;
-          continue;
+          ok = 1;
+          break;
         } else {
           tgl_set_query_error (TLS, EINVAL, "Bad &-sequence");
           tfree (new_text, text_len + 1);
           return NULL;
         }
       }
+      if (ok) { continue; }
       tgl_set_query_error (TLS, EINVAL, "Unterminated &-sequence");
       tfree (new_text, text_len + 1);
       return NULL;
@@ -699,7 +703,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
   char *n = talloc (cur_p + 1);
   memcpy (n, new_text, cur_p);
   n[cur_p] = 0;
-  tfree (new_text, text_len);
+  tfree (new_text, text_len + 1);
   return n;
 }
 
