@@ -3622,7 +3622,10 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, voi
       bl_do_msg_update (TLS, &ML[i]->permanent_id);
     }
     for (i = 0; i < el_pos; i++) {
-      bl_do_msg_update (TLS, &EL[i]->permanent_id);
+      // messages to secret chats that no longer exist are not initialized and NULL
+      if (EL[i]) {
+        bl_do_msg_update (TLS, &EL[i]->permanent_id);
+      }
     }
 
     tfree (ML, ml_pos * sizeof (void *));
