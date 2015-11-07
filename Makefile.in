@@ -57,10 +57,10 @@ ${TGL_OBJECTS_AUTO}: ${OBJ}/auto/%.o: ${AUTO}/%.c | create_dirs
 	${CC} ${INCLUDE} ${COMPILE_FLAGS} -iquote ${srcdir}/tgl -c -MP -MD -MF ${DEP}/$*.d -MQ ${OBJ}/$*.o -o $@ $<
 
 ${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
-	rm -f $@ && ar ruv $@ ${TGL_OBJECTS} ${COMMON_OBJECTS}
+	rm -f $@ && ar ruv $@ ${TGL_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
 
 ${LIB}/libtgl.so: ${TGL_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
-	${CC} -shared -o $@ ${TGL_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS}
+	${CC} -shared -o $@ ${TGL_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS} ${TGL_OBJECTS_AUTO}
 
 ${EXE}/generate: ${GENERATE_OBJECTS} ${COMMON_OBJECTS}
 	${CC} ${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS} -o $@
