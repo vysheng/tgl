@@ -782,7 +782,7 @@ void bl_do_chat (struct tgl_state *TLS, int id, const char *title, int title_len
 }
 /* }}} */
 
-void bl_do_encr_chat (struct tgl_state *TLS, int id, long long *access_hash, int *date, int *admin, int *user_id, void *key, void *g_key, void *first_key_id, int *state, int *ttl, int *layer, int *in_seq_no, int *last_in_seq_no, int *out_seq_no, long long *key_fingerprint, int flags) /* {{{ */ {
+void bl_do_encr_chat (struct tgl_state *TLS, int id, long long *access_hash, int *date, int *admin, int *user_id, void *key, void *g_key, void *first_key_id, int *state, int *ttl, int *layer, int *in_seq_no, int *last_in_seq_no, int *out_seq_no, long long *key_fingerprint, int flags, const char *print_name, int print_name_len) /* {{{ */ {
   tgl_peer_t *_U = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (id));
 
   unsigned updates = 0;
@@ -843,14 +843,18 @@ void bl_do_encr_chat (struct tgl_state *TLS, int id, long long *access_hash, int
   tgl_peer_t *Us = tgl_peer_get (TLS, TGL_MK_USER (U->user_id));
   
   if (!U->print_name) {
-    if (Us) {
-      U->print_name = TLS->callback.create_print_name (TLS, TGL_MK_ENCR_CHAT (id), "!", Us->user.first_name, Us->user.last_name, 0);
+    if (print_name) {
+      U->print_name = tstrndup (print_name, print_name_len);
     } else {
-      static char buf[100];
-      tsnprintf (buf, 99, "user#%d", U->user_id);
-      U->print_name = TLS->callback.create_print_name (TLS, TGL_MK_ENCR_CHAT (id), "!", buf, 0, 0);
+      if (Us) {
+        U->print_name = TLS->callback.create_print_name (TLS, TGL_MK_ENCR_CHAT (id), "!", Us->user.first_name, Us->user.last_name, 0);
+      } else {
+        static char buf[100];
+        tsnprintf (buf, 99, "user#%d", U->user_id);
+        U->print_name = TLS->callback.create_print_name (TLS, TGL_MK_ENCR_CHAT (id), "!", buf, 0, 0);
+      }
+      tglp_peer_insert_name (TLS, (void *)U);
     }
-    tglp_peer_insert_name (TLS, (void *)U);
   }
 
   if (g_key) {

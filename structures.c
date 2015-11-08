@@ -449,7 +449,8 @@ struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS, 
       &r, 
       NULL, NULL, NULL, NULL, NULL, 
       NULL, 
-      TGLECF_CREATE | TGLECF_CREATED
+      TGLECF_CREATE | TGLECF_CREATED,
+      NULL, 0
     );
   } else {
     if (DS_EC->magic == CODE_encrypted_chat_waiting) {
@@ -465,7 +466,8 @@ struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS, 
         &r, 
         NULL, NULL, NULL, NULL, NULL, 
         NULL, 
-        TGL_FLAGS_UNCHANGED 
+        TGL_FLAGS_UNCHANGED,
+        NULL, 0
       );
       return U; // We needed only access hash from here
     }
@@ -485,7 +487,8 @@ struct tgl_secret_chat *tglf_fetch_alloc_encrypted_chat (struct tgl_state *TLS, 
       &r, 
       NULL, NULL, NULL, NULL, NULL, 
       DS_EC->key_fingerprint,
-      TGL_FLAGS_UNCHANGED 
+      TGL_FLAGS_UNCHANGED,
+      NULL, 0
     );
   }
 
@@ -1643,7 +1646,8 @@ struct tgl_message *tglf_fetch_encrypted_message (struct tgl_state *TLS, struct 
     NULL, NULL, NULL, NULL,
     NULL, NULL, NULL, NULL,
     NULL, DS_DML->layer, NULL, NULL, NULL, NULL,
-    TGL_FLAGS_UNCHANGED
+    TGL_FLAGS_UNCHANGED,
+    NULL, 0
   );
 
   int in_seq_no = DS_LVAL (DS_DML->out_seq_no);
@@ -1690,7 +1694,8 @@ struct tgl_message *tglf_fetch_encrypted_message (struct tgl_state *TLS, struct 
       NULL, NULL, NULL, NULL,
       NULL, NULL, NULL, NULL,
       NULL, NULL, &in_seq_no, &out_seq_no, NULL, NULL,
-      TGL_FLAGS_UNCHANGED
+      TGL_FLAGS_UNCHANGED,
+      NULL, 0
     );
     assert (P->encr_chat.in_seq_no == in_seq_no);
   }
@@ -1780,7 +1785,8 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS, s
         NULL, NULL, NULL, NULL,
         NULL, NULL, NULL, NULL,
         NULL, &M->action.layer, NULL, NULL, NULL, NULL,
-        TGL_FLAGS_UNCHANGED
+        TGL_FLAGS_UNCHANGED,
+        NULL, 0
       );
     }
     if (M->action.type == tgl_message_action_set_message_ttl) {
@@ -1789,7 +1795,8 @@ struct tgl_message *tglf_fetch_alloc_encrypted_message (struct tgl_state *TLS, s
         NULL, NULL, NULL, NULL,
         NULL, NULL, NULL, NULL,
         &M->action.ttl, NULL, NULL, NULL, NULL, NULL,
-        TGL_FLAGS_UNCHANGED
+        TGL_FLAGS_UNCHANGED,
+        NULL, 0
       );
     }
   }
