@@ -868,6 +868,10 @@ void bl_do_encr_chat (struct tgl_state *TLS, int id, long long *access_hash, int
     memcpy (U->key, key, 256);
   }
 
+  if (first_key_id) {
+    memcpy (U->first_key_sha, first_key_id, 20);
+  }
+
   if (state) {
     if (U->state == sc_waiting && *state == sc_ok) {
       tgl_do_create_keys_end (TLS, U);
