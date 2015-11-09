@@ -580,7 +580,8 @@ void tgl_do_send_accept_encr_chat (struct tgl_state *TLS, struct tgl_secret_chat
     kk, NULL, sha_buffer, &state, 
     NULL, NULL, NULL, NULL, NULL, 
     &fingerprint, 
-    TGL_FLAGS_UNCHANGED
+    TGL_FLAGS_UNCHANGED,
+    NULL, 0
   );
 
   clear_packet ();
@@ -679,7 +680,7 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   
   int state = sc_waiting;
   int our_id = tgl_get_peer_id (TLS->our_id);
-  bl_do_encr_chat (TLS, t, NULL, NULL, &our_id, &user_id, random, NULL, NULL, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED);
+  bl_do_encr_chat (TLS, t, NULL, NULL, &our_id, &user_id, random, NULL, NULL, &state, NULL, NULL, NULL, NULL, NULL, NULL, TGLPF_CREATE | TGLPF_CREATED, NULL, 0);
 
   
   tgl_peer_t *_E = tgl_peer_get (TLS, TGL_MK_ENCR_CHAT (t));
