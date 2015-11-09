@@ -131,5 +131,4 @@ static inline void hexdump (void *ptr, void *end_ptr) {
   if (total) { fprintf (stderr, "\n"); }
 }
 
-
 #endif

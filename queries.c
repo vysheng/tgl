@@ -75,6 +75,10 @@
 #endif
 
 
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 static void out_peer_id (struct tgl_state *TLS, tgl_peer_id_t id);
 static struct query_methods send_msgs_methods;
 
@@ -1961,7 +1965,7 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
 
 static void send_file_thumb (struct tgl_state *TLS, struct send_file *f, const void *thumb_data, int thumb_len, void *callback, void *callback_extra) {
   clear_packet ();
-  f->thumb_id = rand () * (1ll << 32) + rand ();
+  tglt_secure_random (&f->thumb_id, 8);
   out_int (CODE_upload_save_file_part);
   out_long (f->thumb_id);
   out_int (0);

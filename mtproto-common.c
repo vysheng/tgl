@@ -50,6 +50,11 @@
 #include <mach/mach.h>
 #endif
 
+#include <errno.h>
+
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
 
 static int __packet_buffer[PACKET_BUFFER_SIZE + 16];
 int *tgl_packet_ptr;
