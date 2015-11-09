@@ -2586,7 +2586,6 @@ void gen_fetch_ds_source (void) {
   printf ("#include \"auto/auto-fetch-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
-  printf ("#include \"auto-static-fetch-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
   int i, j;
   for (i = 0; i < tn; i++) {
@@ -2638,7 +2637,6 @@ void gen_free_ds_source (void) {
   printf ("#include \"auto/auto-free-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
-  printf ("#include \"auto-static-free-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
   int i, j;
   for (i = 0; i < tn; i++) {
@@ -2691,7 +2689,6 @@ void gen_store_ds_source (void) {
   printf ("#include \"auto/auto-store-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
-  printf ("#include \"auto-static-store-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
   int i, j;
   for (i = 0; i < tn; i++) {
@@ -2741,6 +2738,9 @@ void gen_store_ds_header (void) {
 }
 
 void gen_print_ds_header (void) {
+  printf ("#include \"config.h\"\n");
+  printf ("#ifndef DISABLE_EXTF\n");
+  printf ("\n");
   printf ("#include \"auto.h\"\n");
   printf ("#include \"auto-types.h\"\n");
   printf ("#include <assert.h>\n");
@@ -2766,12 +2766,16 @@ void gen_print_ds_header (void) {
     printf ("DS, struct paramed_type *T);\n");
   }
   printf ("int print_ds_type_any (void *DS, struct paramed_type *T);\n");
+  printf ("#endif\n");
 }
 
 void gen_print_ds_source (void) {
+  printf ("#include \"config.h\"\n");
+  printf ("#ifndef DISABLE_EXTF\n");
+  printf ("\n");
   printf ("#include \"auto.h\"\n");
   printf ("#include <assert.h>\n");
-
+  printf ("\n");
   printf ("#include \"auto/auto-print-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto-static-print-ds.c\"\n");
@@ -2793,6 +2797,7 @@ void gen_print_ds_source (void) {
   }
   printf ("  default: return -1; }\n");
   printf ("}\n");
+  printf ("#endif\n");
 }
 
 int parse_tlo_file (void) {

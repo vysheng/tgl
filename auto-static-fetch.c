@@ -1,3 +1,7 @@
+#include <assert.h>
+
+#include "config.h"
+
 static int multiline_output = 1;
 static int multiline_offset;
 static int multiline_offset_size = 2;
@@ -100,7 +104,11 @@ static void print_offset (void) {
 }
 
 char *tglf_extf_fetch (struct tgl_state *TLS, struct paramed_type *T) {
+#ifdef DISABLE_EXTF
+  assert (0);
+#else
   out_buf_pos = 0;
   if (fetch_type_any (T) < 0) { return 0; }
   return out_buf;
+#endif
 }
