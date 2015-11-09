@@ -32,7 +32,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#ifdef WIN32
+#include <winsock2.h>
+#else
 #include <netdb.h>
+#endif
+
 #include "crypto/aes.h"
 #include "crypto/rand.h"
 #include "crypto/sha.h"
@@ -54,6 +59,7 @@ static long long rsa_encrypted_chunks, rsa_decrypted_chunks;
 
 //int verbosity;
 
+#ifndef WIN32
 static int get_random_bytes (struct tgl_state *TLS, unsigned char *buf, int n) {
   int r = 0, h = open ("/dev/random", O_RDONLY | O_NONBLOCK);
   if (h >= 0) {
@@ -85,6 +91,22 @@ static int get_random_bytes (struct tgl_state *TLS, unsigned char *buf, int n) {
 
   return r;
 }
+#else
+static HCRYPTPROV hCryptoServiceProvider = 0;
+static int get_random_bytes (struct tgl_state *TLS, unsigned char *buf, int n) {
+	if (hCryptoServiceProvider == 0) {
+		/* Crypto init */
+		CryptAcquireContextA(&hCryptoServiceProvider, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+	}
+	
+	if (!CryptGenRandom(hCryptoServiceProvider, n, buf)) {
+		return -1;
+	}
+    
+	
+	return n;
+}
+#endif
 
 
 /* RDTSC */
@@ -114,8 +136,10 @@ void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int pa
 #endif
   unsigned short p = getpid ();
   TGLC_rand_add (&p, sizeof (p), 0.0);
+#ifndef WIN32
   p = getppid ();
   TGLC_rand_add (&p, sizeof (p), 0.0);
+#endif
   unsigned char rb[32];
   int s = get_random_bytes (TLS, rb, 32);
   if (s > 0) {
@@ -123,14 +147,14 @@ void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int pa
   }
   memset (rb, 0, sizeof (rb));
   if (password_filename && password_length > 0) {
-    int fd = open (password_filename, O_RDONLY);
+    int fd = open (password_filename, O_RDONLY | O_BINARY);
     if (fd < 0) {
-      vlogprintf (E_WARNING, "Warning: fail to open password file - \"%s\", %m.\n", password_filename);
+      vlogprintf (E_WARNING, "Warning: fail to open password file - \"%s\", %s.\n", password_filename, strerror(errno));
     } else {
       unsigned char *a = talloc0 (password_length);
       int l = read (fd, a, password_length);
       if (l < 0) {
-        vlogprintf (E_WARNING, "Warning: fail to read password file - \"%s\", %m.\n", password_filename);
+        vlogprintf (E_WARNING, "Warning: fail to read password file - \"%s\", %s.\n", password_filename, strerror(errno));
       } else {
         vlogprintf (E_DEBUG, "read %d bytes from password file.\n", l);
         TGLC_rand_add (a, l, l);

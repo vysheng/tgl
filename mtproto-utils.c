@@ -125,8 +125,8 @@ int bn_factorize (TGLC_bn *pq, TGLC_bn *p, TGLC_bn *q) {
   unsigned long long g = 0;
   int i;
   for (i = 0; i < 3 || it < 1000; i++) {
-    int q = ((lrand48() & 15) + 17) % what;
-    unsigned long long x = (long long)lrand48 () % (what - 1) + 1, y = x;
+    int q = ((rand() & 15) + 17) % what;
+    unsigned long long x = (long long)rand () % (what - 1) + 1, y = x;
     int lim = 1 << (i + 18);
     int j;
     for (j = 1; j < lim; j++) {

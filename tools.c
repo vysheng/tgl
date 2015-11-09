@@ -41,9 +41,41 @@
 #include <mach/mach.h>
 #endif
 
-#ifdef __MACH__
+#ifndef CLOCK_REALTIME
 #define CLOCK_REALTIME 0
 #define CLOCK_MONOTONIC 1
+#endif
+
+#ifdef WIN32
+#include <winsock2.h>
+#include <windows.h>
+int vasprintf(char ** __restrict__ ret,
+                      const char * __restrict__ format,
+                      va_list ap) {
+  int len;
+  /* Get Length */
+  len = _vsnprintf(NULL,0,format,ap);
+  if (len < 0) return -1;
+  /* +1 for \0 terminator. */
+  *ret = malloc(len + 1);
+  /* Check malloc fail*/
+  if (!*ret) return -1;
+  /* Write String */
+  _vsnprintf(*ret,len+1,format,ap);
+  /* Terminate explicitly */
+  (*ret)[len] = '\0';
+  return len;
+}
+
+int clock_gettime(int ignored, struct timespec *spec)      
+{
+  __int64 wintime;
+  GetSystemTimeAsFileTime((FILETIME*)&wintime);
+  wintime      -= 116444736000000000;  //1jan1601 to 1jan1970
+  spec->tv_sec  = wintime / 10000000;           //seconds
+  spec->tv_nsec = wintime % 10000000 *100;      //nano-seconds
+  return 0;
+}
 #endif
 
 #ifdef VALGRIND_FIXES
