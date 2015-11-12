@@ -10,3 +10,8 @@ objs/
 dep/
 auto/
 libs/
+*.sdf
+*.opensdf
+*.user
+build
+
