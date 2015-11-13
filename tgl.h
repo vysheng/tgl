@@ -23,6 +23,12 @@
 #include "tgl-layout.h"
 #include <string.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#include "config.h"
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#endif
 
 #define TGL_MAX_DC_NUM 100
 #define TG_SERVER_1 "149.154.175.50"
@@ -72,6 +78,51 @@ struct tgl_dc;
 #define TGL_UPDATE_MEMBERS 8192
 #define TGL_UPDATE_ACCESS_HASH 16384
 #define TGL_UPDATE_USERNAME (1 << 15)
+
+#if defined(WIN32) || defined(_WIN32)
+#   if !defined(__cplusplus) && ( !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L )
+#      if __GNUC__ >= 2 || (defined(_MSC_VER) && _MSC_VER >= 1300)
+#         define __func__ __FUNCTION__
+#      else
+#         define __func__ "<unknown>"
+#      endif
+#   endif
+#   if defined(_MSC_VER) && _MSC_VER >= 1400
+#      define strdup _strdup
+#      define read _read
+#      define write _write
+#      define close _close
+#      define lseek _lseek
+#   endif
+#   ifdef _MSC_VER
+#      define __attribute__(x)
+#   endif
+#   define _PRINTF_INT64_ "I64"
+#   define lrand48() rand()
+#   define srand48(x) srand(x)
+    inline const char* GetLastErrorStr(int err)
+    {
+	    static char errorText[256] = { 0 };
+	    FormatMessageA(
+		    FORMAT_MESSAGE_FROM_SYSTEM,
+		    NULL,
+		    err,
+		    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		    (LPSTR)&errorText,
+		    256,
+		    NULL);
+	    return (const char*)errorText;
+    }
+
+    inline const char* GetErrnoStr(int err)
+    {
+	    static char errnoStr[256] = { 0 };
+	    strerror_s(errnoStr, 256, err);
+	    return (const char*)errnoStr;
+    }
+#else
+#   define _PRINTF_INT64_ "ll"
+#endif
 
 struct tgl_allocator {
   void *(*alloc)(size_t size);

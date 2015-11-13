@@ -24,7 +24,9 @@
 
 #include <assert.h>
 #include <string.h>
+#ifdef HAVE_STRINGS_H
 #include <strings.h>
+#endif
 #include "tgl-structures.h"
 #include "mtproto-common.h"
 //#include "telegram.h"
@@ -46,6 +48,9 @@
 #include "auto/auto-free-ds.h"
 
 #define sha1 SHA1
+#if defined(WIN32) || defined(_WIN32)
+#define bzero(b,len) (memset((b), '\0', (len)) )
+#endif
 
 struct random2local {
   long long random_id;
@@ -1360,7 +1365,7 @@ void tglf_fetch_encrypted_message_new (struct tgl_state *TLS, struct tgl_message
 
   struct tl_ds_decrypted_message *DS_DM = DS_DML->message;
   if (M->id != DS_LVAL (DS_DM->random_id)) {
-    vlogprintf (E_ERROR, "Incorrect message: id = %lld, new_id = %lld\n", M->id, DS_LVAL (DS_DM->random_id));
+    vlogprintf (E_ERROR, "Incorrect message: id = %"_PRINTF_INT64_"d, new_id = %"_PRINTF_INT64_"d\n", M->id, DS_LVAL (DS_DM->random_id));
     free_ds_type_decrypted_message_layer (DS_DML, TYPE_TO_PARAM(decrypted_message_layer));
     return;
   }

@@ -26,11 +26,20 @@
 #include <string.h>
 #include <memory.h>
 #include <stdlib.h>
+#if defined(WIN32) || defined(_WIN32)
+#include <io.h>
+#include <stdint.h>
+#include <string.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#else
 #include <unistd.h>
+#include <sys/utsname.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/utsname.h>
 
 
 #include "mtproto-client.h"
@@ -118,7 +127,7 @@ struct query *tglq_query_get (struct tgl_state *TLS, long long id) {
 
 static int alarm_query (struct tgl_state *TLS, struct query *q) {
   assert (q);
-  vlogprintf (E_DEBUG - 2, "Alarm query %lld\n", q->msg_id);
+  vlogprintf (E_DEBUG - 2, "Alarm query %"_PRINTF_INT64_"d\n", q->msg_id);
 
   TLS->timer_methods->insert (q->ev, QUERY_TIMEOUT);
 
@@ -160,14 +169,14 @@ void tglq_regen_query (struct tgl_state *TLS, long long id) {
       q->session_id = 0;
     }
   }
-  vlogprintf (E_NOTICE, "regen query %lld\n", id);
+  vlogprintf (E_NOTICE, "regen query %"_PRINTF_INT64_"d\n", id);
   TLS->timer_methods->insert (q->ev, 0.001);
 }
 
 void tglq_query_restart (struct tgl_state *TLS, long long id) {
   struct query *q = tglq_query_get (TLS, id);
   if (q) {
-    vlogprintf (E_NOTICE, "restarting query %lld\n", id);
+    vlogprintf (E_NOTICE, "restarting query %"_PRINTF_INT64_"d\n", id);
     TLS->timer_methods->remove (q->ev);
     alarm_query (TLS, q);
   }
@@ -196,13 +205,13 @@ struct query *tglq_send_query_ex (struct tgl_state *TLS, struct tgl_dc *DC, int 
   if (!(DC->flags & 4) && !(flags & QUERY_FORCE_SEND)) {
     q->session_id = 0;
   }
-  vlogprintf (E_DEBUG, "Msg_id is %lld %p\n", q->msg_id, q);
+  vlogprintf (E_DEBUG, "Msg_id is %"_PRINTF_INT64_"d %p\n", q->msg_id, q);
   q->methods = methods;
   q->type = methods->type;
   q->DC = DC;
   q->flags = flags & QUERY_FORCE_SEND;
   if (TLS->queries_tree) {
-    vlogprintf (E_DEBUG + 2, "%lld %lld\n", q->msg_id, TLS->queries_tree->x->msg_id);
+    vlogprintf (E_DEBUG + 2, "%"_PRINTF_INT64_"d %"_PRINTF_INT64_"d\n", q->msg_id, TLS->queries_tree->x->msg_id);
   }
   TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
 
@@ -272,7 +281,7 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
   char *error = fetch_str (error_len);
   struct query *q = tglq_query_get (TLS, id);
   if (!q) {
-    vlogprintf (E_WARNING, "error for query #%lld: #%d :%.*s\n", id, error_code, error_len, error);
+    vlogprintf (E_WARNING, "error for query #%"_PRINTF_INT64_"d: #%d :%.*s\n", id, error_code, error_len, error);
     vlogprintf (E_WARNING, "No such query\n");
   } else {
     if (!(q->flags & QUERY_ACK_RECEIVED)) {
@@ -353,7 +362,7 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
           }
           wait = 10;
         } else {
-          wait = atoll (error + 11);
+          wait = (int)atoll (error + 11);
         }
         q->flags &= ~QUERY_ACK_RECEIVED;
         TLS->timer_methods->insert (q->ev, wait);
@@ -367,9 +376,9 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
     }
 
     if (error_handled) {
-      vlogprintf (E_DEBUG - 2, "error for query #%lld: #%d %.*s (HANDLED)\n", id, error_code, error_len, error);
+      vlogprintf (E_DEBUG - 2, "error for query #%"_PRINTF_INT64_"d: #%d %.*s (HANDLED)\n", id, error_code, error_len, error);
     } else {
-      vlogprintf (E_WARNING, "error for query #%lld: #%d %.*s\n", id, error_code, error_len, error);
+      vlogprintf (E_WARNING, "error for query #%"_PRINTF_INT64_"d: #%d %.*s\n", id, error_code, error_len, error);
       if (q->methods && q->methods->on_error) {
         res = q->methods->on_error (TLS, q, error_code, error_len, error);
       }
@@ -394,7 +403,7 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
 static int packed_buffer[MAX_PACKED_SIZE / 4];
 
 int tglq_query_result (struct tgl_state *TLS, long long id) {
-  vlogprintf (E_DEBUG, "result for query #%lld. Size %ld bytes\n", id, (long)4 * (in_end - in_ptr));
+  vlogprintf (E_DEBUG, "result for query #%"_PRINTF_INT64_"d. Size %ld bytes\n", id, (long)4 * (in_end - in_ptr));
   int op = prefetch_int ();
   int *end = 0;
   int *eend = 0;
@@ -459,25 +468,107 @@ static void out_random (int n) {
   out_cstring (buf, n);
 }
 
-int allow_send_linux_version;
+int allow_send_os_version;
 void tgl_do_insert_header (struct tgl_state *TLS) {
   out_int (CODE_invoke_with_layer);
   out_int (TGL_SCHEME_LAYER);
   out_int (CODE_init_connection);
   out_int (TLS->app_id);
-  if (allow_send_linux_version) {
+  if (allow_send_os_version) {
+    static char buf[4096];
+#if defined(WIN32) || defined(_WIN32)
+    SYSTEM_INFO sysInfo;
+    char release[256] = { 0 };
+    char version[256] = { 0 };
+    OSVERSIONINFO versionInfo = { sizeof(OSVERSIONINFO), 0, 0, 0, 0,{ '\0' } };
+    char* szSystemName = "Windows";
+#if (WINVER <= _WIN32_WINNT_WIN7)
+    GetVersionEx(&versionInfo);
+#else
+    // GetModuleHandle is not supported in WinRT and linking to it at load time
+    #if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP || WINAPI_FAMILY==WINAPI_FAMILY_APP
+      szSystemName = "Windows RT"
+      MEMORY_BASIC_INFORMATION mbi = { 0, 0, 0, 0, 0, 0, 0 };
+      VirtualQuery((LPCVOID)VirtualQuery, &mbi, sizeof(mbi);
+      HMODULE kernelModule = (HMODULE)mbi.AllocationBase;
+
+      typedef HMODULE(WINAPI *GetModuleHandleFunction)(LPCWSTR);
+      GetModuleHandleFunction pGetModuleHandle = (GetModuleHandleFunction) GetProcAddressA (kernelModule, "GetModuleHandleW");
+    #else
+      #define pGetModuleHandle GetModuleHandleW
+    #endif
+
+    #if !defined(WINCE) || !defined(_WIN32_WCE)
+      #define GetProcAddressA GetProcAddress
+    #endif
+
+    HMODULE ntdll = pGetModuleHandle (L"ntdll.dll");
+    typedef LONG NTSTATUS;
+    typedef NTSTATUS(NTAPI *RtlGetVersionFunction)(LPOSVERSIONINFO);
+
+    RtlGetVersionFunction pRtlGetVersion = (RtlGetVersionFunction)	GetProcAddressA (ntdll, "RtlGetVersion");
+    if(pRtlGetVersion)
+    pRtlGetVersion(&versionInfo); // always returns STATUS_SUCCESS
+#endif
+    if(versionInfo.dwBuildNumber > 0)
+      _itoa_s(versionInfo.dwBuildNumber, release, sizeof(char) * 256, 10);
+    if (versionInfo.dwMajorVersion > 0)
+      sprintf_s(version, sizeof(char) * 256, "%i.%i", versionInfo.dwMajorVersion, versionInfo.dwMinorVersion);
+    else
+      strcpy_s(version, sizeof(char) * 256, "Unknown");
+
+    // Get hardware info
+    ZeroMemory(&sysInfo, sizeof(SYSTEM_INFO));
+    GetSystemInfo(&sysInfo);
+
+    switch (sysInfo.wProcessorArchitecture) {
+    case PROCESSOR_ARCHITECTURE_AMD64:
+      out_string("x86_64");
+      break;
+    case PROCESSOR_ARCHITECTURE_IA64:
+      out_string("ia64");
+      break;
+    case PROCESSOR_ARCHITECTURE_INTEL:
+      out_string("x86");
+      break;
+    case PROCESSOR_ARCHITECTURE_ARM:
+      out_string("ARM");
+      break;
+    case PROCESSOR_ARCHITECTURE_PPC:
+      out_string("PowerPC");
+      break;
+    case PROCESSOR_ARCHITECTURE_MIPS:
+      out_string("MIPS");
+      break;
+    case PROCESSOR_ARCHITECTURE_MSIL:
+      out_string("MSIL");
+      break;
+    case PROCESSOR_ARCHITECTURE_SHX:
+      out_string("ShX");
+      break;
+    case PROCESSOR_ARCHITECTURE_UNKNOWN:
+    default:
+       out_string("unknown");
+    }
+    tsnprintf(buf, sizeof(buf) - 1, "%.999s %.999s %.999s", szSystemName, version, release);
+#else
     struct utsname st;
     uname (&st);
     out_string (st.machine);
-    static char buf[4096];
     tsnprintf (buf, sizeof (buf) - 1, "%.999s %.999s %.999s", st.sysname, st.release, st.version);
+#endif
     out_string (buf);
     tsnprintf (buf, sizeof (buf) - 1, "%s (TGL %s)", TLS->app_version, TGL_VERSION);
     out_string (buf);
     out_string ("En");
   } else {
+#if defined(WIN32) || defined(_WIN32)
+    out_string("x86");
+    out_string("Windows");
+#else
     out_string ("x86");
     out_string ("Linux");
+#endif
     static char buf[4096];
     tsnprintf (buf, sizeof (buf) - 1, "%s (TGL %s)", TLS->app_version, TGL_VERSION);
     out_string (buf);
@@ -743,7 +834,7 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q, void *D) 
   tfree (q->extra, 8);
 
   struct tgl_message *M = tgl_message_get (TLS, y);
-  vlogprintf (E_DEBUG, "y = %lld\n", y);
+  vlogprintf (E_DEBUG, "y = %"_PRINTF_INT64_"d\n", y);
 
   if (M && M->id != DS_LVAL (DS_MSM->id)) {
     assert (M->flags & TGLMF_PENDING);
@@ -869,7 +960,7 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t id, const char *t
 
   int peer_type = tgl_get_peer_type (id);
   int peer_id = tgl_get_peer_id (id);
-  int date = time (0);
+  int date = (int)time (0);
 
   if (tgl_get_peer_type (id) != TGL_PEER_ENCR_CHAT) {
     int reply = (flags >> 32);
@@ -921,9 +1012,20 @@ void tgl_do_reply_message (struct tgl_state *TLS, int reply_id, const char *text
 
 /* {{{ Send text file */
 void tgl_do_send_text (struct tgl_state *TLS, tgl_peer_id_t id, const char *file_name, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  int fd = 0;
+  errno_t err = _sopen_s(&fd, file_name, _O_RDONLY | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+  if(err != 0) {
+	tgl_set_query_error(TLS, EBADF, "Can not open file: %s", GetErrnoStr (errno));
+#elif defined(WIN32) || defined(_WIN32)
+  int fd = open(file_name, O_RDONLY | O_BINARY);
+  if (fd < 0) {
+	tgl_set_query_error (TLS, EBADF, "Can not open file: %s", GetErrnoStr (errno));
+#else
   int fd = open (file_name, O_RDONLY);
   if (fd < 0) {
     tgl_set_query_error (TLS, EBADF, "Can not open file: %m");
+#endif
     if (callback) {
       callback (TLS, callback_extra, 0, NULL);
     }
@@ -932,8 +1034,13 @@ void tgl_do_send_text (struct tgl_state *TLS, tgl_peer_id_t id, const char *file
   static char buf[(1 << 20) + 1];
   int x = read (fd, buf, (1 << 20) + 1);
   if (x < 0) {
+#if defined(WIN32) || defined(_WIN32)
+    tgl_set_query_error (TLS, EBADF, "Can not read from file: %s", GetErrnoStr (errno));
+#else
     tgl_set_query_error (TLS, EBADF, "Can not read from file: %m");
-    close (fd);
+#endif
+	close (fd);
+
     if (callback) {
       callback (TLS, callback_extra, 0, NULL);
     }
@@ -1062,7 +1169,7 @@ void tgl_do_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)
   if (P->last) {
     tgl_do_messages_mark_read_encr (TLS, id, P->encr_chat.access_hash, P->last->date, callback, callback_extra);
   } else {
-    tgl_do_messages_mark_read_encr (TLS, id, P->encr_chat.access_hash, time (0) - 10, callback, callback_extra);
+    tgl_do_messages_mark_read_encr (TLS, id, P->encr_chat.access_hash, (int)time (0) - 10, callback, callback_extra);
   }
 }
 /* }}} */
@@ -1343,7 +1450,7 @@ void tgl_do_get_dialog_list (struct tgl_state *TLS, int limit, int offset, void 
 }
 /* }}} */
 
-int allow_send_linux_version = 1;
+int allow_send_os_version = 1;
 
 /* {{{ Send document file */
 
@@ -1583,7 +1690,11 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
       out_int ((f->size + f->part_size - 1) / f->part_size);
     }
     static char buf[512 << 10];
+#ifdef _WIN32
+	int x = _read(f->fd, buf, f->part_size);
+#else
     int x = read (f->fd, buf, f->part_size);
+#endif
     assert (x > 0);
     f->offset += x;
     TLS->cur_uploaded_bytes += x;
@@ -1601,7 +1712,7 @@ static void send_part (struct tgl_state *TLS, struct send_file *f, void *callbac
       memset (&aes_key, 0, sizeof (aes_key));
     }
     out_cstring (buf, x);
-    vlogprintf (E_DEBUG, "offset=%lld size=%lld\n", f->offset, f->size);
+    vlogprintf (E_DEBUG, "offset=%"_PRINTF_INT64_"d size=%"_PRINTF_INT64_"d\n", f->offset, f->size);
     if (f->offset == f->size) {
       close (f->fd);
       f->fd = -1;
@@ -1627,9 +1738,20 @@ static void send_file_thumb (struct tgl_state *TLS, struct send_file *f, const v
 
 
 static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, const char *file_name, int avatar, int w, int h, int duration, const void *thumb_data, int thumb_len, const char *caption, int caption_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  int fd = 0;
+  errno_t err = _sopen_s(&fd, file_name, _O_RDONLY | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+  if(err != 0) {
+    tgl_set_query_error (TLS, EBADF, "Can not open file: %s", GetErrnoStr (errno));
+#elif defined(WIN32) || defined(_WIN32)
+  int fd = open(file_name, O_RDONLY | O_BINARY);
+  if (fd < 0) {
+    tgl_set_query_error (TLS, EBADF, "Can not open file: %s", GetErrnoStr (errno));
+#else
   int fd = open (file_name, O_RDONLY);
   if (fd < 0) {
     tgl_set_query_error (TLS, EBADF, "Can not open file: %m");
+#endif
     if (!avatar) {
       if (callback) {
         callback (TLS, callback_extra, 0, 0);
@@ -2270,9 +2392,19 @@ static int download_on_answer (struct tgl_state *TLS, struct query *q, void *DD)
 
   struct download *D = q->extra;
   if (D->fd == -1) {
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+    errno_t err = _sopen_s(&D->fd, D->name, O_CREAT | O_WRONLY | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+    if (err != 0) {
+      tgl_set_query_error (TLS, EBADF, "Can not open file for writing: %s", GetErrnoStr (errno));
+#elif defined(WIN32) || defined(_WIN32)
+    D->fd = open(D->name, O_CREAT | O_WRONLY | O_BINARY, 0640);
+    if (D->fd < 0) {
+      tgl_set_query_error (TLS, EBADF, "Can not open file for writing: %s", GetErrnoStr (errno));
+#else
     D->fd = open (D->name, O_CREAT | O_WRONLY, 0640);
     if (D->fd < 0) {
       tgl_set_query_error (TLS, EBADF, "Can not open file for writing: %m");
+#endif
       if (q->callback) {
         ((void (*)(struct tgl_state *, void *, int, char *))q->callback) (TLS, q->callback_extra, 0, NULL);
       }
@@ -2356,12 +2488,12 @@ static void load_next_part (struct tgl_state *TLS, struct download *D, void *cal
     static char buf[PATH_MAX];
     int l;
     if (!D->id) {
-      l = tsnprintf (buf, sizeof (buf), "%s/download_%lld_%d.jpg", TLS->downloads_directory, D->volume, D->local_id);
+      l = tsnprintf (buf, sizeof (buf), "%s/download_%"_PRINTF_INT64_"d_%d.jpg", TLS->downloads_directory, D->volume, D->local_id);
     } else {
       if (D->ext) {
-        l = tsnprintf (buf, sizeof (buf), "%s/download_%lld.%s", TLS->downloads_directory, D->id, D->ext);
+        l = tsnprintf (buf, sizeof (buf), "%s/download_%"_PRINTF_INT64_"d.%s", TLS->downloads_directory, D->id, D->ext);
       } else {
-        l = tsnprintf (buf, sizeof (buf), "%s/download_%lld", TLS->downloads_directory, D->id);
+        l = tsnprintf (buf, sizeof (buf), "%s/download_%"_PRINTF_INT64_"d", TLS->downloads_directory, D->id);
       }
     }
     if (l >= (int) sizeof (buf)) {
@@ -3675,7 +3807,11 @@ static void tgl_pwd_got (struct tgl_state *TLS, const char *pwd[], void *_T) {
     memcpy (s, E->current_salt, l);
 
     int r = strlen (pwd[0]);
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+    strcpy_s (s + l, 512 -l, pwd[0]);
+#else
     strcpy (s + l, pwd[0]);
+#endif
 
     memcpy (s + l + r, E->current_salt, l);
 
@@ -3748,7 +3884,7 @@ void tgl_do_send_broadcast (struct tgl_state *TLS, int num, tgl_peer_id_t id[], 
   E->count = num;
   E->list = talloc (sizeof (long long) * num);
 
-  int date = time (0);
+  int date = (int)time (0);
   struct tl_ds_message_media TDSM;
   TDSM.magic = CODE_message_media_empty;
 
