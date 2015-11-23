@@ -4416,7 +4416,7 @@ void tgl_set_phone_number_cb (struct tgl_state *TLS, void *extra, int success, c
   TLS->callback.get_values (TLS, tgl_code, "code:", 1, tgl_set_number_code, E);
 }
 
-void tgl_do_set_phone_number (struct tgl_state *TLS, const char *phonenumber, int phonenumber_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra) {
+void tgl_do_set_phone_number (struct tgl_state *TLS, const char *phonenumber, int phonenumber_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
   struct sign_up_extra *E = talloc0 (sizeof (*E));
   E->phone_len = phonenumber_len;
   E->phone = tmemdup (phonenumber, E->phone_len);
