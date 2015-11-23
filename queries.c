@@ -4339,3 +4339,92 @@ void tgl_login (struct tgl_state *TLS) {
     tgl_sign_in (TLS);
   }
 }
+
+
+static int callback (struct tgl_state *TLS, struct query *q, void *D) {
+   if (q->callback) {
+     ((void (*)(struct tgl_state *, void *))(q->callback)) (TLS, q->callback_extra);
+  }
+  return 0;
+}
+
+static int send_change_code_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
+
+  struct tl_ds_account_sent_change_phone_code *DS_ASCPC= D;
+
+  char *phone_code_hash = DS_STR_DUP (DS_ASCPC->phone_code_hash);
+
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, const char *))(q->callback)) (TLS, q->callback_extra, 1, phone_code_hash);
+  }
+  tfree_str (phone_code_hash);
+  return 0;
+}
+
+
+static struct query_methods set_phone_methods  = {
+  .on_answer = callback,
+  .on_error = sign_in_on_error,
+  .type = TYPE_TO_PARAM(user)
+};
+
+static struct query_methods send_change_code_methods  = {
+  .on_answer = send_change_code_on_answer,
+  .on_error = q_list_on_error,
+  .type = TYPE_TO_PARAM(account_sent_change_phone_code)
+};
+
+void tgl_set_number_code (struct tgl_state *TLS, const char *code[], void *_T);
+void tgl_set_number_result (struct tgl_state *TLS, void *_T, int success, struct tgl_user *U) {
+  struct sign_up_extra *E = _T;
+  if (success) {
+    tfree (E->phone, E->phone_len);
+    tfree (E->hash, E->hash_len);
+    tfree (E, sizeof (*E));
+  } else {
+    vlogprintf (E_ERROR, "incorrect code\n");
+    TLS->callback.get_values (TLS, tgl_code, "code:", 1, tgl_set_number_code, E);
+    return;
+  }
+  tgl_export_all_auth (TLS);
+}
+
+void tgl_set_number_code (struct tgl_state *TLS, const char *code[], void *_T) {
+  struct sign_up_extra *E = _T;
+
+  clear_packet ();
+  out_int (CODE_account_change_phone);
+  out_cstring (E->phone, E->phone_len);
+  out_cstring (E->hash, E->hash_len);
+  out_cstring (code[0], strlen (code[0]));
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &set_phone_methods, 0, tgl_set_number_result, E);
+  return;
+
+}
+
+
+void tgl_set_phone_number_cb (struct tgl_state *TLS, void *extra, int success, const char *mhash) {
+  struct sign_up_extra *E = extra;
+  if (!success) {
+    vlogprintf (E_ERROR, "Incorrect phone number\n");
+    return;
+  }
+
+  E->hash_len = strlen (mhash);
+  E->hash = tmemdup (mhash, E->hash_len);
+
+  TLS->callback.get_values (TLS, tgl_code, "code:", 1, tgl_set_number_code, E);
+}
+
+void tgl_do_set_phone_number (struct tgl_state *TLS, const char *phonenumber, int phonenumber_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_user *U), void *callback_extra) {
+  struct sign_up_extra *E = talloc0 (sizeof (*E));
+  E->phone_len = phonenumber_len;
+  E->phone = tmemdup (phonenumber, E->phone_len);
+
+  clear_packet ();
+  tgl_do_insert_header (TLS);
+  out_int (CODE_account_send_change_phone_code);
+  out_cstring (E->phone, E->phone_len);
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_change_code_methods, NULL, tgl_set_phone_number_cb, E);
+}
