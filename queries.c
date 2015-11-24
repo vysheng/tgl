@@ -5232,7 +5232,7 @@ void tgl_set_number_code (struct tgl_state *TLS, const char *code[], void *_T) {
 
 
 void tgl_set_phone_number_cb (struct tgl_state *TLS, void *extra, int success, const char *mhash) {
-  struct sign_up_extra *E = extra;
+  struct change_phone_extra *E = extra;
   if (!success) {
     vlogprintf (E_ERROR, "Incorrect phone number\n");
     if (E->callback) {
