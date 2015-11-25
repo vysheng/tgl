@@ -575,12 +575,13 @@ void bl_do_user (struct tgl_state *TLS, int id, long long *access_hash, const ch
   }
 
   struct tgl_user *U = (void *)_U;
-  if (flags == TGL_FLAGS_UNCHANGED) { flags = U->flags & 0xffff; }
+  if (flags == TGL_FLAGS_UNCHANGED) { flags = U->flags; }
+  flags &= TGLUF_TYPE_MASK;
   
-  if ((flags & 0xff) != (U->flags & 0xff)) {
+  if ((flags & TGLUF_TYPE_MASK) != (U->flags & TGLUF_TYPE_MASK)) {
     updates |= TGL_UPDATE_FLAGS;
   }
-  U->flags = flags & 0xffff;
+  U->flags = (U->flags & ~TGLUF_TYPE_MASK) | flags;
 
   if (access_hash && *access_hash != U->access_hash) {
     U->access_hash = *access_hash;
@@ -686,14 +687,15 @@ void bl_do_chat (struct tgl_state *TLS, int id, const char *title, int title_len
   } else {
     assert (_U->flags & TGLPF_CREATED);
   }
-  
+
   struct tgl_chat *C = &_U->chat;
-  if (flags == TGL_FLAGS_UNCHANGED) { flags = C->flags & 0xffff; }
+  if (flags == TGL_FLAGS_UNCHANGED) { flags = C->flags; }
+  flags &= TGLCF_TYPE_MASK;
   
-  if ((flags & 0xff) != (C->flags & 0xff)) {
+  if ((flags & TGLCF_TYPE_MASK) != (C->flags & TGLCF_TYPE_MASK)) {
     updates |= TGL_UPDATE_FLAGS;
   }
-  C->flags = flags & 0xffff;
+  C->flags = (C->flags & ~TGLCF_TYPE_MASK) | flags;
 
   if (title && (!C->title || mystreq1 (C->title, title, title_len))) {
     if (C->title) {
@@ -801,12 +803,13 @@ void bl_do_encr_chat (struct tgl_state *TLS, int id, long long *access_hash, int
   }
 
   struct tgl_secret_chat *U = (void *)_U;
-  if (flags == TGL_FLAGS_UNCHANGED) { flags = U->flags & 0xffff; }
+  if (flags == TGL_FLAGS_UNCHANGED) { flags = U->flags; }
+  flags &= TGLECF_TYPE_MASK;
   
-  if ((flags & 0xff) != (U->flags & 0xff)) {
+  if ((flags & TGLECF_TYPE_MASK) != (U->flags & TGLECF_TYPE_MASK)) {
     updates |= TGL_UPDATE_FLAGS;
   }
-  U->flags = flags & 0xffff;
+  U->flags = (U->flags & ~TGLECF_TYPE_MASK) | flags;
 
   if (access_hash && *access_hash != U->access_hash) {
     U->access_hash = *access_hash;
@@ -917,12 +920,13 @@ void bl_do_channel (struct tgl_state *TLS, int id, long long *access_hash, int *
   }
   
   struct tgl_channel *C = &_U->channel;
-  if (flags == TGL_FLAGS_UNCHANGED) { flags = C->flags & 0xffff; }
+  if (flags == TGL_FLAGS_UNCHANGED) { flags = C->flags; }
+  flags &= TGLCHF_TYPE_MASK;
   
-  if ((flags & 0xff) != (C->flags & 0xff)) {
+  if ((flags & TGLCHF_TYPE_MASK) != (C->flags & TGLCHF_TYPE_MASK)) {
     updates |= TGL_UPDATE_FLAGS;
   }
-  C->flags = flags & 0xffff;
+  C->flags = (C->flags & ~TGLCHF_TYPE_MASK) | flags;
 
   if (access_hash && *access_hash != C->access_hash) {
     C->access_hash = *access_hash;

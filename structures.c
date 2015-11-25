@@ -290,24 +290,32 @@ struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS, struct tl_ds_user
     TLS->Peers[TLS->peer_num ++] = (tgl_peer_t *)U;
   }
   
-  int flags = U->flags & 0xffff;
+  int flags = U->flags;
 
   if (DS_LVAL (DS_U->flags) & (1 << 10)) {
     bl_do_set_our_id (TLS, U->id);
     flags |= TGLUF_SELF;
+  } else {
+    flags &= ~TGLUF_SELF;
   }
   
   if (DS_LVAL (DS_U->flags) & (1 << 11)) {
     flags |= TGLUF_CONTACT;
+  } else {
+    flags &= ~TGLUF_CONTACT;
   }
   
   if (DS_LVAL (DS_U->flags) & (1 << 12)) {
     flags |= TGLUF_MUTUAL_CONTACT;
+  } else {
+    flags &= ~TGLUF_MUTUAL_CONTACT;
   }
   
   
   if (DS_LVAL (DS_U->flags) & (1 << 14)) {
     flags |= TGLUF_BOT;
+  } else {
+    flags &= ~TGLUF_BOT;
   }
   /*
   if (DS_LVAL (DS_U->flags) & (1 << 15)) {
@@ -317,6 +325,12 @@ struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS, struct tl_ds_user
   if (DS_LVAL (DS_U->flags) & (1 << 16)) {
     flags |= TGLUF_BOT_NO_GROUPS;
   }*/
+  
+  if (DS_LVAL (DS_U->flags) & (1 << 17)) {
+    flags |= TGLUF_OFFICIAL;
+  } else {
+    flags &= ~TGLUF_OFFICIAL;
+  }
 
   if (!(flags & TGLUF_CREATED)) {
     flags |= TGLUF_CREATE | TGLUF_CREATED;
@@ -354,7 +368,7 @@ struct tgl_user *tglf_fetch_alloc_user_full (struct tgl_state *TLS, struct tl_ds
   struct tgl_user *U = tglf_fetch_alloc_user (TLS, DS_UF->user);
   if (!U) { return NULL; }
 
-  int flags = U->flags & 0xffff;
+  int flags = U->flags;
   
   if (DS_BVAL (DS_UF->blocked)) {
     flags |= TGLUF_BLOCKED;
@@ -518,9 +532,45 @@ struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS, struct tl_ds_chat
   
   C->id = chat_id;
   
-  int flags = C->flags & 0xffff;
+  int flags = C->flags;
   if (!(flags & TGLCF_CREATED)) {
     flags |= TGLCF_CREATE | TGLCF_CREATED;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 1) {
+    flags |= TGLCF_CREATOR;
+  } else {
+    flags &= ~TGLCF_CREATOR;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 2) {
+    flags |= TGLCF_KICKED;
+  } else {
+    flags &= ~TGLCF_KICKED;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 4) {
+    flags |= TGLCF_LEFT;
+  } else {
+    flags &= ~TGLCF_LEFT;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 8) {
+    flags |= TGLCF_ADMINS_ENABLED;
+  } else {
+    flags &= ~TGLCF_ADMINS_ENABLED;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 16) {
+    flags |= TGLCF_ADMIN;
+  } else {
+    flags &= ~TGLCF_ADMIN;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 32) {
+    flags |= TGLCF_DEACTIVATED;
+  } else {
+    flags &= ~TGLCF_DEACTIVATED;
   }
 
   bl_do_chat (TLS, tgl_get_peer_id (C->id),
@@ -596,7 +646,8 @@ struct tgl_chat *tglf_fetch_alloc_chat_full (struct tgl_state *TLS, struct tl_ds
     (struct tl_ds_vector *)DS_CF->participants->participants,
     NULL,
     DS_CF->chat_photo,
-    DS_CF->participants->admin_id,
+    NULL,
+    //DS_CF->participants->admin_id,
     NULL, NULL,
     C->flags & 0xffff
   );
@@ -622,14 +673,57 @@ struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_d
   
   C->id = chat_id;
   
-  int flags = C->flags & 0xffff;
-  if (!(flags & TGLCF_CREATED)) {
-    flags |= TGLCF_CREATE | TGLCF_CREATED;
+  int flags = C->flags;
+  if (!(flags & TGLCHF_CREATED)) {
+    flags |= TGLCHF_CREATE | TGLCHF_CREATED;
   }
-  if (DS_LVAL (DS_C->flags) & 0x80) {
+  
+  if (DS_LVAL (DS_C->flags) & 1) {
+    flags |= TGLCHF_CREATOR;
+  } else {
+    flags &= ~TGLCHF_CREATOR;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 2) {
+    flags |= TGLCHF_KICKED;
+  } else {
+    flags &= ~TGLCHF_KICKED;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 4) {
+    flags |= TGLCHF_LEFT;
+  } else {
+    flags |= TGLCHF_LEFT;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 8) {
+    flags |= TGLCHF_EDITOR;
+  } else {
+    flags &= ~TGLCHF_EDITOR;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 16) {
+    flags |= TGLCHF_MODERATOR;
+  } else {
+    flags &= ~TGLCHF_MODERATOR;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 32) {
+    flags |= TGLCHF_BROADCAST;
+  } else {
+    flags &= ~TGLCHF_BROADCAST;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 128) {
     flags |= TGLCHF_OFFICIAL;
   } else {
     flags &= ~TGLCHF_OFFICIAL;
+  }
+
+  if (DS_LVAL (DS_C->flags) & 256) {
+    flags |= TGLCHF_MEGAGROUP;
+  } else {
+    flags &= ~TGLCHF_MEGAGROUP;
   }
 
   bl_do_channel (TLS, tgl_get_peer_id (C->id),
@@ -821,7 +915,6 @@ void tglf_fetch_document_attribute (struct tgl_state *TLS, struct tgl_document *
     D->flags |= TGLDF_ANIMATED;
     return;
   case CODE_document_attribute_sticker:
-  case CODE_document_attribute_sticker_l28:
     D->flags |= TGLDF_STICKER;
     return;
   case CODE_document_attribute_video:
@@ -863,7 +956,7 @@ struct tgl_document *tglf_fetch_alloc_document (struct tgl_state *TLS, struct tl
   D->access_hash = DS_LVAL (DS_D->access_hash);
   //D->user_id = DS_LVAL (DS_D->user_id);
   D->date = DS_LVAL (DS_D->date);
-  D->caption = DS_STR_DUP (DS_D->file_name);
+  //D->caption = DS_STR_DUP (DS_D->file_name);
   D->mime_type = DS_STR_DUP (DS_D->mime_type);
   D->size = DS_LVAL (DS_D->size);
   D->dc_id = DS_LVAL (DS_D->dc_id);
@@ -983,8 +1076,15 @@ void tglf_fetch_message_action (struct tgl_state *TLS, struct tgl_message_action
     M->type = tgl_message_action_chat_delete_photo;
     break;
   case CODE_message_action_chat_add_user:
-    M->type = tgl_message_action_chat_add_user;
-    M->user = DS_LVAL (DS_MA->user_id);
+    M->type = tgl_message_action_chat_add_users;
+    M->user_num = DS_LVAL (DS_MA->users->cnt);
+    M->users = talloc (4 * M->user_num);
+    {
+      int i;
+      for (i = 0; i < M->user_num; i++) {
+        M->users[i] = DS_LVAL (DS_MA->users->data[i]);
+      }
+    }
     break;
   case CODE_message_action_chat_delete_user:
     M->type = tgl_message_action_chat_delete_user;
@@ -996,6 +1096,13 @@ void tglf_fetch_message_action (struct tgl_state *TLS, struct tgl_message_action
     break;
   case CODE_message_action_channel_create:
     M->type = tgl_message_action_channel_create;
+    M->title = DS_STR_DUP (DS_MA->title);
+    break;
+  case CODE_message_action_chat_migrate_to:
+    M->type = tgl_message_action_migrated_to;
+    break;
+  case CODE_message_action_channel_migrate_from:
+    M->type = tgl_message_action_migrated_from;
     M->title = DS_STR_DUP (DS_MA->title);
     break;
   default:
@@ -2016,8 +2123,10 @@ void tgls_free_message_action (struct tgl_state *TLS, struct tgl_message_action 
     tgls_free_photo (TLS, M->photo);
     M->photo = NULL;
     return;
+  case tgl_message_action_chat_add_users:
+    tfree (M->users, M->user_num * 4);
+    return;
   case tgl_message_action_chat_delete_photo:
-  case tgl_message_action_chat_add_user:
   case tgl_message_action_chat_add_user_by_link:
   case tgl_message_action_chat_delete_user:
   case tgl_message_action_geo_chat_create:
@@ -2033,12 +2142,14 @@ void tgls_free_message_action (struct tgl_state *TLS, struct tgl_message_action 
   case tgl_message_action_commit_key:
   case tgl_message_action_abort_key:
   case tgl_message_action_noop:
+  case tgl_message_action_migrated_to:
     return;
   case tgl_message_action_request_key:
   case tgl_message_action_accept_key:
     tfree (M->g_a, 256);
     return;
   case tgl_message_action_channel_create:
+  case tgl_message_action_migrated_from:
     tfree_str (M->title);
     return;
 /*  default:

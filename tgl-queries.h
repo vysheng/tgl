@@ -3,6 +3,8 @@
 
 #include "tgl.h"
 
+void tgl_do_get_terms_of_service (struct tgl_state *TLS, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *ans), void *callback_extra);
+
 /* {{{ WORK WITH ACCOUNT */
 // sets account password
 // user will be requested to type his current password and new password (twice)
@@ -119,6 +121,8 @@ void tgl_do_export_chat_link (struct tgl_state *TLS, tgl_peer_id_t id, void (*ca
 // joins to secret chat by link (or hash of this link)
 void tgl_do_import_chat_link (struct tgl_state *TLS, const char *link, int link_len, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 
+// upgrades chat to channel. 
+void tgl_do_upgrade_group (struct tgl_state *TLS, tgl_peer_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 /* }}} */
 
 /* {{{ WORKING WITH USERS */

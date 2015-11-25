@@ -35,9 +35,9 @@
 void tgl_do_get_channel_difference (struct tgl_state *TLS, int channel_id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
 
 static void fetch_dc_option (struct tgl_state *TLS, struct tl_ds_dc_option *DS_DO) {
-  vlogprintf (E_DEBUG, "id = %d, name = %.*s ip = %.*s port = %d\n", DS_LVAL (DS_DO->id), DS_RSTR (DS_DO->hostname), DS_RSTR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
+  vlogprintf (E_DEBUG, "id = %d, %.*s:%d\n", DS_LVAL (DS_DO->id), DS_RSTR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
 
-  bl_do_dc_option (TLS, DS_LVAL (DS_DO->flags), DS_LVAL (DS_DO->id), DS_STR (DS_DO->hostname), DS_STR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
+  bl_do_dc_option (TLS, DS_LVAL (DS_DO->flags), DS_LVAL (DS_DO->id), NULL, 0, DS_STR (DS_DO->ip_address), DS_LVAL (DS_DO->port));
 }
 
 int tgl_check_pts_diff (struct tgl_state *TLS, int pts, int pts_count) {
@@ -524,6 +524,10 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
   case CODE_update_delete_channel_messages:
     break;
   case CODE_update_channel_message_views:
+    break;
+  case CODE_update_chat_admins:
+    break;
+  case CODE_update_chat_participant_admin:
     break;
   default:
     assert (0);
