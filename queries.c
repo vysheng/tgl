@@ -5194,13 +5194,15 @@ struct change_phone_extra {
 static struct query_methods set_phone_methods  = {
   .on_answer = callback,
   .on_error = sign_in_on_error,
-  .type = TYPE_TO_PARAM(user)
+  .type = TYPE_TO_PARAM(user),
+  .name = "set phone"
 };
 
 static struct query_methods send_change_code_methods  = {
   .on_answer = send_change_code_on_answer,
   .on_error = q_list_on_error,
-  .type = TYPE_TO_PARAM(account_sent_change_phone_code)
+  .type = TYPE_TO_PARAM(account_sent_change_phone_code),
+  .name = "send change phone code"
 };
 
 void tgl_set_number_code (struct tgl_state *TLS, const char *code[], void *_T);
