@@ -22,7 +22,7 @@ Clone GitHub Repository
 Install libs: openssl, zlib
 if you want to use provided net/timers then install libevent and add --enable-libevent key to configure
 
-You can also avoid the OpenSSL dependency: Install gcrypt (>= 1.60, Debian derivates know it as "libgcrypt20-dev"), and add --disable-openssl to openssl.
+You can also avoid the OpenSSL dependency: Install gcrypt (>= 1.60, Debian derivates know it as "libgcrypt20-dev"), and add --disable-openssl key to configure
 
 Then,
 
