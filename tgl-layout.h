@@ -352,6 +352,7 @@ struct tgl_user {
   int last_read_out;
   long long photo_id;
   struct tgl_photo *photo;
+  void *extra;
   char *first_name;
   char *last_name;
   char *phone;
@@ -377,6 +378,7 @@ struct tgl_channel {
   int last_read_out;
   long long photo_id;
   struct tgl_photo *photo;
+  void *extra;
 
   long long access_hash;
   int date;
@@ -407,7 +409,9 @@ struct tgl_chat {
   struct tgl_file_location photo_small;
   int last_read_in;
   int last_read_out;
+  long long pad;
   struct tgl_photo *photo;
+  void *extra;
   char *title;
   int users_num;
   int user_list_size;
@@ -444,7 +448,11 @@ struct tgl_secret_chat {
   int structure_version;
   struct tgl_file_location photo_big;
   struct tgl_file_location photo_small;
+  int pad1;
+  int pad2;
+  long long pad;
   struct tgl_photo *photo;
+  void *extra;
   int user_id;
   int admin_id;
   int date;
@@ -478,6 +486,10 @@ typedef union tgl_peer {
     struct tgl_file_location photo_big;
     struct tgl_file_location photo_small;
     struct tgl_photo *photo;
+    int last_read_in;
+    int last_read_out;
+    long long photo_id;
+    void *extra;
   };
   struct tgl_user user;
   struct tgl_chat chat;
