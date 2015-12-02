@@ -70,7 +70,13 @@ AC_ARG_ENABLE(valgrind,[  --enable-valgrind	  fixes for correct valgrind work],
   ])
     
 # Checks for header files.
-AC_CHECK_HEADERS([execinfo.h fcntl.h malloc.h netdb.h stdlib.h string.h unistd.h arpa/inet.h mach/mach.h netinet/in.h sys/file.h sys/socket.h termios.h])
+AC_CHECK_HEADERS([fcntl.h malloc.h netdb.h stdlib.h string.h unistd.h arpa/inet.h mach/mach.h netinet/in.h sys/file.h sys/socket.h termios.h])
+
+# FreeBSD needs -lexecinfo
+AC_CHECK_HEADERS([execinfo.h], [tgl_found_execinfo_header=yes; break;])
+AS_IF([test "x$tgl_found_execinfo_header" = "xyes"],
+	[AC_SEARCH_LIBS([backtrace_symbols_fd], [execinfo])])
+
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
