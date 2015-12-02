@@ -160,6 +160,9 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
       channel_id = DS_LVAL (DS_U->channel_id);
     } else {
       assert (DS_U->message);
+      if (!DS_U->message->to_id) {
+        return;
+      }
       assert (DS_U->message->to_id);
       assert (DS_U->message->to_id->magic == CODE_peer_channel);
       channel_id = DS_LVAL (DS_U->message->to_id->channel_id);

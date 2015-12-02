@@ -588,7 +588,7 @@ static void increase_ent (int *ent_size, int **ent, int s) {
 }
 
 static char *process_html_text (struct tgl_state *TLS, const char *text, int text_len, int *ent_size, int **ent) {
-  char *new_text = talloc (text_len + 1);
+  char *new_text = talloc (2 * text_len + 1);
   int stpos[100];
   int sttype[100];
   int stp = 0;
@@ -599,10 +599,11 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
   (*ent)[0] = CODE_vector;
   (*ent)[1] = 0;
   for (p = 0; p < text_len; p++) {
+    assert (cur_p <= 2 * text_len);
     if (text[p] == '<') {
       if (stp == 99) {
         tgl_set_query_error (TLS, EINVAL, "Too nested tags...");
-        tfree (new_text, text_len + 1);
+        tfree (new_text, 2 * text_len + 1);
         return NULL;
       }
       int old_p = *ent_size;
@@ -619,7 +620,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       if (text_len - p >= 4 && !memcmp (text + p, "</b>", 4)) {
         if (stp == 0 || sttype[stp - 1]  != 0) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
-          tfree (new_text, text_len + 1);
+          tfree (new_text, 2 * text_len + 1);
           return NULL;
         }
         (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
@@ -640,7 +641,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       if (text_len - p >= 4 && !memcmp (text + p, "</i>", 4)) {
         if (stp == 0 || sttype[stp - 1]  != 1) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
-          tfree (new_text, text_len + 1);
+          tfree (new_text, 2 * text_len + 1);
           return NULL;
         }
         (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
@@ -661,7 +662,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       if (text_len - p >= 7 && !memcmp (text + p, "</code>", 7)) {
         if (stp == 0 || sttype[stp - 1]  != 2) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
-          tfree (new_text, text_len + 1);
+          tfree (new_text, 2 * text_len + 1);
           return NULL;
         }
         (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
@@ -675,8 +676,21 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         continue;
       }
       tgl_set_query_error (TLS, EINVAL, "Unknown tag");
-      tfree (new_text, text_len + 1);
+      tfree (new_text, 2 * text_len + 1);
       return NULL;
+    } else if (text_len - p >= 4  && !memcmp (text + p, "&gt;", 4)) {
+      p += 3;
+      new_text[cur_p ++] = '>';
+    } else if (text_len - p >= 4  && !memcmp (text + p, "&lt;", 4)) {
+      p += 3;
+      new_text[cur_p ++] = '<';
+    } else if (text_len - p >= 5  && !memcmp (text + p, "&amp;", 5)) {
+      p += 4;
+      new_text[cur_p ++] = '&';
+    } else if (text_len - p >= 6  && !memcmp (text + p, "&nbsp;", 6)) {
+      p += 5;
+      new_text[cur_p ++] = 0xc2;
+      new_text[cur_p ++] = 0xa0;
     } else if (text_len - p >= 3  && text[p] == '&' && text[p + 1] == '#') {
       p += 2;
       int num = 0;
@@ -717,7 +731,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
   char *n = talloc (cur_p + 1);
   memcpy (n, new_text, cur_p);
   n[cur_p] = 0;
-  tfree (new_text, text_len + 1);
+  tfree (new_text, 2 * text_len + 1);
   return n;
 }
 
