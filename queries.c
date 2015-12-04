@@ -587,6 +587,17 @@ static void increase_ent (int *ent_size, int **ent, int s) {
   (*ent_size) +=s;
 }
 
+int utf8_len (const char *s, int len) {
+  int i;
+  int r = 0;
+  for (i = 0; i < len; i++) {
+    if ((s[i] & 0xc0) != 0x80) {
+      r ++;
+    }
+  }
+  return r;
+}
+
 static char *process_html_text (struct tgl_state *TLS, const char *text, int text_len, int *ent_size, int **ent) {
   char *new_text = talloc (2 * text_len + 1);
   int stpos[100];
@@ -610,7 +621,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       if (text_len - p >= 3 && !memcmp (text + p, "<b>", 3)) {
         increase_ent (ent_size, ent, 3);
         (*ent)[old_p] = CODE_message_entity_bold;
-        (*ent)[old_p + 1] = cur_p;
+        (*ent)[old_p + 1] = utf8_len (new_text, cur_p);
         stpos[stp] = old_p + 2;
         sttype[stp] = 0;
         stp ++;
@@ -623,7 +634,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
           tfree (new_text, 2 * text_len + 1);
           return NULL;
         }
-        (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
+        (*ent)[stpos[stp - 1]] = utf8_len (new_text, cur_p) - (*ent)[stpos[stp - 1] - 1];
         stp --;
         p += 3;
         continue;
@@ -631,7 +642,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       if (text_len - p >= 3 && !memcmp (text + p, "<i>", 3)) {
         increase_ent (ent_size, ent, 3);
         (*ent)[old_p] = CODE_message_entity_italic;
-        (*ent)[old_p + 1] = cur_p;
+        (*ent)[old_p + 1] = utf8_len (new_text, cur_p);
         stpos[stp] = old_p + 2;
         sttype[stp] = 1;
         stp ++;
@@ -644,7 +655,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
           tfree (new_text, 2 * text_len + 1);
           return NULL;
         }
-        (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
+        (*ent)[stpos[stp - 1]] = utf8_len (new_text, cur_p) - (*ent)[stpos[stp - 1] - 1];
         stp --;
         p += 3;
         continue;
@@ -652,7 +663,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       if (text_len - p >= 6 && !memcmp (text + p, "<code>", 6)) {
         increase_ent (ent_size, ent, 3);
         (*ent)[old_p] = CODE_message_entity_code;
-        (*ent)[old_p + 1] = cur_p;
+        (*ent)[old_p + 1] = utf8_len (new_text, cur_p);
         stpos[stp] = old_p + 2;
         sttype[stp] = 2;
         stp ++;
@@ -665,7 +676,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
           tfree (new_text, 2 * text_len + 1);
           return NULL;
         }
-        (*ent)[stpos[stp - 1]] = cur_p - (*ent)[stpos[stp - 1] - 1];
+        (*ent)[stpos[stp - 1]] = utf8_len (new_text, cur_p) - (*ent)[stpos[stp - 1] - 1];
         stp --;
         p += 6;
         continue;
