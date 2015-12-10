@@ -1496,6 +1496,7 @@ void tglf_fetch_message_entity (struct tgl_state *TLS, struct tgl_message_entity
     break;
   case CODE_message_entity_text_url:
     E->type = tgl_message_entity_text_url;
+    E->extra = DS_STR_DUP (DS_ME->url);
     break;
   default:
     assert (0);
