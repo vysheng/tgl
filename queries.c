@@ -609,6 +609,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
   *ent_size = 2;
   (*ent)[0] = CODE_vector;
   (*ent)[1] = 0;
+  int total = 0;
   for (p = 0; p < text_len; p++) {
     assert (cur_p <= 2 * text_len);
     if (text[p] == '<') {
@@ -620,6 +621,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       int old_p = *ent_size;
       if (text_len - p >= 3 && !memcmp (text + p, "<b>", 3)) {
         increase_ent (ent_size, ent, 3);
+        total ++;
         (*ent)[old_p] = CODE_message_entity_bold;
         (*ent)[old_p + 1] = utf8_len (new_text, cur_p);
         stpos[stp] = old_p + 2;
@@ -641,6 +643,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       }
       if (text_len - p >= 3 && !memcmp (text + p, "<i>", 3)) {
         increase_ent (ent_size, ent, 3);
+        total ++;
         (*ent)[old_p] = CODE_message_entity_italic;
         (*ent)[old_p + 1] = utf8_len (new_text, cur_p);
         stpos[stp] = old_p + 2;
@@ -662,6 +665,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       }
       if (text_len - p >= 6 && !memcmp (text + p, "<code>", 6)) {
         increase_ent (ent_size, ent, 3);
+        total ++;
         (*ent)[old_p] = CODE_message_entity_code;
         (*ent)[old_p + 1] = utf8_len (new_text, cur_p);
         stpos[stp] = old_p + 2;
@@ -679,6 +683,51 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         (*ent)[stpos[stp - 1]] = utf8_len (new_text, cur_p) - (*ent)[stpos[stp - 1] - 1];
         stp --;
         p += 6;
+        continue;
+      }
+      if (text_len - p >= 9 && !memcmp (text + p, "<a href=\"", 9)) {
+        int pp = p + 9;
+        while (pp < text_len && text[pp] != '"') {
+          pp ++;
+        }
+        if (pp == text_len || pp == text_len - 1 || text[pp + 1] != '>') {
+          tgl_set_query_error (TLS, EINVAL, "<a> tag did not close");
+          tfree (new_text, 2 * text_len + 1);
+          return NULL;
+        }
+        int len = pp - p - 9;
+        assert (len >= 0);
+        if (len >= 250) {
+          tgl_set_query_error (TLS, EINVAL, "too long link");
+          tfree (new_text, 2 * text_len + 1);
+          return NULL;
+        }
+
+        increase_ent (ent_size, ent, 3 + (len + 1 + ((-len-1) & 3)) / 4);
+        total ++;
+        (*ent)[old_p] = CODE_message_entity_text_url;
+        (*ent)[old_p + 1] = utf8_len (new_text, cur_p);
+        stpos[stp] = old_p + 2;
+        sttype[stp] = 3;
+        stp ++;
+
+        unsigned char *r = (void *)((*ent) + old_p + 3);
+        r[0] = len;
+        memcpy (r + 1, text + p + 9, len);
+        memset (r + 1 + len, 0, (-len-1) & 3);
+
+        p = pp + 1;
+        continue;
+      }
+      if (text_len - p >= 4 && !memcmp (text + p, "</a>", 4)) {
+        if (stp == 0 || sttype[stp - 1]  != 3) {
+          tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
+          tfree (new_text, 2 * text_len + 1);
+          return NULL;
+        }
+        (*ent)[stpos[stp - 1]] = utf8_len (new_text, cur_p) - (*ent)[stpos[stp - 1] - 1];
+        stp --;
+        p += 3;
         continue;
       }
       if (text_len - p >= 4 && !memcmp (text + p, "<br>", 4)) {
@@ -738,7 +787,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
     tfree (new_text, text_len + 1);
     return NULL;
   }
-  (*ent)[1] = ((*ent_size) - 2) / 3;
+  (*ent)[1] = total;
   char *n = talloc (cur_p + 1);
   memcpy (n, new_text, cur_p);
   n[cur_p] = 0;
@@ -1072,6 +1121,12 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
         out_int (CODE_message_entity_code);
         out_int (E->start);
         out_int (E->length);
+        break;
+      case tgl_message_entity_text_url:
+        out_int (CODE_message_entity_text_url);
+        out_int (E->start);
+        out_int (E->length);
+        out_string (E->extra);
         break;
       default:
         assert (0);
