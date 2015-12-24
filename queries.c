@@ -3112,6 +3112,13 @@ static struct query_methods delete_msg_methods = {
 };
 
 void tgl_do_delete_msg (struct tgl_state *TLS, long long id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra) {
+  struct tgl_message *M = tgl_message_get (TLS, id);
+  if (tgl_get_peer_type (M->to_id) == TGL_PEER_ENCR_CHAT) {
+     M->action.type=tgl_message_action_delete_messages;
+     M->flags |=TGLMF_SERVICE;
+     tgl_do_send_msg (TLS, M, 0, 0);
+     return;
+  }
   clear_packet ();
   out_int (CODE_messages_delete_messages);
   out_int (CODE_vector);
