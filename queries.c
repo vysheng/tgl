@@ -540,6 +540,18 @@ static void fetch_dc_option (struct tgl_state *TLS, struct tl_ds_dc_option *DS_D
 static int help_get_config_on_answer (struct tgl_state *TLS, struct query *q, void *DS) {
   struct tl_ds_config *DS_C = DS;
 
+  if (TLS->DC_list[TGL_DC_AUTO_ID])
+  {
+      int new_id = DS_LVAL (DS_C->this_dc);
+      assert(!TLS->DC_list[new_id]);
+      if (TLS->dc_working_num == TGL_DC_AUTO_ID)
+        TLS->dc_working_num = new_id;
+      TLS->DC_list[new_id] = TLS->DC_list[TGL_DC_AUTO_ID];
+      TLS->DC_list[new_id]->id = new_id;
+      TLS->DC_list[TGL_DC_AUTO_ID] = 0;
+      vlogprintf (E_NOTICE, "DC id assigned: DC%d -> DC%d \n", TGL_DC_AUTO_ID, new_id);
+  }
+
   int i;
   for (i = 0; i < DS_LVAL (DS_C->dc_options->cnt); i++) {
     fetch_dc_option (TLS, DS_C->dc_options->data[i]);

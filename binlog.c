@@ -1,4 +1,4 @@
-/* 
+/*
     This file is part of tgl-library
 
     This library is free software; you can redistribute it and/or
@@ -82,34 +82,34 @@ static int fetch_comb_binlog_start (struct tgl_state *TLS, void *extra) {
 
 /* {{{  DC option */
 static int fetch_comb_binlog_dc_option (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
-  vlogprintf (E_NOTICE, "DC%d '%.*s' update: %.*s:%d\n", 
-    DS_LVAL (DS_U->dc), 
-    DS_RSTR (DS_U->name), 
-    DS_RSTR (DS_U->ip), 
+  vlogprintf (E_NOTICE, "DC%d '%.*s' update: %.*s:%d\n",
+    DS_LVAL (DS_U->dc),
+    DS_RSTR (DS_U->name),
+    DS_RSTR (DS_U->ip),
     DS_LVAL (DS_U->port)
   );
 
   tglmp_alloc_dc (TLS,
     0,
-    DS_LVAL (DS_U->dc), 
-    DS_STR_DUP (DS_U->ip), 
+    DS_LVAL (DS_U->dc),
+    DS_STR_DUP (DS_U->ip),
     DS_LVAL (DS_U->port)
   );
   return 0;
 }
 
 static int fetch_comb_binlog_dc_option_new (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
-  vlogprintf (E_NOTICE, "DC%d '%.*s' update: %.*s:%d\n", 
-    DS_LVAL (DS_U->dc), 
-    DS_RSTR (DS_U->name), 
-    DS_RSTR (DS_U->ip), 
+  vlogprintf (E_NOTICE, "DC%d '%.*s' update: %.*s:%d\n",
+    DS_LVAL (DS_U->dc),
+    DS_RSTR (DS_U->name),
+    DS_RSTR (DS_U->ip),
     DS_LVAL (DS_U->port)
   );
 
   tglmp_alloc_dc (TLS,
-    DS_LVAL (DS_U->flags), 
-    DS_LVAL (DS_U->dc), 
-    DS_STR_DUP (DS_U->ip), 
+    DS_LVAL (DS_U->flags),
+    DS_LVAL (DS_U->dc),
+    DS_STR_DUP (DS_U->ip),
     DS_LVAL (DS_U->port)
   );
   return 0;
@@ -119,11 +119,11 @@ static int fetch_comb_binlog_dc_option_new (struct tgl_state *TLS, struct tl_ds_
 /* {{{ Auth key */
 static int fetch_comb_binlog_auth_key (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
   int num = DS_LVAL (DS_U->dc);
-  assert (num > 0 && num <= MAX_DC_ID);
+  assert (num >= 0 && num < TGL_MAX_DC_NUM);
   assert (TLS->DC_list[num]);
 
   tglf_fetch_int_tuple ((void *)TLS->DC_list[num]->auth_key, DS_U->key->key, 64);
-  
+
   static unsigned char sha1_buffer[20];
   SHA1 ((void *)TLS->DC_list[num]->auth_key, 256, sha1_buffer);
   TLS->DC_list[num]->auth_key_id = *(long long *)(sha1_buffer + 12);
@@ -136,7 +136,7 @@ static int fetch_comb_binlog_auth_key (struct tgl_state *TLS, struct tl_ds_binlo
 /* {{{ Default dc */
 static int fetch_comb_binlog_default_dc (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
   int num = DS_LVAL (DS_U->dc);
-  assert (num > 0 && num <= MAX_DC_ID);
+  assert (num >= 0 && num < TGL_MAX_DC_NUM);
   TLS->DC_working = TLS->DC_list[num];
   TLS->dc_working_num = num;
   return 0;
@@ -146,7 +146,7 @@ static int fetch_comb_binlog_default_dc (struct tgl_state *TLS, struct tl_ds_bin
 /* {{{ DC signed */
 static int fetch_comb_binlog_dc_signed (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
   int num = DS_LVAL (DS_U->dc);
-  assert (num > 0 && num <= MAX_DC_ID);
+  assert (num > 0 && num < TGL_MAX_DC_NUM);
   assert (TLS->DC_list[num]);
   TLS->DC_list[num]->flags |= TGLDCF_LOGGED_IN;
   return 0;
@@ -163,7 +163,7 @@ static int fetch_comb_binlog_our_id (struct tgl_state *TLS, struct tl_ds_binlog_
   return 0;
 }
 /* }}} */
-     
+
 /* {{{ Set DH params */
 static int fetch_comb_binlog_set_dh_params (struct tgl_state *TLS, struct tl_ds_binlog_update *DS_U) {
   if (TLS->encr_prime) { tfree (TLS->encr_prime, 256); BN_free (TLS->encr_prime_bn); }
@@ -175,7 +175,7 @@ static int fetch_comb_binlog_set_dh_params (struct tgl_state *TLS, struct tl_ds_
   TLS->encr_prime_bn = BN_new ();
   BN_bin2bn ((void *)TLS->encr_prime, 256, TLS->encr_prime_bn);
   TLS->encr_param_version = DS_LVAL (DS_U->version);
-    
+
   assert (tglmp_check_DH_params (TLS, TLS->encr_prime_bn, TLS->encr_root) >= 0);
 
   return 0;
@@ -210,7 +210,7 @@ static int fetch_comb_binlog_user_delete (struct tgl_state *TLS, struct tl_ds_bi
   tgl_peer_t *U = tgl_peer_get (TLS, id);
   assert (U);
   U->flags |= TGLUF_DELETED;
-  
+
   if (TLS->callback.user_update) {
     TLS->callback.user_update (TLS, (void *)U, TGL_UPDATE_DELETED);
   }
@@ -231,7 +231,7 @@ static int fetch_comb_binlog_encr_chat_delete (struct tgl_state *TLS, struct tl_
     tfree_secure (U->g_key, 256);
     U->g_key = 0;
   }
-  
+
   if (TLS->callback.secret_chat_update) {
     TLS->callback.secret_chat_update (TLS, U, TGL_UPDATE_DELETED);
   }
@@ -261,7 +261,7 @@ static int fetch_comb_binlog_user_new (struct tgl_state *TLS, struct tl_ds_binlo
   }
 
   struct tgl_user *U = (void *)_U;
-  
+
   if ((flags & 0xff) != (U->flags & 0xff)) {
     updates |= TGL_UPDATE_FLAGS;
   }
@@ -284,9 +284,9 @@ static int fetch_comb_binlog_user_new (struct tgl_state *TLS, struct tl_ds_binlo
 
     updates |= TGL_UPDATE_NAME;
 
-    if (U->print_name) { 
+    if (U->print_name) {
       tglp_peer_delete_name (TLS, (void *)U);
-      tfree_str (U->print_name); 
+      tfree_str (U->print_name);
     }
     U->print_name = TLS->callback.create_print_name (TLS, U->id, U->first_name, U->last_name, 0, 0);
     tglp_peer_insert_name (TLS, (void *)U);
@@ -336,12 +336,12 @@ static int fetch_comb_binlog_user_new (struct tgl_state *TLS, struct tl_ds_binlo
 
     updates |= TGL_UPDATE_REAL_NAME;
   }
- 
+
   if (DS_U->last_read_in) {
     U->last_read_in = DS_LVAL (DS_U->last_read_in);
     tgls_messages_mark_read (TLS, U->last, 0, U->last_read_in);
   }
- 
+
   if (DS_U->last_read_out) {
     U->last_read_out = DS_LVAL (DS_U->last_read_out);
     tgls_messages_mark_read (TLS, U->last, TGLMF_OUT, U->last_read_out);
@@ -357,7 +357,7 @@ static int fetch_comb_binlog_user_new (struct tgl_state *TLS, struct tl_ds_binlo
   if (TLS->callback.user_update && updates) {
     TLS->callback.user_update (TLS, U, updates);
   }
-  
+
   return 0;
 }
 
@@ -383,7 +383,7 @@ static int fetch_comb_binlog_encr_chat_new (struct tgl_state *TLS, struct tl_ds_
   }
 
   struct tgl_secret_chat *U = (void *)_U;
-  
+
   if ((flags & 0xff) != (U->flags & 0xff)) {
     updates |= TGL_UPDATE_FLAGS;
   }
@@ -417,7 +417,7 @@ static int fetch_comb_binlog_encr_chat_new (struct tgl_state *TLS, struct tl_ds_
   }
 
   tgl_peer_t *Us = tgl_peer_get (TLS, TGL_MK_USER (U->user_id));
-  
+
   if (!U->print_name) {
     if (Us) {
       U->print_name = TLS->callback.create_print_name (TLS, id, "!", Us->user.first_name, Us->user.last_name, 0);
@@ -455,15 +455,15 @@ static int fetch_comb_binlog_encr_chat_new (struct tgl_state *TLS, struct tl_ds_
         break;
       default:
         break;
-      } 
+      }
     }
     U->state = DS_LVAL (DS_U->state);
   }
-  
+
   if (TLS->callback.secret_chat_update && updates) {
     TLS->callback.secret_chat_update (TLS, U, updates);
   }
-  
+
   return 0;
 }
 
@@ -487,9 +487,9 @@ static int fetch_comb_binlog_chat_new (struct tgl_state *TLS, struct tl_ds_binlo
   } else {
     assert (_U->flags & TGLPF_CREATED);
   }
-  
+
   struct tgl_chat *C = &_U->chat;
-  
+
   if ((flags & 0xff) != (C->flags & 0xff)) {
     updates |= TGL_UPDATE_FLAGS;
   }
@@ -501,20 +501,20 @@ static int fetch_comb_binlog_chat_new (struct tgl_state *TLS, struct tl_ds_binlo
     }
     C->title = DS_STR_DUP (DS_U->title);
 
-    if (C->print_title) { 
+    if (C->print_title) {
       tglp_peer_delete_name (TLS, (void *)C);
-      tfree_str (C->print_title); 
+      tfree_str (C->print_title);
     }
     C->print_title = TLS->callback.create_print_name (TLS, C->id, C->title, 0, 0, 0);
     tglp_peer_insert_name (TLS, (void *)C);
-    
+
     updates |= TGL_UPDATE_TITLE;
   }
-  
+
   if (DS_U->user_num) {
     C->users_num = DS_LVAL (DS_U->user_num);
   }
-  
+
   if (DS_U->date) {
     C->date = DS_LVAL (DS_U->date);
   }
@@ -541,7 +541,7 @@ static int fetch_comb_binlog_chat_new (struct tgl_state *TLS, struct tl_ds_binlo
 
   if (DS_U->version) {
     C->version = DS_LVAL (DS_U->version);
-  
+
     if (C->user_list) { tfree (C->user_list, 12 * C->user_list_size); }
 
     C->user_list_size = DS_LVAL (DS_U->participants->cnt);
@@ -556,18 +556,18 @@ static int fetch_comb_binlog_chat_new (struct tgl_state *TLS, struct tl_ds_binlo
 
     updates |= TGL_UPDATE_MEMBERS;
   }
- 
+
   if (DS_U->last_read_in) {
     C->last_read_in = DS_LVAL (DS_U->last_read_in);
     tgls_messages_mark_read (TLS, C->last, 0, C->last_read_in);
   }
- 
+
   if (DS_U->last_read_out) {
     C->last_read_out = DS_LVAL (DS_U->last_read_out);
     tgls_messages_mark_read (TLS, C->last, TGLMF_OUT, C->last_read_out);
   }
 
-      
+
   if (TLS->callback.chat_update && updates) {
     TLS->callback.chat_update (TLS, C, updates);
   }
@@ -590,7 +590,7 @@ static int fetch_comb_binlog_chat_add_participant (struct tgl_state *TLS, struct
 
   int i;
   for (i = 0; i < C->user_list_size; i++) {
-    if (C->user_list[i].user_id == user) { 
+    if (C->user_list[i].user_id == user) {
       return 0;
     }
   }
@@ -601,7 +601,7 @@ static int fetch_comb_binlog_chat_add_participant (struct tgl_state *TLS, struct
   C->user_list[C->user_list_size - 1].inviter_id = inviter;
   C->user_list[C->user_list_size - 1].date = date;
   C->user_list_version = version;
-  
+
   if (TLS->callback.chat_update) {
     TLS->callback.chat_update (TLS, C, TGL_UPDATE_MEMBERS);
   }
@@ -613,11 +613,11 @@ static int fetch_comb_binlog_chat_del_participant (struct tgl_state *TLS, struct
   tgl_peer_t *_C = tgl_peer_get (TLS, id);
   assert (_C && (_C->flags & TGLPF_CREATED));
   struct tgl_chat *C = &_C->chat;
-  
+
   int version = DS_LVAL (DS_U->version);
   int user = DS_LVAL (DS_U->user_id);
   if (C->user_list_version > version) { return 0; }
-      
+
   int i;
   for (i = 0; i < C->user_list_size; i++) {
     if (C->user_list[i].user_id == user) {
@@ -633,7 +633,7 @@ static int fetch_comb_binlog_chat_del_participant (struct tgl_state *TLS, struct
   C->user_list_size --;
   C->user_list = trealloc (C->user_list, 12 * C->user_list_size + 12, 12 * C->user_list_size);
   C->user_list_version = version;
-  
+
   if (TLS->callback.chat_update) {
     TLS->callback.chat_update (TLS, C, TGL_UPDATE_MEMBERS);
   }
@@ -669,11 +669,11 @@ static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_bi
   } else {
     M->flags = (flags & 0xffff);
   }
- 
+
   if (DS_U->from_id) {
     M->from_id = TGL_MK_USER (DS_LVAL (DS_U->from_id));
   }
-  if (DS_U->to_type) {  
+  if (DS_U->to_type) {
     assert (flags & 0x10000);
     M->to_id = tgl_set_peer_id (DS_LVAL (DS_U->to_type), DS_LVAL (DS_U->to_id));
     assert (DS_LVAL (DS_U->to_type) != TGL_PEER_ENCR_CHAT);
@@ -682,16 +682,16 @@ static int fetch_comb_binlog_message_new (struct tgl_state *TLS, struct tl_ds_bi
   if (DS_U->date) {
     M->date = DS_LVAL (DS_U->date);
   }
-  
+
   if (DS_U->fwd_from_id) {
     M->fwd_from_id = TGL_MK_USER (DS_LVAL (DS_U->fwd_from_id));
     M->fwd_date = DS_LVAL (DS_U->fwd_date);
   }
-  
+
   if (DS_U->action) {
     tglf_fetch_message_action_new (TLS, &M->action, DS_U->action);
     M->flags |= TGLMF_SERVICE;
-  } 
+  }
 
   if (DS_U->message) {
     M->message_len = DS_U->message->len;
@@ -748,11 +748,11 @@ static int fetch_comb_binlog_message_encr_new (struct tgl_state *TLS, struct tl_
   }
 
   M->flags = flags & 0xffff;
- 
+
   if (DS_U->from_id) {
     M->from_id = TGL_MK_USER (DS_LVAL (DS_U->from_id));
   }
-  if (DS_U->to_type) {  
+  if (DS_U->to_type) {
     assert (flags & 0x10000);
     M->to_id = tgl_set_peer_id (DS_LVAL (DS_U->to_type), DS_LVAL (DS_U->to_id));
   }
@@ -806,10 +806,10 @@ static int fetch_comb_binlog_set_msg_id (struct tgl_state *TLS, struct tl_ds_bin
     tglm_message_remove_unsent (TLS, M);
     M->flags &= ~TGLMF_PENDING;
   }
-  
+
   tglm_message_remove_tree (TLS, M);
   tglm_message_del_peer (TLS, M);
-  
+
   M->id = DS_LVAL (DS_U->new_id);
   if (tgl_message_get (TLS, M->id)) {
     tglm_message_del_use (TLS, M);
@@ -839,7 +839,7 @@ static int fetch_comb_binlog_msg_update (struct tgl_state *TLS, struct tl_ds_bin
   struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->lid));
   if (!M) { return 0; }
   assert (M);
-  
+
   if (!(M->flags & TGLMF_ENCRYPTED)) {
     if (TLS->max_msg_id < M->id) {
       TLS->max_msg_id = M->id;
@@ -882,7 +882,7 @@ static int fetch_comb_binlog_encr_chat_exchange_new (struct tgl_state *TLS, stru
     break;
   case tgl_sce_accepted:
     tglf_fetch_int_tuple (P->encr_chat.exchange_key, DS_U->key->key, 64);
-  
+
     SHA1 ((unsigned char *)P->encr_chat.exchange_key, 256, sha_buffer);
     P->encr_chat.exchange_key_fingerprint = *(long long *)(sha_buffer + 12);
     break;
@@ -891,7 +891,7 @@ static int fetch_comb_binlog_encr_chat_exchange_new (struct tgl_state *TLS, stru
     P->encr_chat.exchange_key_fingerprint = P->encr_chat.key_fingerprint;
 
     tglf_fetch_int_tuple (P->encr_chat.key, DS_U->key->key, 64);
-  
+
     SHA1 ((unsigned char *)P->encr_chat.key, 256, sha_buffer);
     P->encr_chat.key_fingerprint = *(long long *)(sha_buffer + 12);
     break;
@@ -919,7 +919,7 @@ static int fetch_comb_binlog_encr_chat_exchange_new (struct tgl_state *TLS, stru
   case CODE_ ## NAME:\
     ok = fetch_comb_ ## NAME (TLS, DS_U); \
     break; \
-    
+
 
 static void replay_log_event (struct tgl_state *TLS) {
   assert (rptr < wptr);
@@ -948,7 +948,7 @@ static void replay_log_event (struct tgl_state *TLS) {
   FETCH_COMBINATOR_FUNCTION (binlog_auth_key)
   FETCH_COMBINATOR_FUNCTION (binlog_default_dc)
   FETCH_COMBINATOR_FUNCTION (binlog_dc_signed)
-  
+
   FETCH_COMBINATOR_FUNCTION (binlog_our_id)
 
   FETCH_COMBINATOR_FUNCTION (binlog_set_dh_params)
@@ -974,7 +974,7 @@ static void replay_log_event (struct tgl_state *TLS) {
   FETCH_COMBINATOR_FUNCTION (binlog_set_msg_id)
 
   FETCH_COMBINATOR_FUNCTION (binlog_encr_chat_exchange_new)
-  
+
   FETCH_COMBINATOR_FUNCTION (binlog_msg_update)
   FETCH_COMBINATOR_FUNCTION (binlog_reset_authorization)
   default:
@@ -1043,7 +1043,7 @@ static void create_new_binlog (struct tgl_state *TLS) {
     out_int (CODE_binlog_default_dc);
     out_int (2);
   }
-  
+
   int fd = open (TLS->binlog_name, O_WRONLY | O_EXCL | O_CREAT, 0600);
   if (fd < 0) {
     perror ("Write new binlog");
@@ -1084,7 +1084,7 @@ void tgl_replay_log (struct tgl_state *TLS) {
         exit (2);
       }
       assert (!(k & 3));
-      if (k < l) { 
+      if (k < l) {
         end = 1;
       }
       wptr += (k / 4);
@@ -1104,12 +1104,12 @@ void tgl_reopen_binlog_for_writing (struct tgl_state *TLS) {
     perror ("binlog open");
     exit (2);
   }
-  
+
   assert (lseek (TLS->binlog_fd, binlog_pos, SEEK_SET) == binlog_pos);
   if (flock (TLS->binlog_fd, LOCK_EX | LOCK_NB) < 0) {
     perror ("get lock");
     exit (2);
-  } 
+  }
 }
 
 static void add_log_event (struct tgl_state *TLS, const int *data, int len) {
@@ -1174,7 +1174,7 @@ void bl_do_set_working_dc (struct tgl_state *TLS, int num) {
 void bl_do_dc_signed (struct tgl_state *TLS, int id) {
   clear_packet ();
   out_int (CODE_binlog_dc_signed);
-  out_int (id);  
+  out_int (id);
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 
@@ -1186,7 +1186,7 @@ void bl_do_set_our_id (struct tgl_state *TLS, int id) {
 
   clear_packet ();
   out_int (CODE_binlog_our_id);
-  out_int (id);  
+  out_int (id);
   add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
 }
 
@@ -1202,7 +1202,7 @@ void bl_do_set_dh_params (struct tgl_state *TLS, int root, unsigned char prime[]
 void bl_do_set_pts (struct tgl_state *TLS, int pts) {
   if (TLS->locks & TGL_LOCK_DIFF) { return; }
   if (pts <= TLS->pts) { return; }
-  
+
   clear_packet ();
   out_int (CODE_binlog_set_pts);
   out_int (pts);
@@ -1212,7 +1212,7 @@ void bl_do_set_pts (struct tgl_state *TLS, int pts) {
 void bl_do_set_qts (struct tgl_state *TLS, int qts) {
   if (TLS->locks & TGL_LOCK_DIFF) { return; }
   if (qts <= TLS->qts) { return; }
-  
+
   clear_packet ();
   out_int (CODE_binlog_set_qts);
   out_int (qts);
@@ -1222,7 +1222,7 @@ void bl_do_set_qts (struct tgl_state *TLS, int qts) {
 void bl_do_set_date (struct tgl_state *TLS, int date) {
   if (TLS->locks & TGL_LOCK_DIFF) { return; }
   if (date <= TLS->date) { return; }
-  
+
   clear_packet ();
   out_int (CODE_binlog_set_date);
   out_int (date);
@@ -1232,7 +1232,7 @@ void bl_do_set_date (struct tgl_state *TLS, int date) {
 void bl_do_set_seq (struct tgl_state *TLS, int seq) {
   if (TLS->locks & TGL_LOCK_DIFF) { return; }
   if (seq <= TLS->seq) { return; }
-  
+
   clear_packet ();
   out_int (CODE_binlog_set_seq);
   out_int (seq);
@@ -1241,7 +1241,7 @@ void bl_do_set_seq (struct tgl_state *TLS, int seq) {
 
 void bl_do_set_msg_id (struct tgl_state *TLS, struct tgl_message *M, int id) {
   if (M->id == id) { return; }
-  
+
   clear_packet ();
   out_int (CODE_binlog_set_msg_id);
   out_long (M->id);
@@ -1260,7 +1260,7 @@ void bl_do_user_delete (struct tgl_state *TLS, struct tgl_user *U) {
 
 void bl_do_encr_chat_delete (struct tgl_state *TLS, struct tgl_secret_chat *U) {
   if (!(U->flags & TGLPF_CREATED) || U->state == sc_deleted || U->state == sc_none) { return; }
-  
+
   clear_packet ();
   out_int (CODE_binlog_encr_chat_delete);
   out_int (tgl_get_peer_id (U->id));
@@ -1301,7 +1301,7 @@ void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id
   assert (*flags_p == flags);
 
   out_long (id);
-  
+
   if (from_id) {
     assert (to_type);
     assert (to_id);
@@ -1317,7 +1317,7 @@ void bl_do_create_message_new (struct tgl_state *TLS, long long id, int *from_id
     out_int (*fwd_from_id);
     out_int (*fwd_date);
   }
-  
+
   if (date) {
     (*flags_p) |= (1 << 19);
     out_int (*date);
@@ -1363,7 +1363,7 @@ void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int *fr
   assert (*flags_p == flags);
 
   out_long (id);
-  
+
   if (from_id) {
     assert (to_id);
     assert (to_type);
@@ -1377,7 +1377,7 @@ void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int *fr
     (*flags_p) |= (1 << 19);
     out_int (*date);
   }
-  
+
   if (message) {
     (*flags_p) |= (1 << 20);
     out_cstring (message, message_len);
@@ -1392,7 +1392,7 @@ void bl_do_create_message_encr_new (struct tgl_state *TLS, long long id, int *fr
     (*flags_p) |= (1 << 22);
     store_ds_type_decrypted_message_action (action, TYPE_TO_PARAM (decrypted_message_action));
   }
-  
+
   if (file) {
     (*flags_p) |= (1 << 23);
     store_ds_type_encrypted_file (file, TYPE_TO_PARAM (encrypted_file));
@@ -1423,13 +1423,13 @@ void bl_do_reset_authorization (struct tgl_state *TLS)  {
 
 void bl_do_encr_chat_exchange_new (struct tgl_state *TLS, struct tgl_secret_chat *E, long long *exchange_id, const void *key, int *state) {
   clear_packet ();
-  
+
   out_int (CODE_binlog_encr_chat_exchange_new);
   out_int (tgl_get_peer_id (E->id));
 
   int *flags_p = packet_ptr;
   out_int (0);
-  
+
   if (exchange_id) {
     *flags_p |= (1 << 17);
     out_long (*exchange_id);
@@ -1466,25 +1466,25 @@ void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, cons
 
   clear_packet ();
   out_int (CODE_binlog_user_new);
-  
+
   int *flags_p = packet_ptr;
-  
+
   assert (!(flags & 0xfffe0000));
   out_int (flags);
   out_int (id);
- 
+
   if (access_hash) {
     if (!P || P->access_hash != *access_hash) {
       out_long (*access_hash);
       (*flags_p) |= (1 << 17);
     }
   }
- 
+
   if (first_name) {
     if (!P || !P->first_name || !P->last_name || mystreq1 (P->first_name, first_name, first_name_len) || mystreq1 (P->last_name, last_name, last_name_len)) {
       out_cstring (first_name, first_name_len);
       out_cstring (last_name, last_name_len);
-      
+
       (*flags_p) |= (1 << 18);
     }
   }
@@ -1515,7 +1515,7 @@ void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, cons
     if (!P || !P->real_first_name || !P->real_last_name || mystreq1 (P->real_first_name, real_first_name, real_first_name_len) || mystreq1 (P->real_last_name, real_last_name, real_last_name_len)) {
       out_cstring (real_first_name, real_first_name_len);
       out_cstring (real_last_name, real_last_name_len);
-      
+
       (*flags_p) |= (1 << 22);
     }
   }
@@ -1547,7 +1547,7 @@ void bl_do_user_new (struct tgl_state *TLS, int id, long long *access_hash, cons
       (*flags_p) |= (1 << 26);
     }
   }
-  
+
   if (((*flags_p) & 0xffff0000) || !P || (P->flags & 0xffff) != flags) {
     add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
   }
@@ -1563,9 +1563,9 @@ void bl_do_chat_new (struct tgl_state *TLS, int id, const char *title, int title
 
   clear_packet ();
   out_int (CODE_binlog_chat_new);
-  
+
   int *flags_p = packet_ptr;
-  
+
   assert (!(flags & 0xfffe0000));
   out_int (flags);
   out_int (id);
@@ -1634,7 +1634,7 @@ void bl_do_chat_new (struct tgl_state *TLS, int id, const char *title, int title
       (*flags_p) |= (1 << 25);
     }
   }
-  
+
   if (((*flags_p) & 0xffff0000) || !P || (P->flags & 0xffff) != flags)   {
     add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
   }
@@ -1650,9 +1650,9 @@ void bl_do_encr_chat_new (struct tgl_state *TLS, int id, long long *access_hash,
 
   clear_packet ();
   out_int (CODE_binlog_encr_chat_new);
-  
+
   int *flags_p = packet_ptr;
-  
+
   assert (!(flags & 0xfffe0000));
   out_int (flags);
   out_int (id);
@@ -1722,9 +1722,9 @@ void bl_do_encr_chat_new (struct tgl_state *TLS, int id, long long *access_hash,
 
   if (in_seq_no || last_in_seq_no || out_seq_no) {
     if (!P || (in_seq_no && P->in_seq_no != *in_seq_no) ||
-              (out_seq_no && P->out_seq_no != *out_seq_no) || 
+              (out_seq_no && P->out_seq_no != *out_seq_no) ||
               (last_in_seq_no && P->last_in_seq_no != *last_in_seq_no)) {
-      
+
       out_int (in_seq_no ? *in_seq_no : P ? P->in_seq_no : 0);
       out_int (last_in_seq_no ? *last_in_seq_no : P ? P->last_in_seq_no : 0);
       out_int (out_seq_no ? *out_seq_no : P ? P->out_seq_no : 0);
@@ -1738,7 +1738,7 @@ void bl_do_encr_chat_new (struct tgl_state *TLS, int id, long long *access_hash,
       (*flags_p) |= (1 << 27);
     }
   }
- 
+
   if (((*flags_p) & 0xffff0000) || !P || (P->flags & 0xffff) != flags)   {
     add_log_event (TLS, packet_buffer, 4 * (packet_ptr - packet_buffer));
   }
