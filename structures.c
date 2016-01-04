@@ -693,7 +693,7 @@ struct tgl_channel *tglf_fetch_alloc_channel (struct tgl_state *TLS, struct tl_d
   if (DS_LVAL (DS_C->flags) & 4) {
     flags |= TGLCHF_LEFT;
   } else {
-    flags |= TGLCHF_LEFT;
+    flags &= ~TGLCHF_LEFT;
   }
 
   if (DS_LVAL (DS_C->flags) & 8) {

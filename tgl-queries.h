@@ -166,6 +166,10 @@ int tgl_do_visualize_key (struct tgl_state *TLS, tgl_secret_chat_id_t id, unsign
 
 // requests creation of secret chat with user id
 void tgl_do_create_secret_chat (struct tgl_state *TLS, tgl_user_id_t id, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra);
+
+// cancel a working secret chat
+void tgl_do_discard_secret_chat (struct tgl_state *TLS, struct tgl_secret_chat *E, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra);
+
 /* }}} */
 
 /* {{{ WORKING WITH CHANNELS */

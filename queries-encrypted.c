@@ -707,6 +707,43 @@ void tgl_do_send_create_encr_chat (struct tgl_state *TLS, void *x, unsigned char
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_encr_request_methods, E, callback, callback_extra);
 }
 
+static int send_encr_discard_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
+  struct tgl_secret_chat *E = q->extra;
+
+  bl_do_peer_delete (TLS, E->id);
+
+  if (q->callback) {
+    ((void (*)(struct tgl_state *, void *, int, struct tgl_secret_chat *))q->callback) (TLS, q->callback_extra, 1, E);
+  }
+  return 0;
+}
+
+static struct query_methods send_encr_discard_methods  = {
+  .on_answer = send_encr_discard_on_answer,
+  .on_error = q_ptr_on_error,
+  .type = TYPE_TO_PARAM(bool),
+  .name = "send encrypted (chat discard)",
+  .timeout = 0,
+};
+
+void tgl_do_discard_secret_chat (struct tgl_state *TLS, struct tgl_secret_chat *E, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_secret_chat *E), void *callback_extra) {
+  assert (E);
+  assert (tgl_get_peer_id (E->id) > 0);
+
+  if (E->state == sc_deleted || E->state == sc_none) {
+    if (callback) {
+      callback (TLS, callback_extra, 0, E);
+    }
+    return;
+  }
+
+  clear_packet ();
+  out_int (CODE_messages_discard_encryption);
+  out_int (tgl_get_peer_id (E->id));
+
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_encr_discard_methods, E, callback, callback_extra);
+}
+
 static int get_dh_config_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
   struct tl_ds_messages_dh_config *DS_MDC = D;
 
