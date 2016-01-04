@@ -69,6 +69,7 @@ application/epub+zip				epub
 application/exi					exi
 # application/fastinfoset
 # application/fastsoap
+application/fb2					fb2
 # application/fits
 application/font-tdpfr				pfr
 # application/framework-attributes+xml

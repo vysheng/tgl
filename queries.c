@@ -4050,8 +4050,8 @@ void tgl_do_create_channel (struct tgl_state *TLS, int users_num, tgl_peer_id_t 
   out_int (flags); // looks like 2 is disable non-admin messages
   out_cstring (chat_topic, chat_topic_len);
   out_cstring (about, about_len);
-  out_int (CODE_vector);
-  out_int (users_num); 
+  //out_int (CODE_vector);
+  //out_int (users_num); 
   int i;
   for (i = 0; i < users_num; i++) {
     tgl_peer_id_t id = ids[i];
