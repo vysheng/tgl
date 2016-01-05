@@ -979,10 +979,10 @@ void tglf_fetch_message_media_new (struct tgl_state *TLS, struct tgl_message_med
     M->last_name = DS_STR_DUP (DS_MM->last_name);
     M->user_id = DS_LVAL (DS_MM->user_id);
     break;
-  //case CODE_message_media_unsupported:
+  case CODE_message_media_unsupported:
   //case CODE_message_media_unsupported_l22:
-  //  M->type = tgl_message_media_unsupported;
-  //  break;
+    M->type = tgl_message_media_unsupported;
+    break;
   case CODE_message_media_web_page:
     M->type = tgl_message_media_webpage;
     M->webpage = tglf_fetch_alloc_webpage_new (TLS, DS_MM->webpage);
