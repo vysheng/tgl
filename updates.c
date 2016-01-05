@@ -532,6 +532,16 @@ void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_updat
     break;
   case CODE_update_chat_participant_admin:
     break;
+  case CODE_update_new_sticker_set:
+    break;
+  case CODE_update_sticker_sets_order:
+    break;
+  case CODE_update_sticker_sets:
+    break;
+  case CODE_update_saved_gifs:
+    break;
+  case CODE_update_bot_inline_query:
+    break;
   default:
     assert (0);
   }

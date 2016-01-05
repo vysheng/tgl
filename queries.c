@@ -1971,6 +1971,8 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
       out_string ("thumb.jpg");
       out_string ("");
     }
+    
+    out_string (f->caption ? f->caption : "");
   } else {
     out_string (f->caption ? f->caption : "");
   }
@@ -2615,6 +2617,7 @@ void tgl_do_forward_media (struct tgl_state *TLS, tgl_peer_id_t peer_id, tgl_mes
     out_int (CODE_input_document);
     out_long (M->media.document->id);
     out_long (M->media.document->access_hash);
+    out_string ("");
     break;
   default:
     assert (0);
