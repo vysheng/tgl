@@ -1280,6 +1280,7 @@ void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *
   case CODE_message_media_document:
     M->type = tgl_message_media_document;
     M->document = tglf_fetch_alloc_document (TLS, DS_MM->document);
+    M->caption = DS_STR_DUP (DS_MM->caption);
     break;
   case CODE_message_media_geo:
     M->type = tgl_message_media_geo;
