@@ -42,16 +42,13 @@
 
 /* Find the length of STRING, but scan at most MAXLEN characters.
    If no '\0' terminator is found in that many characters, return MAXLEN.  */
-size_t
-strnlen (const char *string, size_t maxlen)
+size_t strnlen (const char *string, size_t maxlen)
 {
   const char *end = memchr (string, '\0', maxlen);
   return end ? (size_t)(end - string) : maxlen;
 }
 
-char *
-strndup (const char *s, size_t n)
-{
+char *strndup (const char *s, size_t n) {
   size_t len = strnlen (s, n);
   char *new = malloc (len + 1);
 
@@ -2987,17 +2984,16 @@ void sig_abrt_handler (int signum __attribute__ ((unused))) {
   exit (EXIT_FAILURE);
 }
 
-static int
-read_all(int fd, void *buf, size_t len)
-{
+static int read_all (int fd, void *buf, size_t len) {
 	unsigned int rs = 0;
-	while(rs < len)
-	{
-		int rval = read(fd, buf + rs, len - rs);
-		if (rval == 0)
+	while(rs < len) {
+		int rval = read (fd, buf + rs, len - rs);
+		if (rval == 0) {
 			break;
-		if (rval < 0)
+    }
+		if (rval < 0) {
 			return rval;
+    }
 
 		rs += rval;
 	}

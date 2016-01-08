@@ -1293,10 +1293,6 @@ void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *
     M->last_name = DS_STR_DUP (DS_MM->last_name);
     M->user_id = DS_LVAL (DS_MM->user_id);
     break;
-  case CODE_message_media_unsupported:
-  //case CODE_message_media_unsupported_l22:
-    M->type = tgl_message_media_unsupported;
-    break;
   case CODE_message_media_web_page:
     M->type = tgl_message_media_webpage;
     M->webpage = tglf_fetch_alloc_webpage (TLS, DS_MM->webpage);
@@ -2091,7 +2087,6 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
     if (M->caption) { tfree_str (M->caption); }
     return;
   case tgl_message_media_unsupported:
-    tfree (M->data, M->data_size);
     return;
   case tgl_message_media_document_encr:
     tfree_secure (M->encr_document->key, 32);
