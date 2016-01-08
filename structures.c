@@ -1309,6 +1309,9 @@ void tglf_fetch_message_media (struct tgl_state *TLS, struct tgl_message_media *
     M->venue.provider = DS_STR_DUP (DS_MM->provider);
     M->venue.venue_id = DS_STR_DUP (DS_MM->venue_id);   
     break;
+  case CODE_message_media_unsupported:
+    M->type = tgl_message_media_unsupported;
+    break;
   default:
     assert (0);
   }
