@@ -1200,7 +1200,7 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t peer_id, const ch
       in_end = ent + ent_size;
       EN = fetch_ds_type_any (TYPE_TO_PARAM_1 (vector, TYPE_TO_PARAM (message_entity)));
       assert (EN);
-      vlogprintf (0, "in_ptr = %p, in_end = %p\n", in_ptr, in_end);
+      vlogprintf (E_DEBUG, "in_ptr = %p, in_end = %p\n", in_ptr, in_end);
       assert (in_ptr == in_end);
       in_ptr = save_ptr;
       in_end = save_end;
