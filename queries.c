@@ -1690,6 +1690,19 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q, void *
   vlogprintf (E_DEBUG, "dl_size = %d, total = %d\n", dl_size, E->list_offset);
   if (dl_size && E->list_offset < E->limit && DS_MD->magic == CODE_messages_dialogs_slice && E->list_offset < DS_LVAL (DS_MD->count)) {
     E->offset += dl_size;
+    if (E->list_offset > 0) {
+      E->offset_peer = E->PL[E->list_offset - 1];
+    
+      int p = E->list_offset - 1;
+      while (p >= 0) {
+        struct tgl_message *M = tgl_message_get (TLS, E->LM[p]);
+        if (M) {
+          E->offset_date = M->date;
+          break;
+        }
+        p --;
+      }
+    }
     _tgl_do_get_dialog_list (TLS, E, q->callback, q->callback_extra);
   } else {
     if (q->callback) {
