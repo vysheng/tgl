@@ -1117,6 +1117,7 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
       }
     } else {
       out_int (CODE_reply_keyboard_hide);
+      out_int (M->reply_markup->flags);
     }
   }
 
