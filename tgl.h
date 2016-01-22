@@ -87,13 +87,6 @@ struct tgl_dc;
 #         define __func__ "<unknown>"
 #      endif
 #   endif
-#   if defined(_MSC_VER) && _MSC_VER >= 1400
-#      define strdup _strdup
-#      define read _read
-#      define write _write
-#      define close _close
-#      define lseek _lseek
-#   endif
 #   ifdef _MSC_VER
 #      define __attribute__(x)
 #   endif
