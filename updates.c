@@ -342,7 +342,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
       
       tgl_peer_t *C = tgl_peer_get (TLS, chat_id);
       if (C && (C->flags & TGLPF_CREATED)) {
-        bl_do_chat_add_user (TLS, &C->chat, version, tgl_get_peer_id (user_id), tgl_get_peer_id (inviter_id), time (0));
+        bl_do_chat_add_user (TLS, &C->chat, version, tgl_get_peer_id (user_id), tgl_get_peer_id (inviter_id), (int)time (0));
       }
     }
     break;
@@ -652,7 +652,7 @@ static void user_expire (struct tgl_state *TLS, void *arg) {
   TLS->timer_methods->free (U->status.ev);
   U->status.ev = 0;
   U->status.online = -1;
-  U->status.when = tglt_get_double_time ();
+  U->status.when = (int)tglt_get_double_time ();
   tgl_insert_status_update (TLS, U);
 }
 

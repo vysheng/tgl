@@ -29,15 +29,34 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef _MSC_VER
+#include <io.h>
+#include <stdint.h>
+#include <string.h>
+#include <intrin.h>
+#include <process.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#include <tlhelp32.h>
+#include <sys/stat.h>
+#include "tgl.h"
+#elif defined(__MINGW32__)
+#include "tgl.h"
++#include <winsock2.h>
 #include <unistd.h>
+#else
+#include <unistd.h>
+#include <netdb.h>
+#endif
 #include <fcntl.h>
 #include <sys/types.h>
-#include <netdb.h>
 #include <openssl/bn.h>
 #include <openssl/rand.h>
 #include <openssl/pem.h>
 #include <openssl/aes.h>
 #include <openssl/sha.h>
+#include <openssl/rand.h>
 
 #include "mtproto-common.h"
 #include "tools.h"
@@ -57,6 +76,15 @@ static long long rsa_encrypted_chunks, rsa_decrypted_chunks;
 //int verbosity;
 
 static int get_random_bytes (struct tgl_state *TLS, unsigned char *buf, int n) {
+#if defined(WIN32) || defined(_WIN32)
+  if (RAND_bytes(buf, n) != 1)
+    return 0;
+
+  vlogprintf(E_DEBUG, "added %d bytes of real entropy to secure random numbers seed\n", n);
+  *(long *)buf ^= lrand48();
+  srand48(*(long *)buf);
+  return n;
+#else
   int r = 0, h = open ("/dev/random", O_RDONLY | O_NONBLOCK);
   if (h >= 0) {
     r = read (h, buf, n);
@@ -86,11 +114,45 @@ static int get_random_bytes (struct tgl_state *TLS, unsigned char *buf, int n) {
   }
 
   return r;
+#endif
 }
 
 
 /* RDTSC */
-#if defined(__i386__)
+#ifdef _MSC_VER
+#define HAVE_RDTSC
+#pragma intrinsic(__rdtsc)
+static __inline unsigned long long rdtsc(void) {
+  return __rdtsc();
+}
+
+inline DWORD  getppid() {
+  HANDLE hSnapshot = INVALID_HANDLE_VALUE;
+  PROCESSENTRY32 pe32;
+  DWORD ppid = 0, pid = GetCurrentProcessId();
+
+  hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  __try {
+    if (hSnapshot == INVALID_HANDLE_VALUE) __leave;
+    ZeroMemory(&pe32, sizeof(pe32));
+    pe32.dwSize = sizeof(pe32);
+    if (!Process32First(hSnapshot, &pe32)) __leave;
+
+    do {
+      if (pe32.th32ProcessID == pid) {
+        ppid = pe32.th32ParentProcessID;
+        break;
+      }
+    } while (Process32Next(hSnapshot, &pe32));
+
+  }
+  __finally {
+    if (hSnapshot != INVALID_HANDLE_VALUE) CloseHandle(hSnapshot);
+  }
+  return ppid;
+}
+
+#elif defined(__i386__)
 #define HAVE_RDTSC
 static __inline__ unsigned long long rdtsc (void) {
   unsigned long long int x;
@@ -114,7 +176,11 @@ void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int pa
   unsigned long long r = rdtsc ();
   RAND_add (&r, 8, 4.0);
 #endif
+#if defined(_MSC_VER)
+  DWORD p = GetCurrentProcessId ();
+#else
   unsigned short p = getpid ();
+#endif
   RAND_add (&p, sizeof (p), 0.0);
   p = getppid ();
   RAND_add (&p, sizeof (p), 0.0);
@@ -125,14 +191,29 @@ void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int pa
   }
   memset (rb, 0, sizeof (rb));
   if (password_filename && password_length > 0) {
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+    int fd = 0;
+    errno_t err = _sopen_s(&fd, password_filename, _O_RDONLY | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+    if (err != 0) {
+      vlogprintf(E_WARNING, "Warning: fail to open password file - \"%s\", %s.\n", password_filename, GetErrnoStr (errno));
+#elif defined(WIN32) || defined(_WIN32)
+    int fd = open(password_filename, O_RDONLY | O_BINARY);
+    if (fd < 0) {
+      vlogprintf (E_WARNING, "Warning: fail to open password file - \"%s\", %s.\n", password_filename, GetErrnoStr (errno));
+#else
     int fd = open (password_filename, O_RDONLY);
     if (fd < 0) {
       vlogprintf (E_WARNING, "Warning: fail to open password file - \"%s\", %m.\n", password_filename);
+#endif
     } else {
       unsigned char *a = talloc0 (password_length);
       int l = read (fd, a, password_length);
       if (l < 0) {
+#if defined(WIN32) || defined(_WIN32)
+        vlogprintf (E_WARNING, "Warning: fail to read password file - \"%s\", %s.\n", password_filename, GetErrnoStr (errno));
+#else
         vlogprintf (E_WARNING, "Warning: fail to read password file - \"%s\", %m.\n", password_filename);
+#endif
       } else {
         vlogprintf (E_DEBUG, "read %d bytes from password file.\n", l);
         RAND_add (a, l, l);

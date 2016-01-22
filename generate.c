@@ -29,7 +29,16 @@
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
+#if defined(WIN32) || defined(_WIN32)
+#include <io.h>
+#include <stdint.h>
+#include <string.h>
+#ifndef __MINGW32__
+#include "wingetopt.h"
+#endif
+#else
 #include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -43,6 +52,27 @@
 #include "tree.h"
 
 int header;
+
+#if defined(WIN32) || defined(_WIN32)
+char* strndup(const char* str, size_t n) {
+  size_t len = n;
+  const char *end = memchr(str, '\0', n);
+  if (end)
+    len = end - str;
+
+  char* dupstr = malloc(len + 1);
+  if (dupstr != NULL) {
+    memcpy(dupstr, str, len);
+    dupstr[len] = '\0';
+  }
+  return dupstr;
+}
+
+#define lrand48() rand()
+#define _PRINTF_INT64_ "I64"
+#else
+#define _PRINTF_INT64_ "ll"
+#endif
 
 #define tl_type_name_cmp(a,b) (a->name > b->name ? 1 : a->name < b->name ? -1 : 0)
 
@@ -312,23 +342,41 @@ int gen_uni_skip (struct tl_tree *t, char *cur_name, int *vars, int first, int f
       printf ("  if (ODDP(%s) || (%s->type->name != 0x%08x && %s->type->name != 0x%08x)) { %s }\n", cur_name, cur_name, t1->type->name, cur_name, ~t1->type->name, fail);
     }
     for (i = 0; i < t1->children_num; i++) {
+#if defined(_MSC_VER)
+#pragma warning(disable : 4996)
+#endif
       sprintf (cur_name + L, "->params[%d]", i);
+#if defined(_MSC_VER)
+#pragma warning(default : 4996)
+#endif
       gen_uni_skip (t1->children[i], cur_name, vars, 0, fun);
       cur_name[L] = 0;
     }
     return 0;
   case NODE_TYPE_NAT_CONST:
-    printf ("  if (EVENP(%s) || ((long)%s) != %lld) { %s }\n", cur_name, cur_name, var_nat_const_to_int (t) * 2 + 1, fail);
+    printf ("  if (EVENP(%s) || ((long)%s) != %"_PRINTF_INT64_"d) { %s }\n", cur_name, cur_name, var_nat_const_to_int (t) * 2 + 1, fail);
     return 0;
   case NODE_TYPE_ARRAY:
     printf ("  if (ODDP(%s) || %s->type->name != TL_TYPE_ARRAY) { %s }\n", cur_name, cur_name, fail);
     t2 = (void *)t;
     
+#if defined(_MSC_VER)
+#pragma warning(disable : 4996)
+#endif
     sprintf (cur_name + L, "->params[0]");
+#if defined(_MSC_VER)
+#pragma warning(default : 4996)
+#endif
     y = gen_uni_skip (t2->multiplicity, cur_name, vars, 0, fun);    
     cur_name[L] = 0;
 
+#if defined(_MSC_VER)
+#pragma warning(disable : 4996)
+#endif
     sprintf (cur_name + L, "->params[1]");
+#if defined(_MSC_VER)
+#pragma warning(default : 4996)
+#endif
     y += gen_uni_skip (t2->args[0]->type, cur_name, vars, 0, fun);
     cur_name[L] = 0;
     return 0;
@@ -382,9 +430,9 @@ int gen_create (struct tl_tree *t, int *vars, int offset) {
     print_offset (offset + 2);
     t1 = (void *)t;
     if (t1->self.flags & FLAG_BARE) {
-      printf (".type = &(struct tl_type_descr) {.name = 0x%08x, .id = \"Bare_%s\", .params_num = %d, .params_types = %lld},\n", ~t1->type->name, t1->type->id, t1->type->arity, t1->type->params_types);
+      printf (".type = &(struct tl_type_descr) {.name = 0x%08x, .id = \"Bare_%s\", .params_num = %d, .params_types = %"_PRINTF_INT64_"d},\n", ~t1->type->name, t1->type->id, t1->type->arity, t1->type->params_types);
     } else {
-      printf (".type = &(struct tl_type_descr) {.name = 0x%08x, .id = \"%s\", .params_num = %d, .params_types = %lld},\n", t1->type->name, t1->type->id, t1->type->arity, t1->type->params_types);
+      printf (".type = &(struct tl_type_descr) {.name = 0x%08x, .id = \"%s\", .params_num = %d, .params_types = %"_PRINTF_INT64_"d},\n", t1->type->name, t1->type->id, t1->type->arity, t1->type->params_types);
     }
     if (t1->children_num) {
       print_offset (offset + 2);
@@ -1112,7 +1160,11 @@ int gen_field_autocomplete_excl (struct arg *arg, int *vars, int num, int from_f
   printf ("%sif (!field%d) { return 0; }\n", offset, num);
   printf ("%sadd_var_to_be_freed (field%d);\n", offset, num);
   static char s[20];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 20, "field%d", num);
+#else
   sprintf (s, "field%d", num);
+#endif
   gen_uni_skip (arg->type, s, vars, 1, 1);
   if (arg->exist_var_num >= 0) {
     printf ("  }\n");
@@ -1140,7 +1192,11 @@ int gen_field_store_excl (struct arg *arg, int *vars, int num, int from_func) {
   printf ("%sstruct paramed_type *field%d = store_function_any ();\n", offset, num);
   printf ("%sif (!field%d) { return 0; }\n", offset, num);
   static char s[20];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 20, "field%d", num);
+#else
   sprintf (s, "field%d", num);
+#endif
   gen_uni_skip (arg->type, s, vars, 1, 1);
   if (arg->exist_var_num >= 0) {
     printf ("  }\n");
@@ -1157,7 +1213,11 @@ void gen_constructor_skip (struct tl_combinator *c) {
     return;
   }
   static char s[10000];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 10000, "T");
+#else
   sprintf (s, "T");
+#endif
   
   int *vars = malloc0 (c->var_num * 4);;
   gen_uni_skip (c->result, s, vars, 1, 0);
@@ -1206,7 +1266,11 @@ void gen_constructor_fetch (struct tl_combinator *c) {
     return;
   }
   static char s[10000];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 10000, "T");
+#else
   sprintf (s, "T");
+#endif
   
   int *vars = malloc0 (c->var_num * 4);;
   gen_uni_skip (c->result, s, vars, 1, 0);
@@ -1219,7 +1283,7 @@ void gen_constructor_fetch (struct tl_combinator *c) {
     return;
   } else if (c->name == NAME_LONG) {
     printf ("  if (in_remaining () < 8) { return -1;}\n");
-    printf ("  eprintf (\" %%lld\", fetch_long ());\n");
+    printf ("  eprintf (\" %%"_PRINTF_INT64_"d\", fetch_long ());\n");
     printf ("  return 0;\n");
     printf ("}\n");
     return;
@@ -1266,7 +1330,11 @@ void gen_constructor_store (struct tl_combinator *c) {
     return;
   }
   static char s[10000];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 10000, "T");
+#else
   sprintf (s, "T");
+#endif
   
   int *vars = malloc0 (c->var_num * 4);;
   assert (c->var_num <= 10);
@@ -1333,7 +1401,11 @@ void gen_constructor_autocomplete (struct tl_combinator *c) {
     return;
   }
   static char s[10000];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 10000, "T");
+#else
   sprintf (s, "T");
+#endif
   
   int *vars = malloc0 (c->var_num * 4);;
   assert (c->var_num <= 10);
@@ -1397,7 +1469,11 @@ void gen_constructor_fetch_ds (struct tl_combinator *c) {
     return;
   }
   static char s[10000];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 10000, "T");
+#else
   sprintf (s, "T");
+#endif
   
   int *vars = malloc0 (c->var_num * 4);;
   gen_uni_skip (c->result, s, vars, 1, 1);
@@ -1465,7 +1541,11 @@ void gen_constructor_free_ds (struct tl_combinator *c) {
   }
 
   static char s[10000];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 10000, "T");
+#else
   sprintf (s, "T");
+#endif
   
   int *vars = malloc0 (c->var_num * 4);;
   gen_uni_skip (c->result, s, vars, 1, -1);
@@ -1517,7 +1597,11 @@ void gen_constructor_store_ds (struct tl_combinator *c) {
   }
 
   static char s[10000];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 10000, "T");
+#else
   sprintf (s, "T");
+#endif
   
   int *vars = malloc0 (c->var_num * 4);;
   gen_uni_skip (c->result, s, vars, 1, -1);
@@ -1567,7 +1651,11 @@ void gen_constructor_print_ds (struct tl_combinator *c) {
     return;
   }
   static char s[10000];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  sprintf_s (s, 10000, "T");
+#else
   sprintf (s, "T");
+#endif
   
   int *vars = malloc0 (c->var_num * 4);;
   gen_uni_skip (c->result, s, vars, 1, 0);
@@ -1578,7 +1666,7 @@ void gen_constructor_print_ds (struct tl_combinator *c) {
     printf ("}\n");
     return;
   } else if (c->name == NAME_LONG) {
-    printf ("  eprintf (\" %%lld\", *DS);\n");
+    printf ("  eprintf (\" %%"_PRINTF_INT64_"d\", *DS);\n");
     printf ("  return 0;\n");
     printf ("}\n");
     return;
@@ -2008,10 +2096,18 @@ struct tl_tree *read_type (int *var_num) {
   for (i = 0; i < T->children_num; i++) {
     int t = get_int ();
     if (t == (int)TLS_EXPR_NAT) {
+#ifdef _MSC_VER
+      assert ((T->type->params_types & (1i64 << i)));
+#else
       assert ((T->type->params_types & (1 << i)));
+#endif
       T->children[i] = read_nat_expr (var_num);
     } else if (t == (int)TLS_EXPR_TYPE) {
+#ifdef _MSC_VER
+      assert (!(T->type->params_types & (1i64 << i)));
+#else
       assert (!(T->type->params_types & (1 << i)));
+#endif
       T->children[i] = read_type_expr (var_num);
     } else {
       assert (0);
@@ -2258,7 +2354,11 @@ int gen_what_cnt;
 
 
 void gen_skip_header (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
+  printf ("#endif\n");
   printf ("#include <assert.h>\n");
 
   int i, j;
@@ -2275,12 +2375,19 @@ void gen_skip_header (void) {
 }
 
 void gen_skip_source (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-skip.h\"\n");
+  printf ("#include \"..\\auto-static-skip.c\"\n");
+  printf ("#include \"..\\mtproto-common.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
-  printf ("#include <assert.h>\n");
 
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto-static-skip.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
+  printf ("#endif\n");
+  printf ("#include <assert.h>\n");
 
   int i, j;
   for (i = 0; i < tn; i++) {
@@ -2302,7 +2409,11 @@ void gen_skip_source (void) {
 }
 
 void gen_fetch_header (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
+  printf ("#endif\n");
   printf ("#include <assert.h>\n");
   printf ("#include <stdio.h>\n");
 
@@ -2323,13 +2434,21 @@ void gen_fetch_header (void) {
 }
 
 void gen_fetch_source (void) {
+  printf ("#ifdef _MSC_VER \n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-fetch.h\"\n");
+  printf ("#include \"auto-skip.h\"\n");
+  printf ("#include \"..\\auto-static-fetch.c\"\n");
+  printf ("#include \"..\\mtproto-common.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
-  printf ("#include <assert.h>\n");
 
   printf ("#include \"auto/auto-fetch.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto-static-fetch.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
+  printf ("#endif\n");
+  printf ("#include <assert.h>\n");
   int i, j;
   for (i = 0; i < tn; i++) {
     for (j = 0; j < tps[i]->constructors_num; j ++) {
@@ -2350,7 +2469,11 @@ void gen_fetch_source (void) {
 }
 
 void gen_store_header (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
+  printf ("#endif\n");
   printf ("#include <assert.h>\n");
 
 
@@ -2375,12 +2498,19 @@ void gen_store_header (void) {
 }
 
 void gen_store_source (void ) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"..\\mtproto-common.h\"\n");
+  printf ("#include \"auto-store.h\"\n");
+  printf ("#include \"..\\auto-static-store.c\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
-  printf ("#include <assert.h>\n");
   
   printf ("#include \"mtproto-common.h\"\n");
   printf ("#include \"auto/auto-store.h\"\n");
   printf ("#include \"auto-static-store.c\"\n");
+  printf ("#endif\n");
+  printf ("#include <assert.h>\n");
 
   int i, j;
   for (i = 0; i < tn; i++) {
@@ -2427,7 +2557,11 @@ void gen_store_source (void ) {
 }
 
 void gen_autocomplete_header (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
+  printf ("#endif\n");
   printf ("#include <assert.h>\n");
 
   printf ("int tglf_extf_autocomplete (struct tgl_state *TLS, const char *text, int text_len, int index, char **R, char *data, int data_len);\n");
@@ -2448,12 +2582,19 @@ void gen_autocomplete_header (void) {
 }
 
 void gen_autocomplete_source (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"..\\mtproto-common.h\"\n");
+  printf ("#include \"auto-autocomplete.h\"\n");
+  printf ("#include \"..\\auto-static-autocomplete.c\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
-  printf ("#include <assert.h>\n");
   
   printf ("#include \"mtproto-common.h\"\n");
   printf ("#include \"auto/auto-autocomplete.h\"\n");
   printf ("#include \"auto-static-autocomplete.c\"\n");
+  printf ("#endif\n");
+  printf ("#include <assert.h>\n");
 
   int i, j;
   for (i = 0; i < tn; i++) {
@@ -2504,7 +2645,11 @@ void gen_autocomplete_source (void) {
 void gen_types_header (void) {
   printf ("#ifndef __AUTO_TYPES_H__\n");
   printf ("#define __AUTO_TYPES_H__\n");
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
+  printf ("#endif\n");
   int i;
   for (i = 0; i < tn; i++) if (tps[i]->id[0] != '#' && strcmp (tps[i]->id, "Type")) {
     printf ("extern struct tl_type_descr tl_type_%s;\n", tps[i]->print_id);
@@ -2512,6 +2657,15 @@ void gen_types_header (void) {
   }
   for (i = 0; i < tn; i++) if (tps[i]->id[0] != '#' && strcmp (tps[i]->id, "Type")) {
     printf ("struct tl_ds_%s {\n", tps[i]->print_id);
+#if !defined(__STDC__) ||  __STDC_VERSION__ < 199901L
+    if (tps[i]->constructors_num == 1 && tps[i]->constructors[0]->args_num == 0 &&
+        !(!strcmp (tps[i]->id, "String") || !strcmp (tps[i]->id, "Bytes"))) {
+      printf ("  int : 0;\n");
+      printf ("};\n");
+      continue;
+    }
+#endif
+
     if (!strcmp (tps[i]->id, "String") || !strcmp (tps[i]->id, "Bytes")) {
       printf ("  int len;\n");
       printf ("  char *data;\n");
@@ -2560,33 +2714,46 @@ void gen_types_header (void) {
 }
 
 void gen_types_source (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
+  printf ("#endif\n");
   int i;
   for (i = 0; i < tn; i++) if (tps[i]->id[0] != '#' && strcmp (tps[i]->id, "Type")) {
     printf ("struct tl_type_descr tl_type_%s = {\n", tps[i]->print_id);
     printf ("  .name = 0x%08x,\n", tps[i]->name);
     printf ("  .id = \"%s\"\n,", tps[i]->id);
     printf ("  .params_num = %d,\n", tps[i]->arity);
-    printf ("  .params_types = %lld\n", tps[i]->params_types);
+    printf ("  .params_types = %"_PRINTF_INT64_"d\n", tps[i]->params_types);
     printf ("};\n");
     printf ("struct tl_type_descr tl_type_bare_%s = {\n", tps[i]->print_id);
     printf ("  .name = 0x%08x,\n", ~tps[i]->name);
     printf ("  .id = \"Bare_%s\",\n", tps[i]->id);
     printf ("  .params_num = %d,\n", tps[i]->arity);
-    printf ("  .params_types = %lld\n", tps[i]->params_types);
+    printf ("  .params_types = %"_PRINTF_INT64_"d\n", tps[i]->params_types);
     printf ("};\n");
   }
 }
 
 void gen_fetch_ds_source (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-fetch-ds.h\"\n");
+  printf ("#include \"auto-skip.h\"\n");
+  printf ("#include \"auto-types.h\"\n");
+  printf ("#include \"..\\auto-static-fetch-ds.c\"\n");
+  printf ("#include \"..\\mtproto-common.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
-  printf ("#include <assert.h>\n");
 
   printf ("#include \"auto/auto-fetch-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
   printf ("#include \"auto-static-fetch-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
+  printf ("#endif\n");
+  printf ("#include <assert.h>\n");
   int i, j;
   for (i = 0; i < tn; i++) {
     for (j = 0; j < tps[i]->constructors_num; j ++) {
@@ -2607,7 +2774,11 @@ void gen_fetch_ds_source (void) {
 }
 
 void gen_fetch_ds_header (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
+  printf ("#endif\n");
   printf ("#include <assert.h>\n");
   printf ("#include <stdio.h>\n");
 
@@ -2631,14 +2802,23 @@ void gen_fetch_ds_header (void) {
 }
 
 void gen_free_ds_source (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-free-ds.h\"\n");
+  printf ("#include \"auto-skip.h\"\n");
+  printf ("#include \"auto-types.h\"\n");
+  printf ("#include \"..\\auto-static-free-ds.c\"\n");
+  printf ("#include \"..\\mtproto-common.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
-  printf ("#include <assert.h>\n");
 
   printf ("#include \"auto/auto-free-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
   printf ("#include \"auto-static-free-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
+  printf ("#endif\n");
+  printf ("#include <assert.h>\n");
   int i, j;
   for (i = 0; i < tn; i++) {
     for (j = 0; j < tps[i]->constructors_num; j ++) {
@@ -2659,8 +2839,13 @@ void gen_free_ds_source (void) {
 }
 
 void gen_free_ds_header (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-types.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
+  printf ("#endif\n");
   printf ("#include <assert.h>\n");
   printf ("#include <stdio.h>\n");
 
@@ -2684,14 +2869,23 @@ void gen_free_ds_header (void) {
 }
 
 void gen_store_ds_source (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-store-ds.h\"\n");
+  printf ("#include \"auto-skip.h\"\n");
+  printf ("#include \"auto-types.h\"\n");
+  printf ("#include \"..\\auto-static-store-ds.c\"\n");
+  printf ("#include \"..\\mtproto-common.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
-  printf ("#include <assert.h>\n");
 
   printf ("#include \"auto/auto-store-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
   printf ("#include \"auto-static-store-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
+  printf ("#endif\n");
+  printf ("#include <assert.h>\n");
   int i, j;
   for (i = 0; i < tn; i++) {
     for (j = 0; j < tps[i]->constructors_num; j ++) {
@@ -2712,8 +2906,13 @@ void gen_store_ds_source (void) {
 }
 
 void gen_store_ds_header (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-types.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
   printf ("#include \"auto/auto-types.h\"\n");
+  printf ("#endif\n");
   printf ("#include <assert.h>\n");
   printf ("#include <stdio.h>\n");
 
@@ -2740,8 +2939,13 @@ void gen_store_ds_header (void) {
 }
 
 void gen_print_ds_header (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-types.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
   printf ("#include \"auto-types.h\"\n");
+  printf ("#endif\n");
   printf ("#include <assert.h>\n");
   printf ("#include <stdio.h>\n");
 
@@ -2768,13 +2972,21 @@ void gen_print_ds_header (void) {
 }
 
 void gen_print_ds_source (void) {
+  printf ("#ifdef _MSC_VER\n");
+  printf ("#include \"..\\auto.h\"\n");
+  printf ("#include \"auto-print-ds.h\"\n");
+  printf ("#include \"auto-skip.h\"\n");
+  printf ("#include \"..\\auto-static-print-ds.c\"\n");
+  printf ("#include \"..\\mtproto-common.h\"\n");
+  printf ("#else\n");
   printf ("#include \"auto.h\"\n");
-  printf ("#include <assert.h>\n");
 
   printf ("#include \"auto/auto-print-ds.h\"\n");
   printf ("#include \"auto/auto-skip.h\"\n");
   printf ("#include \"auto-static-print-ds.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
+  printf ("#endif\n");
+  printf ("#include <assert.h>\n");
   int i, j;
   for (i = 0; i < tn; i++) {
     for (j = 0; j < tps[i]->constructors_num; j ++) {
@@ -2911,9 +3123,11 @@ void usage (void) {
   exit (2);
 }
 
+#ifndef _MSC_VER
 void logprintf (const char *format, ...) __attribute__ ((format (printf, 1, 2)));
 void logprintf (const char *format __attribute__ ((unused)), ...) {
 }
+#endif
 /*
 void hexdump (int *in_ptr, int *in_end) {
   int *ptr = in_ptr;
@@ -2977,9 +3191,22 @@ int main (int argc, char **argv) {
     usage ();
   }
 
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  int fd = 0;
+  errno_t err = _sopen_s(&fd, argv[optind], _O_RDONLY | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE);
+  if(err != 0) {
+    char errnoStr[256] = { 0 };
+    strerror_s (errnoStr, 256, err);
+    fprintf (stderr, "Can not open file '%s'. Error %s\n", argv[optind], errnoStr);
+#elif defined(WIN32) || defined(_WIN32)
+  int fd = open (argv[optind], O_RDONLY | O_BINARY);
+  if (fd < 0) {
+    fprintf (stderr, "Can not open file '%s'. Error %s\n", argv[optind], strerror (errno));
+#else
   int fd = open (argv[optind], O_RDONLY);
   if (fd < 0) {
     fprintf (stderr, "Can not open file '%s'. Error %m\n", argv[optind]);
+#endif
     exit (1);
   }
   buf_size = read (fd, buf, (1 << 20));

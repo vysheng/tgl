@@ -90,7 +90,11 @@ char *tg_mime_by_filename (const char *filename) {
     return def;
   }
   static char s[11];
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  strcpy_s(s, 11, p);
+#else
   strcpy (s, p);
+#endif
   char *q = s;
   while (*q) {
     if (*q >= 'A' && *p <= 'Z') {

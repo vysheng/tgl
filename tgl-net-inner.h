@@ -19,6 +19,12 @@
 */
 #ifndef __NET_H__
 #define __NET_H__
+#if !defined(WIN32) || !defined(_WIN32)
+typedef int SOCKET
+#ifndef SOCKET_ERROR
+#define SOCKET_ERROR -1
+#endif
+#endif
 
 struct connection_buffer {
   unsigned char *start;
@@ -37,7 +43,7 @@ enum conn_state {
 };
 
 struct connection {
-  int fd;
+  SOCKET fd;
   char *ip;
   int port;
   int flags;

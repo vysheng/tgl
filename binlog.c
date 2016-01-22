@@ -22,10 +22,21 @@
 #  include "config.h"
 #endif
 
+#if defined(WIN32) || defined(_WIN32)
+#include <stdint.h>
+#include <string.h>
+#include <fcntl.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#include <io.h>
+#include <sys/locking.h>
+#else
 #include <unistd.h>
+#include <sys/file.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/file.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -925,12 +936,12 @@ static void replay_log_event (struct tgl_state *TLS) {
   assert (rptr < wptr);
   int op = *rptr;
 
-  vlogprintf (E_DEBUG, "replay_log_event: log_pos=%lld, op=0x%08x\n", binlog_pos, op);
+  vlogprintf (E_DEBUG, "replay_log_event: log_pos=%"_PRINTF_INT64_"d, op=0x%08x\n", binlog_pos, op);
 
   in_ptr = rptr;
   in_end = wptr;
   if (skip_type_any (TYPE_TO_PARAM (binlog_update)) < 0) {
-    vlogprintf (E_ERROR, "Can not replay at %lld (magic = 0x%08x)\n", binlog_pos, *rptr);
+    vlogprintf (E_ERROR, "Can not replay at %"_PRINTF_INT64_"d (magic = 0x%08x)\n", binlog_pos, *rptr);
     assert (0);
   }
   int *end = in_ptr;
@@ -1044,8 +1055,13 @@ static void create_new_binlog (struct tgl_state *TLS) {
     out_int (2);
   }
   
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  int fd = 0;
+  if(_sopen_s (&fd, TLS->binlog_name, _O_WRONLY | _O_EXCL | _O_CREAT, _SH_DENYNO, _S_IREAD | _S_IWRITE) != 0 ) {
+#else
   int fd = open (TLS->binlog_name, O_WRONLY | O_EXCL | O_CREAT, 0600);
   if (fd < 0) {
+#endif
     perror ("Write new binlog");
     exit (2);
   }
@@ -1056,12 +1072,24 @@ static void create_new_binlog (struct tgl_state *TLS) {
 
 void tgl_replay_log (struct tgl_state *TLS) {
   if (!TLS->binlog_enabled) { return; }
+#if defined(WIN32) || defined(_WIN32)
+  if (INVALID_FILE_ATTRIBUTES == GetFileAttributesA (TLS->binlog_name) && GetLastError () == ERROR_FILE_NOT_FOUND) {
+#else
   if (access (TLS->binlog_name, F_OK) < 0) {
+#endif
     printf ("No binlog found. Creating new one\n");
     create_new_binlog (TLS);
   }
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  int fd = 0;
+  if (_sopen_s(&fd, TLS->binlog_name, _O_RDONLY | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE) != 0) {
+#elif defined(WIN32) || defined(_WIN32)
+  int fd = open (TLS->binlog_name, O_RDONLY | O_BINARY);
+  if (fd < 0) {
+#else
   int fd = open (TLS->binlog_name, O_RDONLY);
   if (fd < 0) {
+#endif
     perror ("binlog open");
     exit (2);
   }
@@ -1099,17 +1127,73 @@ void tgl_replay_log (struct tgl_state *TLS) {
 //static int b_packet_buffer[PACKET_BUFFER_SIZE];
 
 void tgl_reopen_binlog_for_writing (struct tgl_state *TLS) {
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+  if (_sopen_s (&TLS->binlog_fd, TLS->binlog_name, _O_WRONLY | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE) != 0) {
+#elif defined(WIN32) || defined(_WIN32)
+  TLS->binlog_fd = open (TLS->binlog_name, O_WRONLY | _O_BINARY);
+  if (TLS->binlog_fd < 0) {
+#else
   TLS->binlog_fd = open (TLS->binlog_name, O_WRONLY);
   if (TLS->binlog_fd < 0) {
+#endif
     perror ("binlog open");
     exit (2);
   }
   
   assert (lseek (TLS->binlog_fd, binlog_pos, SEEK_SET) == binlog_pos);
+#if defined(WIN32) || defined(_WIN32)
+  HANDLE h = INVALID_HANDLE_VALUE;
+  DWORD size_lower, size_upper;
+  DWORD err = 0;
+  OVERLAPPED ovlp;
+  int flags = 0;
+
+  h = (HANDLE)_get_osfhandle(TLS->binlog_fd);
+  if (h == INVALID_HANDLE_VALUE) {
+    errno = EBADF;
+    goto error;
+  }
+
+  size_lower = GetFileSize (h, &size_upper);
+  if (size_lower == INVALID_FILE_SIZE) {
+    goto get_err;
+  }
+
+  memset (&ovlp, 0, sizeof ovlp);
+  flags |= LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY;
+
+  if (!LockFileEx (h, flags, 0, size_lower, size_upper, &ovlp)) {
+    goto get_err;
+  }
+  return;
+
+error:
+  perror ("get lock");
+  exit(2);
+
+get_err:
+  err = GetLastError();
+  switch (err)
+  {
+  case ERROR_LOCK_VIOLATION:
+	  errno = EAGAIN;
+	  break;
+  case ERROR_NOT_ENOUGH_MEMORY:
+	  errno = ENOMEM;
+	  break;
+  case ERROR_BAD_COMMAND:
+	  errno = EINVAL;
+	  break;
+  default:
+	  errno = err;
+  }
+  goto error;
+#else
   if (flock (TLS->binlog_fd, LOCK_EX | LOCK_NB) < 0) {
     perror ("get lock");
     exit (2);
   } 
+#endif
 }
 
 static void add_log_event (struct tgl_state *TLS, const int *data, int len) {
@@ -1123,7 +1207,7 @@ static void add_log_event (struct tgl_state *TLS, const int *data, int len) {
   int *end = in_end;
   replay_log_event (TLS);
   if (rptr != wptr) {
-    vlogprintf (E_ERROR, "Unread %lld ints. Len = %d\n", (long long)(wptr - rptr), len);
+    vlogprintf (E_ERROR, "Unread %"_PRINTF_INT64_"d ints. Len = %d\n", (long long)(wptr - rptr), len);
     assert (rptr == wptr);
   }
   if (TLS->binlog_enabled) {

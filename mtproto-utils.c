@@ -3,6 +3,15 @@
 #include "tgl.h"
 #include "tools.h"
 
+#if !defined(HAVE___BUILTIN_BSWAP32) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
+static inline unsigned __builtin_bswap32(unsigned x) {
+  return ((x << 24) & 0xff000000) |
+    ((x << 8) & 0x00ff0000) |
+    ((x >> 8) & 0x0000ff00) |
+    ((x >> 24) & 0x000000ff);
+}
+#endif
+
 static unsigned long long gcd (unsigned long long a, unsigned long long b) {
   return b ? gcd (b, a % b) : a;
 }

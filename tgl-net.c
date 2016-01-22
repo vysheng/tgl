@@ -27,24 +27,40 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/types.h>
+#include <errno.h>
+#include <stdio.h>
+#if defined(WIN32) || defined(_WIN32)
+#include <io.h>
+#include <fcntl.h>
+#include <sys\types.h>
+#include <sys\stat.h>
+#include <stdint.h>
+#include <string.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#else
+#include <unistd.h>
+#include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/fcntl.h>
-#include <sys/socket.h>
-#include <errno.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <poll.h>
-#include <openssl/rand.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
+#endif
+
+#include <openssl/rand.h>
+
 #ifdef EVENT_V2
 #include <event2/event.h>
 #else
 #include <event.h>
 #include "event-old.h"
 #endif
-#include <sys/time.h>
 #include <time.h>
 
 #include "tgl-net-inner.h"
@@ -262,23 +278,34 @@ static void conn_try_write (evutil_socket_t fd, short what, void *arg) {
   }
 }
   
-static int my_connect (struct connection *c, const char *host) {
+static SOCKET my_connect (struct connection *c, const char *host) {
   struct tgl_state *TLS = c->TLS;
   int v6 = TLS->ipv6_enabled;
-  int fd = socket (v6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
+  SOCKET fd = socket (v6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
+#if defined(WIN32) || defined(_WIN32)
+  if (fd  == INVALID_SOCKET) {
+	vlogprintf(E_ERROR, "Can not create socket: %s\n", GetLastErrorStr(WSAGetLastError()));
+#else
   if (fd < 0) {
     vlogprintf (E_ERROR, "Can not create socket: %m\n");
+#endif
     start_fail_timer (c);
-    return -1;
+    return SOCKET_ERROR;
   }
+
+#if defined(WIN32) || defined(_WIN32)
+  assert(++max_connection_fd < MAX_CONNECTIONS);
+#else
   assert (fd >= 0 && fd < MAX_CONNECTIONS);
   if (fd > max_connection_fd) {
     max_connection_fd = fd;
   }
+#endif
+ 
   int flags = -1;
-  setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof (flags));
-  setsockopt (fd, SOL_SOCKET, SO_KEEPALIVE, &flags, sizeof (flags));
-  setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &flags, sizeof (flags));
+  setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&flags, sizeof (flags));
+  setsockopt (fd, SOL_SOCKET, SO_KEEPALIVE, (const char *)&flags, sizeof (flags));
+  setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, (const char *)&flags, sizeof (flags));
 
   struct sockaddr_in addr;
   struct sockaddr_in6 addr6;
@@ -289,25 +316,47 @@ static int my_connect (struct connection *c, const char *host) {
     addr6.sin6_port = htons (c->port);
     if (inet_pton (AF_INET6, host, &addr6.sin6_addr.s6_addr) != 1) {    
       vlogprintf (E_ERROR, "Bad ipv6 %s\n", host);
+#if defined(WIN32) || defined(_WIN32)
+	  closesocket (fd);
+	  max_connection_fd--;
+#else
       close (fd);
-      return -1;
+#endif
+      return SOCKET_ERROR;
     }
   } else {
     addr.sin_family = AF_INET; 
     addr.sin_port = htons (c->port);
     if (inet_pton (AF_INET, host, &addr.sin_addr.s_addr) != 1) {
       vlogprintf (E_ERROR, "Bad ipv4 %s\n", host);
+#if defined(WIN32) || defined(_WIN32)
+	  closesocket (fd);
+	  max_connection_fd--;
+#else
       close (fd);
-      return -1;
+#endif
+      return SOCKET_ERROR;
     }
   }
-
+ 
+#if defined(WIN32) || defined(_WIN32)
+  unsigned long nonblocking = 1;
+  assert (ioctlsocket (fd, FIONBIO, &nonblocking) != SOCKET_ERROR);
+#else
   fcntl (fd, F_SETFL, O_NONBLOCK);
+#endif  
 
+#if defined(WIN32) || defined(_WIN32)
+  if (connect (fd, (struct sockaddr *) (v6 ? (void *)&addr6 : (void *)&addr), v6 ? sizeof (addr6) : sizeof (addr)) != 0) {
+	  if (WSAGetLastError () != WSAEWOULDBLOCK) {
+		closesocket (fd);
+		max_connection_fd--;
+#else
   if (connect (fd, (struct sockaddr *) (v6 ? (void *)&addr6 : (void *)&addr), v6 ? sizeof (addr6) : sizeof (addr)) == -1) {
     if (errno != EINPROGRESS) {
       close (fd);
-      return -1;
+#endif
+      return SOCKET_ERROR;
     }
   }
   return fd;
@@ -319,9 +368,13 @@ struct connection *tgln_create_connection (struct tgl_state *TLS, const char *ho
   c->ip = tstrdup (host);
   c->port = port;
   
-  int fd = my_connect (c, c->ip);
-  if (fd < 0) {
+  SOCKET fd = my_connect (c, c->ip);
+  if (fd == SOCKET_ERROR) {
+#if defined(WIN32) || defined(_WIN32)
+	vlogprintf(E_ERROR, "Can not connect to %s:%d %s\n", host, port, GetLastErrorStr (WSAGetLastError ()));
+#else
     vlogprintf (E_ERROR, "Can not connect to %s:%d %m\n", host, port);
+#endif
     tfree (c, sizeof (*c));
     return 0;
   }
@@ -365,10 +418,14 @@ static void restart_connection (struct connection *c) {
     tfree_str (c->ip);
     c->ip = tstrdup (c->dc->ip);
   }*/
-  c->last_connect_time = time (0);
-  int fd = my_connect (c, c->ip);
-  if (fd < 0) {
+  c->last_connect_time = (int)time (0);
+  SOCKET fd = my_connect (c, c->ip);
+  if (fd == SOCKET_ERROR) {
+#if defined(WIN32) || defined(_WIN32)
+	vlogprintf(E_ERROR, "Can not connect to %s:%d %s\n", c->ip, c->port, GetLastErrorStr (WSAGetLastError ()));
+#else
     vlogprintf (E_WARNING, "Can not connect to %s:%d %m\n", c->ip, c->port);
+#endif
     start_fail_timer (c);
     return;
   }
@@ -414,7 +471,12 @@ static void fail_connection (struct connection *c) {
   c->out_head = c->out_tail = c->in_head = c->in_tail = 0;
   c->state = conn_failed;
   c->out_bytes = c->in_bytes = 0;
+#if defined(WIN32) || defined(_WIN32)
+  closesocket (c->fd);
+  max_connection_fd--;
+#else
   close (c->fd);
+#endif  
   Connections[c->fd] = 0;
   vlogprintf (E_NOTICE, "Lost connection to server... %s:%d\n", c->ip, c->port);
   restart_connection (c);
@@ -426,8 +488,13 @@ static void try_write (struct connection *c) {
   vlogprintf (E_DEBUG, "try write: fd = %d\n", c->fd);
   int x = 0;
   while (c->out_head) {
+#if defined(WIN32) || defined(_WIN32)
+	int r = send(c->fd, c->out_head->rptr, c->out_head->wptr - c->out_head->rptr, 0);
+	if (r != SOCKET_ERROR) {
+#else
     int r = write (c->fd, c->out_head->rptr, c->out_head->wptr - c->out_head->rptr);
     if (r >= 0) {
+#endif    
       x += r;
       c->out_head->rptr += r;
       if (c->out_head->rptr != c->out_head->wptr) {
@@ -440,8 +507,13 @@ static void try_write (struct connection *c) {
       }
       delete_connection_buffer (b);
     } else {
+#if defined(WIN32) || defined(_WIN32)
+	  if (/*WSAGetLastError() != EAGAIN && */WSAGetLastError() != WSAEWOULDBLOCK) {
+		vlogprintf(E_NOTICE, "fail_connection: write_error %s\n", GetLastErrorStr(WSAGetLastError()));
+#else
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
         vlogprintf (E_NOTICE, "fail_connection: write_error %m\n");
+#endif
         fail_connection (c);
         return;
       } else {
@@ -503,8 +575,13 @@ static void try_read (struct connection *c) {
   #endif
   int x = 0;
   while (1) {
+#if defined(WIN32) || defined(_WIN32)
+	int r = recv(c->fd, c->in_tail->wptr, c->in_tail->end - c->in_tail->wptr, 0);
+	if (r != SOCKET_ERROR) {
+#else
     int r = read (c->fd, c->in_tail->wptr, c->in_tail->end - c->in_tail->wptr);
     if (r > 0) {
+#endif    
       c->last_receive_time = tglt_get_double_time ();
       stop_ping_timer (c);
       start_ping_timer (c);
@@ -519,8 +596,13 @@ static void try_read (struct connection *c) {
       c->in_tail->next = b;
       c->in_tail = b;
     } else {
+#if defined(WIN32) || defined(_WIN32)
+	  if (/*WSAGetLastError() != EAGAIN &&*/ WSAGetLastError() != WSAEWOULDBLOCK) {
+		vlogprintf(E_NOTICE, "fail_connection: read_error %s\n", GetLastErrorStr(WSAGetLastError()));
+#else
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
         vlogprintf (E_NOTICE, "fail_connection: read_error %m\n");
+#endif
         fail_connection (c);
         return;
       } else {
@@ -567,7 +649,15 @@ static void tgln_free (struct connection *c) {
     delete_connection_buffer (d);
   }
 
-  if (c->fd >= 0) { Connections[c->fd] = 0; close (c->fd); }
+  if (c->fd >= 0) { 
+	  Connections[c->fd] = 0; 
+#if defined(WIN32) || defined(_WIN32)
+	  closesocket (c->fd);
+	  max_connection_fd--;
+#else
+	  close (c->fd);
+#endif
+  }
   tfree (c, sizeof (*c));
 }
 
