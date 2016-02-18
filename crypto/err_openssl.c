@@ -24,10 +24,18 @@
 
 #include <openssl/err.h>
 
+#include "../tgl.h"
+#include "../tgl-inner.h"
 #include "err.h"
 
 void TGLC_err_print_errors_fp (FILE *fp) {
   ERR_print_errors_fp (fp);
+}
+
+int TGLC_init (struct tgl_state *TLS) {
+  // Doesn't seem to need any initialization.
+  vlogprintf (6, "Init OpenSSL (no-op)\n");
+  return !0;
 }
 
 #endif
