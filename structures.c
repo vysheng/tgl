@@ -2071,7 +2071,7 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
   case tgl_message_media_geo:
     return;
   case tgl_message_media_photo:
-    tgls_free_photo (TLS, M->photo);
+    if (M->photo) { tgls_free_photo (TLS, M->photo); }
     if (M->caption) { tfree_str (M->caption); }
     M->photo = NULL;
     return;
