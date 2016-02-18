@@ -30,4 +30,10 @@ void TGLC_err_print_errors_fp (FILE *fp) {
   ERR_print_errors_fp (fp);
 }
 
+int TGLC_init (void) {
+  // Doesn't seem to need any initialization.
+  vlogprintf (E_DEBUG, "Init OpenSSL (no-op)\n");
+  return !0;
+}
+
 #endif
