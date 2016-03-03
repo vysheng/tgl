@@ -1449,7 +1449,9 @@ struct get_history_extra {
   tgl_peer_id_t id;
   int limit;
   int offset;
-  int max_id;
+  int offset_id;
+  int min_id;
+  int is_range;
 };
 
 static void _tgl_do_get_history (struct tgl_state *TLS, struct get_history_extra *E, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
@@ -1493,8 +1495,14 @@ static int get_history_on_answer (struct tgl_state *TLS, struct query *q, void *
     E->limit = count - E->offset;
     if (E->limit < 0) { E->limit = 0; }
   }
-  assert (E->limit >= 0);
 
+  if (E->is_range > 0) {
+    if (n <= 0) {
+      E->limit = 0; // no messages left in the range
+    } else if (E->ML[E->list_offset - 1] && E->ML[E->list_offset - 1]->permanent_id.id <= E->min_id + 1) {
+      E->limit = 0; // offset_id lower than min_id
+    }
+  }
 
   if (E->limit <= 0 || DS_MM->magic == CODE_messages_messages) {
     if (q->callback) {
@@ -1507,8 +1515,9 @@ static int get_history_on_answer (struct tgl_state *TLS, struct query *q, void *
     tfree (E->ML, sizeof (void *) * E->list_size);
     tfree (E, sizeof (*E));
   } else {
+    assert (E->list_offset > 0);
     E->offset = 0;
-    E->max_id = E->ML[E->list_offset - 1]->permanent_id.id;
+    E->offset_id = E->ML[E->list_offset - 1]->permanent_id.id;
     _tgl_do_get_history (TLS, E, q->callback, q->callback_extra);
   }
   return 0;
@@ -1587,11 +1596,11 @@ static void _tgl_do_get_history (struct tgl_state *TLS, struct get_history_extra
     out_int (tgl_get_peer_id (E->id));
     out_long (E->id.access_hash);
   }
-  out_int (E->max_id);
+  out_int (E->offset_id);
   out_int (E->offset);
   out_int (E->limit);
   out_int (0);
-  out_int (0);
+  out_int (E->min_id);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_history_methods, E, callback, callback_extra);
 }
 
@@ -1605,6 +1614,18 @@ void tgl_do_get_history (struct tgl_state *TLS, tgl_peer_id_t id, int offset, in
   E->id = id;
   E->limit = limit;
   E->offset = offset;
+  _tgl_do_get_history (TLS, E, callback, callback_extra);
+}
+
+void tgl_do_get_history_range (struct tgl_state *TLS, tgl_peer_id_t id, int min_id, int max_id, int limit, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
+
+  struct get_history_extra *E = talloc0 (sizeof (*E));
+  E->id = id;
+  E->limit = limit;
+  E->offset_id = max_id;
+  E->min_id = min_id;
+  E->is_range = 1;
+
   _tgl_do_get_history (TLS, E, callback, callback_extra);
 }
 /* }}} */
