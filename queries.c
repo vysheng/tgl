@@ -1496,7 +1496,7 @@ static int get_history_on_answer (struct tgl_state *TLS, struct query *q, void *
   assert (E->limit >= 0);
 
 
-  if (E->limit <= 0 || DS_MM->magic == CODE_messages_messages || DS_MM->magic == CODE_messages_channel_messages) {
+  if (E->limit <= 0 || DS_MM->magic == CODE_messages_messages) {
     if (q->callback) {
       ((void (*)(struct tgl_state *TLS, void *, int, int, struct tgl_message **))q->callback) (TLS, q->callback_extra, 1, E->list_offset, E->ML);
     }
