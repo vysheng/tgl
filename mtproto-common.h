@@ -22,11 +22,17 @@
 #define __MTPROTO_COMMON_H__
 
 #include <string.h>
-#include <openssl/rsa.h>
-#include <openssl/bn.h>
-#include <openssl/aes.h>
+#include "crypto/rsa_pem.h"
+#include "crypto/bn.h"
 #include <stdio.h>
 #include <assert.h>
+
+
+#if defined(_MSC_VER) || defined(__MINGW32__)
+#define INT64_PRINTF_MODIFIER "I64"
+#else
+#define INT64_PRINTF_MODIFIER "ll"
+#endif
 
 //#include "interface.h"
 #include "tools.h"
@@ -115,11 +121,11 @@ struct encrypted_message {
 
 #pragma pack(pop)
 
-//BN_CTX *BN_ctx;
+//TGLC_bn_ctx *bn_ctx;
 
 void tgl_prng_seed (struct tgl_state *TLS, const char *password_filename, int password_length);
-int tgl_serialize_bignum (BIGNUM *b, char *buffer, int maxlen);
-long long tgl_do_compute_rsa_key_fingerprint (RSA *key);
+int tgl_serialize_bignum (TGLC_bn *b, char *buffer, int maxlen);
+long long tgl_do_compute_rsa_key_fingerprint (TGLC_rsa *key);
 
 #define packet_buffer tgl_packet_buffer
 #define packet_ptr tgl_packet_ptr
@@ -168,7 +174,7 @@ static inline void out_string (const char *str) {
   out_cstring (str, strlen (str));
 }
 
-static inline void out_bignum (BIGNUM *n) {
+static inline void out_bignum (TGLC_bn *n) {
   int l = tgl_serialize_bignum (n, (char *)packet_ptr, (PACKET_BUFFER_SIZE - (packet_ptr - packet_buffer)) * 4);
   assert (l > 0);
   packet_ptr += l >> 2;
@@ -288,7 +294,7 @@ static inline long have_prefetch_ints (void) {
   return in_end - in_ptr;
 }
 
-int tgl_fetch_bignum (BIGNUM *x);
+int tgl_fetch_bignum (TGLC_bn *x);
 #define fetch_bignum tgl_fetch_bignum
 
 static inline int fetch_int (void) {
@@ -357,13 +363,13 @@ static inline int in_remaining (void) {
 
 //int get_random_bytes (unsigned char *buf, int n);
 
-int tgl_pad_rsa_encrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, BIGNUM *N, BIGNUM *E);
-int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, BIGNUM *N, BIGNUM *D);
+int tgl_pad_rsa_encrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, TGLC_bn *N, TGLC_bn *E);
+int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *to, int size, TGLC_bn *N, TGLC_bn *D);
 
 //extern long long rsa_encrypted_chunks, rsa_decrypted_chunks;
 
 //extern unsigned char aes_key_raw[32], aes_iv[32];
-//extern AES_KEY aes_key;
+//extern TGLC_aes_key aes_key;
 
 void tgl_init_aes_unauth (const char server_nonce[16], const char hidden_client_nonce[32], int encrypt);
 void tgl_init_aes_auth (char auth_key[192], char msg_key[16], int encrypt);
@@ -378,7 +384,7 @@ static inline void hexdump_out (void) {
   hexdump (packet_buffer, packet_ptr);
 }*/
 
-#ifdef __MACH__
+#ifndef CLOCK_REALTIME
 #define CLOCK_REALTIME 0
 #define CLOCK_MONOTONIC 1
 #endif

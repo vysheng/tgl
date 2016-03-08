@@ -21,9 +21,21 @@
 #ifndef __TOOLS_H__
 #define __TOOLS_H__
 #include <time.h>
-#include <openssl/err.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include <assert.h>
-#include "tgl.h"
+#include <string.h>
+//#include "tgl.h"
+#include "crypto/err.h"
+#include "crypto/rand.h"
+
+struct tgl_allocator {
+  void *(*alloc)(size_t size);
+  void *(*realloc)(void *ptr, size_t old_size, size_t size);
+  void (*free)(void *ptr, int size);
+  void (*check)(void);
+  void (*exists)(void *ptr, int size);
+};
 
 #define talloc tgl_allocator->alloc
 #define talloc0 tgl_alloc0
@@ -54,8 +66,8 @@ static inline void out_of_memory (void) {
 
 static inline void ensure (int r) {
   if (!r) {
-    fprintf (stderr, "Open SSL error\n");
-    ERR_print_errors_fp (stderr);
+    fprintf (stderr, "Crypto error\n");
+    TGLC_err_print_errors_fp (stderr);
     assert (0);
   }
 }
@@ -88,8 +100,8 @@ void tgl_exists_release (void *ptr, int size);
 
 void *tgl_memdup (const void *s, size_t n);
 
-int tgl_snprintf (char *buf, int len, const char *format, ...) __attribute__ ((format (printf, 3, 4)));
-int tgl_asprintf (char **res, const char *format, ...) __attribute__ ((format (printf, 2, 3)));
+int tgl_snprintf (char *buf, int len, const char *format, ...) __attribute__ ((format (__printf__, 3, 4)));
+int tgl_asprintf (char **res, const char *format, ...) __attribute__ ((format (__printf__, 2, 3)));
 
 void tglt_secure_random (void *s, int l);
 void tgl_my_clock_gettime (int clock_id, struct timespec *T);
@@ -118,6 +130,5 @@ static inline void hexdump (void *ptr, void *end_ptr) {
   }
   if (total) { fprintf (stderr, "\n"); }
 }
-
 
 #endif

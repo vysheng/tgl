@@ -30,13 +30,13 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <sys/fcntl.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <poll.h>
-#include <openssl/rand.h>
+#include "crypto/rand.h"
 #include <arpa/inet.h>
 #ifdef EVENT_V2
 #include <event2/event.h>
@@ -267,7 +267,7 @@ static int my_connect (struct connection *c, const char *host) {
   int v6 = TLS->ipv6_enabled;
   int fd = socket (v6 ? AF_INET6 : AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
-    vlogprintf (E_ERROR, "Can not create socket: %m\n");
+    vlogprintf (E_ERROR, "Can not create socket: %s\n", strerror(errno));
     start_fail_timer (c);
     return -1;
   }
@@ -321,7 +321,7 @@ struct connection *tgln_create_connection (struct tgl_state *TLS, const char *ho
   
   int fd = my_connect (c, c->ip);
   if (fd < 0) {
-    vlogprintf (E_ERROR, "Can not connect to %s:%d %m\n", host, port);
+    vlogprintf (E_ERROR, "Can not connect to %s:%d %s\n", host, port, strerror(errno));
     tfree (c, sizeof (*c));
     return 0;
   }
@@ -368,7 +368,7 @@ static void restart_connection (struct connection *c) {
   c->last_connect_time = time (0);
   int fd = my_connect (c, c->ip);
   if (fd < 0) {
-    vlogprintf (E_WARNING, "Can not connect to %s:%d %m\n", c->ip, c->port);
+    vlogprintf (E_WARNING, "Can not connect to %s:%d %s\n", c->ip, c->port, strerror(errno));
     start_fail_timer (c);
     return;
   }
@@ -441,7 +441,7 @@ static void try_write (struct connection *c) {
       delete_connection_buffer (b);
     } else {
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
-        vlogprintf (E_NOTICE, "fail_connection: write_error %m\n");
+        vlogprintf (E_NOTICE, "fail_connection: write_error %s\n", strerror(errno));
         fail_connection (c);
         return;
       } else {
@@ -520,7 +520,7 @@ static void try_read (struct connection *c) {
       c->in_tail = b;
     } else {
       if (errno != EAGAIN && errno != EWOULDBLOCK) {
-        vlogprintf (E_NOTICE, "fail_connection: read_error %m\n");
+        vlogprintf (E_NOTICE, "fail_connection: read_error %s\n", strerror(errno));
         fail_connection (c);
         return;
       } else {

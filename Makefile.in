@@ -15,15 +15,15 @@ AUTO=auto
 OBJ=objs
 LIB=libs
 EXE=bin
-DIR_LIST=${DEP} ${AUTO} ${EXE} ${OBJ} ${LIB} ${DEP}/auto ${OBJ}/auto
+DIR_LIST=${DEP} ${DEP}/crypto ${AUTO} ${EXE} ${OBJ} ${OBJ}/crypto ${LIB} ${DEP}/auto ${OBJ}/auto
 
 LIB_LIST=${LIB}/libtgl.a ${LIB}/libtgl.so
 
-TGL_OBJECTS=${OBJ}/mtproto-common.o ${OBJ}/mtproto-client.o ${OBJ}/queries.o ${OBJ}/structures.o ${OBJ}/binlog.o ${OBJ}/tgl.o ${OBJ}/updates.o ${OBJ}/tg-mime-types.o ${OBJ}/mtproto-utils.o @EXTRA_OBJECTS@
+TGL_OBJECTS=${OBJ}/mtproto-common.o ${OBJ}/mtproto-client.o ${OBJ}/mtproto-key.o ${OBJ}/queries.o ${OBJ}/structures.o ${OBJ}/binlog.o ${OBJ}/tgl.o ${OBJ}/updates.o ${OBJ}/tg-mime-types.o ${OBJ}/mtproto-utils.o ${OBJ}/crypto/bn_openssl.o ${OBJ}/crypto/bn_altern.o ${OBJ}/crypto/rsa_pem_openssl.o ${OBJ}/crypto/rsa_pem_altern.o ${OBJ}/crypto/md5_openssl.o ${OBJ}/crypto/md5_altern.o ${OBJ}/crypto/sha_openssl.o ${OBJ}/crypto/sha_altern.o ${OBJ}/crypto/aes_openssl.o ${OBJ}/crypto/aes_altern.o @EXTRA_OBJECTS@
 TGL_OBJECTS_AUTO=${OBJ}/auto/auto-skip.o ${OBJ}/auto/auto-fetch.o ${OBJ}/auto/auto-store.o ${OBJ}/auto/auto-autocomplete.o ${OBJ}/auto/auto-types.o ${OBJ}/auto/auto-fetch-ds.o  ${OBJ}/auto/auto-free-ds.o ${OBJ}/auto/auto-store-ds.o ${OBJ}/auto/auto-print-ds.o
 TLD_OBJECTS=${OBJ}/dump-tl-file.o
 GENERATE_OBJECTS=${OBJ}/generate.o
-COMMON_OBJECTS=${OBJ}/tools.o
+COMMON_OBJECTS=${OBJ}/tools.o ${OBJ}/crypto/rand_openssl.o ${OBJ}/crypto/rand_altern.o ${OBJ}/crypto/err_openssl.o ${OBJ}/crypto/err_altern.o
 OBJ_C=${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS} ${TLD_OBJECTS}
 
 DEPENDENCE=$(subst ${OBJ}/,${DEP}/,$(patsubst %.o,%.d,${OBJ_C}))
@@ -57,10 +57,10 @@ ${TGL_OBJECTS_AUTO}: ${OBJ}/auto/%.o: ${AUTO}/%.c | create_dirs
 	${CC} ${INCLUDE} ${COMPILE_FLAGS} -iquote ${srcdir}/tgl -c -MP -MD -MF ${DEP}/$*.d -MQ ${OBJ}/$*.o -o $@ $<
 
 ${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
-	rm -f $@ && ar ruv $@ ${TGL_OBJECTS} ${COMMON_OBJECTS}
+	rm -f $@ && ar ruv $@ $^
 
 ${LIB}/libtgl.so: ${TGL_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
-	${CC} -shared -o $@ ${TGL_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS}
+	${CC} -shared -o $@ $^ ${LINK_FLAGS}
 
 ${EXE}/generate: ${GENERATE_OBJECTS} ${COMMON_OBJECTS}
 	${CC} ${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS} -o $@
@@ -78,10 +78,10 @@ ${AUTO}/auto.c: ${AUTO}/scheme.tlo ${EXE}/generate
 	${EXE}/generate ${AUTO}/scheme.tlo > $@
 
 ${AUTO}/auto-%.c: ${AUTO}/scheme.tlo ${EXE}/generate auto/constants.h ${AUTO}/auto-%.h | create_dirs_and_headers
-	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.c,%,$@) ${AUTO}/scheme.tlo > $@ || rm $@
+	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.c,%,$@) ${AUTO}/scheme.tlo > $@ || ( rm $@ && false )
 
 ${AUTO}/auto-%.h: ${AUTO}/scheme.tlo ${EXE}/generate
-	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.h,%-header,$@) ${AUTO}/scheme.tlo > $@ || rm $@
+	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.h,%-header,$@) ${AUTO}/scheme.tlo > $@ || ( rm $@ && false )
 
 
 ${AUTO}/constants.h: ${AUTO}/scheme2.tl ${srcdir}/gen_constants_h.awk
@@ -91,5 +91,12 @@ ${EXE}/dump-tl-file: ${OBJ}/auto/auto.o ${TLD_OBJECTS}
 	${CC} ${OBJ}/auto/auto.o ${TLD_OBJECTS} ${LINK_FLAGS} -o $@
 
 clean:
-	rm -rf ${DIR_LIST} config.log config.status > /dev/null || echo "all clean"
+	rm -rf ${DIR_LIST}
 
+distclean:
+	rm -rf ${DIR_LIST} config.h config.log config.status
+
+mime-types.c: mime.types
+	@echo "// DO NOT EDIT! SEE MAKE-TARGET 'gen-mime-types'" > mime-types.c
+# xxd is usually packaged with vim-common
+	xxd -i mime.types >> mime-types.c

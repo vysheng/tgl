@@ -21,7 +21,7 @@
 #ifndef __MTPROTO_CLIENT_H__
 #define __MTPROTO_CLIENT_H__
 //#include "net.h"
-#include <openssl/bn.h>
+#include "crypto/bn.h"
 //void on_start (void);
 //..long long encrypt_send_message (struct connection *c, int *msg, int msg_ints, int useful);
 //void dc_authorize (struct tgl_dc *DC);
@@ -53,7 +53,7 @@ struct tgl_dc *tglmp_alloc_dc (struct tgl_state *TLS, int flags, int id, char *i
 void tglmp_regenerate_temp_auth_key (struct tgl_state *TLS, struct tgl_dc *D);
 
 void tgln_insert_msg_id (struct tgl_state *TLS, struct tgl_session *S, long long id);
-void tglmp_on_start (struct tgl_state *TLS);
+int tglmp_on_start (struct tgl_state *TLS);
 void tgl_dc_authorize (struct tgl_state *TLS, struct tgl_dc *DC);
 void tgls_free_dc (struct tgl_state *TLS, struct tgl_dc *DC);
 void tgls_free_pubkey (struct tgl_state *TLS);

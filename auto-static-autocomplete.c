@@ -1,3 +1,7 @@
+#include <assert.h>
+
+#include "config.h"
+
 #define IN_AUTOCOMPLETE_H
 #include "auto-static-store.c"
 #undef IN_AUTOCOMPLETE_H
@@ -36,6 +40,10 @@ static void free_vars_to_be_freed (void) {
 }
 
 int tglf_extf_autocomplete (struct tgl_state *TLS, const char *text, int text_len, int index, char **R, char *data, int data_len) {
+#ifdef DISABLE_EXTF
+  (void) free_vars_to_be_freed;
+  assert (0);
+#else
   if (index == -1) {
     buffer_pos = data;
     buffer_end = data + data_len;
@@ -60,4 +68,5 @@ int tglf_extf_autocomplete (struct tgl_state *TLS, const char *text, int text_le
   } else {
     return autocomplete_fun (text, len, index, R);
   }
+#endif
 }

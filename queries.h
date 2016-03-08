@@ -33,6 +33,8 @@ struct query_methods {
   int (*on_error)(struct tgl_state *TLS, struct query *q, int error_code, int len, const char *error);
   int (*on_timeout)(struct tgl_state *TLS, struct query *q);
   struct paramed_type *type;
+  char *name;
+  double timeout;
 };
 
 struct query {
@@ -77,6 +79,7 @@ void tgl_do_abort_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E);
 void tglq_regen_query (struct tgl_state *TLS, long long id);
 void tglq_query_delete (struct tgl_state *TLS, long long id);
 void tglq_query_free_all (struct tgl_state *TLS);
+void tglq_regen_queries_from_old_session (struct tgl_state *TLS, struct tgl_dc *DC, struct tgl_session *S);
 // For binlog
 
 //int get_dh_config_on_answer (struct query *q);

@@ -1,14 +1,15 @@
 #include "config.h"
-#include <openssl/bn.h>
+#include "crypto/bn.h"
 #include "tgl.h"
 #include "tools.h"
+#include "mtproto-utils.h"
 
 static unsigned long long gcd (unsigned long long a, unsigned long long b) {
   return b ? gcd (b, a % b) : a;
 }
 
-static int check_prime (struct tgl_state *TLS, BIGNUM *p) {
-  int r = BN_is_prime (p, BN_prime_checks, 0, TLS->BN_ctx, 0);
+static int check_prime (struct tgl_state *TLS, TGLC_bn *p) {
+  int r = TGLC_bn_is_prime (p, /* "use default" */ 0, 0, TLS->TGLC_bn_ctx, 0);
   ensure (r >= 0);
   return r;
 }
@@ -18,20 +19,20 @@ static int check_prime (struct tgl_state *TLS, BIGNUM *p) {
 
 
 // Checks that (p,g) is acceptable pair for DH
-int tglmp_check_DH_params (struct tgl_state *TLS, BIGNUM *p, int g) {
+int tglmp_check_DH_params (struct tgl_state *TLS, TGLC_bn *p, int g) {
   if (g < 2 || g > 7) { return -1; }
-  if (BN_num_bits (p) != 2048) { return -1; }
+  if (TGLC_bn_num_bits (p) != 2048) { return -1; }
   
-  BIGNUM *t = BN_new ();
+  TGLC_bn *t = TGLC_bn_new ();
   
-  BIGNUM *dh_g = BN_new ();
+  TGLC_bn *dh_g = TGLC_bn_new ();
   
-  ensure (BN_set_word (dh_g, 4 * g));
-  ensure (BN_mod (t, p, dh_g, TLS->BN_ctx));
-  int x = BN_get_word (t);
+  ensure (TGLC_bn_set_word (dh_g, 4 * g));
+  ensure (TGLC_bn_mod (t, p, dh_g, TLS->TGLC_bn_ctx));
+  int x = TGLC_bn_get_word (t);
   assert (x >= 0 && x < 4 * g);
 
-  BN_free (dh_g);
+  TGLC_bn_free (dh_g);
 
   int res = 0;
   switch (g) {
@@ -55,66 +56,66 @@ int tglmp_check_DH_params (struct tgl_state *TLS, BIGNUM *p, int g) {
   }
 
   if (res < 0 || !check_prime (TLS, p)) { 
-    BN_free (t);
+    TGLC_bn_free (t);
     return -1; 
   }
 
-  BIGNUM *b = BN_new ();
-  ensure (BN_set_word (b, 2));
-  ensure (BN_div (t, 0, p, b, TLS->BN_ctx));
+  TGLC_bn *b = TGLC_bn_new ();
+  ensure (TGLC_bn_set_word (b, 2));
+  ensure (TGLC_bn_div (t, 0, p, b, TLS->TGLC_bn_ctx));
   if (!check_prime (TLS, t)) { 
     res = -1;
   }
-  BN_free (b);
-  BN_free (t);
+  TGLC_bn_free (b);
+  TGLC_bn_free (t);
   return res;
 }
 
 // checks that g_a is acceptable for DH
-int tglmp_check_g_a (struct tgl_state *TLS, BIGNUM *p, BIGNUM *g_a) {
-  if (BN_num_bytes (g_a) > 256) {
+int tglmp_check_g_a (struct tgl_state *TLS, TGLC_bn *p, TGLC_bn *g_a) {
+  if (TGLC_bn_num_bytes (g_a) > 256) {
     return -1;
   }
-  if (BN_num_bits (g_a) < 2048 - 64) {
+  if (TGLC_bn_num_bits (g_a) < 2048 - 64) {
     return -1;
   }
-  if (BN_cmp (p, g_a) <= 0) {
+  if (TGLC_bn_cmp (p, g_a) <= 0) {
     return -1;
   }
   
-  BIGNUM *dif = BN_new ();
-  BN_sub (dif, p, g_a);
-  if (BN_num_bits (dif) < 2048 - 64) {
-    BN_free (dif);
+  TGLC_bn *dif = TGLC_bn_new ();
+  TGLC_bn_sub (dif, p, g_a);
+  if (TGLC_bn_num_bits (dif) < 2048 - 64) {
+    TGLC_bn_free (dif);
     return -1;
   }
-  BN_free (dif);
+  TGLC_bn_free (dif);
   return 0;
 }
 
-static unsigned long long BN2ull (BIGNUM *b) {
-  if (sizeof (BN_ULONG) == 8) {
-    return BN_get_word (b);
+static unsigned long long BN2ull (TGLC_bn *b) {
+  if (sizeof (unsigned long) == 8) {
+    return TGLC_bn_get_word (b);
   } else {
     unsigned int tmp[2];
     memset (tmp, 0, 8);
-    BN_bn2bin (b, (void *)tmp);
+    TGLC_bn_bn2bin (b, (void *)tmp);
     return __builtin_bswap32 (tmp[0]) * (1ll << 32) | __builtin_bswap32 (tmp[1]);
   }
 }
 
-static void ull2BN (BIGNUM *b, unsigned long long val) {
-  if (sizeof (BN_ULONG) == 8 || val < (1ll << 32)) {
-    BN_set_word (b, val);
+static void ull2BN (TGLC_bn *b, unsigned long long val) {
+  if (sizeof (unsigned long) == 8 || val < (1ll << 32)) {
+    TGLC_bn_set_word (b, val);
   } else {
     unsigned int tmp[2];
     tmp[0] = __builtin_bswap32 (val >> 32);
     tmp[1] = __builtin_bswap32 ((unsigned)val);
-    BN_bin2bn ((void *)tmp, 8, b);
+    TGLC_bn_bin2bn ((void *)tmp, 8, b);
   }
 }
 
-int bn_factorize (BIGNUM *pq, BIGNUM *p, BIGNUM *q) {
+int bn_factorize (TGLC_bn *pq, TGLC_bn *p, TGLC_bn *q) {
   // Should work in any case
   // Rewrite this code
   unsigned long long what = BN2ull (pq);
@@ -124,8 +125,8 @@ int bn_factorize (BIGNUM *pq, BIGNUM *p, BIGNUM *q) {
   unsigned long long g = 0;
   int i;
   for (i = 0; i < 3 || it < 1000; i++) {
-    int q = ((lrand48() & 15) + 17) % what;
-    unsigned long long x = (long long)lrand48 () % (what - 1) + 1, y = x;
+    int q = ((rand() & 15) + 17) % what;
+    unsigned long long x = (long long)rand () % (what - 1) + 1, y = x;
     int lim = 1 << (i + 18);
     int j;
     for (j = 1; j < lim; j++) {
