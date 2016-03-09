@@ -1200,7 +1200,7 @@ void tgl_do_send_message (struct tgl_state *TLS, tgl_peer_id_t peer_id, const ch
       in_end = ent + ent_size;
       EN = fetch_ds_type_any (TYPE_TO_PARAM_1 (vector, TYPE_TO_PARAM (message_entity)));
       assert (EN);
-      vlogprintf (0, "in_ptr = %p, in_end = %p\n", in_ptr, in_end);
+      vlogprintf (E_DEBUG, "in_ptr = %p, in_end = %p\n", in_ptr, in_end);
       assert (in_ptr == in_end);
       in_ptr = save_ptr;
       in_end = save_end;
@@ -1690,6 +1690,19 @@ static int get_dialogs_on_answer (struct tgl_state *TLS, struct query *q, void *
   vlogprintf (E_DEBUG, "dl_size = %d, total = %d\n", dl_size, E->list_offset);
   if (dl_size && E->list_offset < E->limit && DS_MD->magic == CODE_messages_dialogs_slice && E->list_offset < DS_LVAL (DS_MD->count)) {
     E->offset += dl_size;
+    if (E->list_offset > 0) {
+      E->offset_peer = E->PL[E->list_offset - 1];
+    
+      int p = E->list_offset - 1;
+      while (p >= 0) {
+        struct tgl_message *M = tgl_message_get (TLS, E->LM[p]);
+        if (M) {
+          E->offset_date = M->date;
+          break;
+        }
+        p --;
+      }
+    }
     _tgl_do_get_dialog_list (TLS, E, q->callback, q->callback_extra);
   } else {
     if (q->callback) {
@@ -1971,6 +1984,8 @@ static void send_file_unencrypted_end (struct tgl_state *TLS, struct send_file *
       out_string ("thumb.jpg");
       out_string ("");
     }
+    
+    out_string (f->caption ? f->caption : "");
   } else {
     out_string (f->caption ? f->caption : "");
   }
@@ -2615,6 +2630,7 @@ void tgl_do_forward_media (struct tgl_state *TLS, tgl_peer_id_t peer_id, tgl_mes
     out_int (CODE_input_document);
     out_long (M->media.document->id);
     out_long (M->media.document->access_hash);
+    out_string ("");
     break;
   default:
     assert (0);
@@ -2799,7 +2815,7 @@ void tgl_do_channel_set_admin (struct tgl_state *TLS, tgl_peer_id_t channel_id, 
     out_int (CODE_channel_role_empty);
     break;
   }
-  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &channels_set_about_methods, 0, callback, callback_extra);
+  tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, 0, callback, callback_extra);
 }
 /* }}} */
 
@@ -4053,8 +4069,8 @@ void tgl_do_create_channel (struct tgl_state *TLS, int users_num, tgl_peer_id_t 
   out_int (flags); // looks like 2 is disable non-admin messages
   out_cstring (chat_topic, chat_topic_len);
   out_cstring (about, about_len);
-  out_int (CODE_vector);
-  out_int (users_num); 
+  //out_int (CODE_vector);
+  //out_int (users_num); 
   int i;
   for (i = 0; i < users_num; i++) {
     tgl_peer_id_t id = ids[i];
