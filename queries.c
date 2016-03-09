@@ -2883,6 +2883,9 @@ void _tgl_do_channel_get_members  (struct tgl_state *TLS, struct channel_get_mem
   case 3:
     out_int (CODE_channel_participants_kicked);
     break;
+  case 4:
+    out_int (CODE_channel_participants_bots);
+    break;
   default:
     out_int (CODE_channel_participants_recent);
     break;
