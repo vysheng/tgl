@@ -33,9 +33,6 @@
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
-#include <sys/endian.h>
-#endif
 #include <sys/types.h>
 #ifdef WIN32
 #include <winsock2.h>
@@ -67,14 +64,6 @@
 #include "auto.h"
 #include "tgl-methods-in.h"
 
-#if defined(__FreeBSD__)
-#define __builtin_bswap32(x) bswap32(x)
-#endif
-
-#if defined(__OpenBSD__)
-#define __builtin_bswap32(x) __swap32gen(x)
-#endif
-
 #include "mtproto-common.h"
 
 #define MAX_NET_RES        (1L << 16)
@@ -82,15 +71,6 @@
 
 static long long generate_next_msg_id (struct tgl_state *TLS, struct tgl_dc *DC, struct tgl_session *S);
 static double get_server_time (struct tgl_dc *DC);
-
-#if !defined(HAVE___BUILTIN_BSWAP32) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
-static inline unsigned __builtin_bswap32(unsigned x) {
-  return ((x << 24) & 0xff000000 ) |
-  ((x << 8) & 0x00ff0000 ) |
-  ((x >> 8) & 0x0000ff00 ) |
-  ((x >> 24) & 0x000000ff );
-}
-#endif
 
 // for statistic only
 static int total_packets_sent;
