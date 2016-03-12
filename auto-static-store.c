@@ -253,6 +253,7 @@ void tgl_paramed_type_free (struct paramed_type *P);
 struct paramed_type *tglf_extf_store (struct tgl_state *TLS, const char *data, int data_len) { 
 #ifdef DISABLE_EXTF
   assert (0);
+  return 0;
 #else
   buffer_pos = (char *)data;
   buffer_end = (char *)(data + data_len);
