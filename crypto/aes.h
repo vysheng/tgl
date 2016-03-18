@@ -23,7 +23,7 @@
 
 #include <stddef.h> /* size_t */
 
-#include "../config.h"
+#include "config.h"
 
 typedef struct TGLC_aes_key {
   char _dummy[
