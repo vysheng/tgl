@@ -514,7 +514,7 @@ struct tgl_chat *tglf_fetch_alloc_chat (struct tgl_state *TLS, struct tl_ds_chat
   if (DS_C->magic == CODE_chat_empty) { 
     return NULL;
   }
-  if (DS_C->magic == CODE_channel) {
+  if (DS_C->magic == CODE_channel || DS_C->magic == CODE_channel_forbidden) {
     return (void *)tglf_fetch_alloc_channel (TLS, DS_C);
   }
   tgl_peer_id_t chat_id = TGL_MK_CHAT (DS_LVAL (DS_C->id));  
@@ -1548,7 +1548,8 @@ struct tgl_message *tglf_fetch_alloc_message (struct tgl_state *TLS, struct tl_d
   tgl_peer_t *FF = NULL;
 
   if (DS_M->fwd_from_id) {
-    FF = tgl_peer_get (TLS, tglf_fetch_peer_id (TLS, DS_M->fwd_from_id));
+    tgl_peer_id_t FF_id = tglf_fetch_peer_id (TLS, DS_M->fwd_from_id); 
+    FF = tgl_peer_get (TLS, FF_id);    
     if (!FF) {
       tgl_do_get_difference (TLS, 0, 0, 0);
       vlogprintf (E_NOTICE, "unknown fwd_id\n");
