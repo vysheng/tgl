@@ -99,7 +99,6 @@ static unsigned long long BN2ull (TGLC_bn *b) {
     return TGLC_bn_get_word (b);
   } else if (sizeof (unsigned long long) == 8) {
     unsigned long long tmp;
-    /* Here be dragons, but it should be okay due to be64toh */
     TGLC_bn_bn2bin (b, (unsigned char *) &tmp);
     return be64toh (tmp);
   } else {
@@ -111,9 +110,7 @@ static void ull2BN (TGLC_bn *b, unsigned long long val) {
   if (sizeof (unsigned long) == 8 || val < (1ll << 32)) {
     TGLC_bn_set_word (b, val);
   } else if (sizeof (unsigned long long) == 8) {
-    assert (0); // As long as nobody ever uses this code, assume it is broken.
     htobe64(val);
-    /* Here be dragons, but it should be okay due to htobe64 */
     TGLC_bn_bin2bn ((unsigned char *) &val, 8, b);
   } else {
     assert (0);
