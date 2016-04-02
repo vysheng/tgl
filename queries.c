@@ -598,6 +598,20 @@ int utf8_len (const char *s, int len) {
   return r;
 }
 
+static inline char ascii_char_norm (char c) {
+  return (c >= 0x41 && c <= 0x5A) ? c + 32 : c;
+}
+
+static int ascii_cmp_nocase (const char *what, const char *with, size_t num) {
+  size_t i;
+  for (i = 0; i < num; i ++) {
+    if (ascii_char_norm (what[i]) != ascii_char_norm (with[i])) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static char *process_html_text (struct tgl_state *TLS, const char *text, int text_len, int *ent_size, int **ent) {
   char *new_text = talloc (2 * text_len + 1);
   int stpos[100];
@@ -619,7 +633,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         return NULL;
       }
       int old_p = *ent_size;
-      if (text_len - p >= 3 && !memcmp (text + p, "<b>", 3)) {
+      if (text_len - p >= 3 && !ascii_cmp_nocase (text + p, "<b>", 3)) {
         increase_ent (ent_size, ent, 3);
         total ++;
         (*ent)[old_p] = CODE_message_entity_bold;
@@ -630,7 +644,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 2;
         continue;
       }
-      if (text_len - p >= 4 && !memcmp (text + p, "</b>", 4)) {
+      if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "</b>", 4)) {
         if (stp == 0 || sttype[stp - 1]  != 0) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
           tfree (new_text, 2 * text_len + 1);
@@ -641,7 +655,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 3;
         continue;
       }
-      if (text_len - p >= 3 && !memcmp (text + p, "<i>", 3)) {
+      if (text_len - p >= 3 && !ascii_cmp_nocase (text + p, "<i>", 3)) {
         increase_ent (ent_size, ent, 3);
         total ++;
         (*ent)[old_p] = CODE_message_entity_italic;
@@ -652,7 +666,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 2;
         continue;
       }
-      if (text_len - p >= 4 && !memcmp (text + p, "</i>", 4)) {
+      if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "</i>", 4)) {
         if (stp == 0 || sttype[stp - 1]  != 1) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
           tfree (new_text, 2 * text_len + 1);
@@ -663,7 +677,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 3;
         continue;
       }
-      if (text_len - p >= 6 && !memcmp (text + p, "<code>", 6)) {
+      if (text_len - p >= 6 && !ascii_cmp_nocase (text + p, "<code>", 6)) {
         increase_ent (ent_size, ent, 3);
         total ++;
         (*ent)[old_p] = CODE_message_entity_code;
@@ -674,7 +688,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 5;
         continue;
       }
-      if (text_len - p >= 7 && !memcmp (text + p, "</code>", 7)) {
+      if (text_len - p >= 7 && !ascii_cmp_nocase (text + p, "</code>", 7)) {
         if (stp == 0 || sttype[stp - 1]  != 2) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
           tfree (new_text, 2 * text_len + 1);
@@ -685,7 +699,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 6;
         continue;
       }
-      if (text_len - p >= 9 && !memcmp (text + p, "<a href=\"", 9)) {
+      if (text_len - p >= 9 && !ascii_cmp_nocase (text + p, "<a href=\"", 9)) {
         int pp = p + 9;
         while (pp < text_len && text[pp] != '"') {
           pp ++;
@@ -719,7 +733,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p = pp + 1;
         continue;
       }
-      if (text_len - p >= 4 && !memcmp (text + p, "</a>", 4)) {
+      if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "</a>", 4)) {
         if (stp == 0 || sttype[stp - 1]  != 3) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
           tfree (new_text, 2 * text_len + 1);
@@ -730,7 +744,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 3;
         continue;
       }
-      if (text_len - p >= 4 && !memcmp (text + p, "<br>", 4)) {
+      if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "<br>", 4)) {
         new_text[cur_p ++] = '\n';
         p += 3;
         continue;
@@ -738,16 +752,19 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       tgl_set_query_error (TLS, EINVAL, "Unknown tag");
       tfree (new_text, 2 * text_len + 1);
       return NULL;
-    } else if (text_len - p >= 4  && !memcmp (text + p, "&gt;", 4)) {
+    } else if (text_len - p >= 4  && !ascii_cmp_nocase (text + p, "&gt;", 4)) {
       p += 3;
       new_text[cur_p ++] = '>';
-    } else if (text_len - p >= 4  && !memcmp (text + p, "&lt;", 4)) {
+    } else if (text_len - p >= 4  && !ascii_cmp_nocase (text + p, "&lt;", 4)) {
       p += 3;
       new_text[cur_p ++] = '<';
-    } else if (text_len - p >= 5  && !memcmp (text + p, "&amp;", 5)) {
+    } else if (text_len - p >= 5  && !ascii_cmp_nocase (text + p, "&amp;", 5)) {
       p += 4;
       new_text[cur_p ++] = '&';
-    } else if (text_len - p >= 6  && !memcmp (text + p, "&nbsp;", 6)) {
+    } else if (text_len - p >= 6  && !ascii_cmp_nocase (text + p, "&quot;", 6)) {
+      p += 5;
+      new_text[cur_p ++] = '"';
+    } else if (text_len - p >= 6  && !ascii_cmp_nocase (text + p, "&nbsp;", 6)) {
       p += 5;
       new_text[cur_p ++] = 0xc2;
       new_text[cur_p ++] = 0xa0;
