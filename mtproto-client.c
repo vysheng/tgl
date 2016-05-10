@@ -38,6 +38,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #undef WIN32_LEAN_AND_MEAN
+#pragma warning(disable: 4996)
+#include <openssl/applink.c> 
+#pragma warning(default:4265)
 #else
 #include <unistd.h>
 #include <netdb.h>
@@ -130,6 +133,7 @@ static RSA *rsa_load_public_key (struct tgl_state *TLS, const char *public_key_n
     vlogprintf (E_WARNING, "Couldn't open public key file: %s\n", public_key_name);
     return NULL;
   }
+
   RSA *res = PEM_read_RSAPublicKey (f, NULL, NULL, NULL);
   fclose (f);
   if (res == NULL) {
@@ -1473,6 +1477,17 @@ void tgls_free_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
 
   struct tgl_session *S = DC->sessions[0];
   if (S) { tgls_free_session (TLS, S); }
+
+  int i;
+  for (i = 0; i < 4; i++) {
+    struct tgl_dc_option *O = DC->options[i];
+    while (O) {
+      struct tgl_dc_option *N = O->next;
+        tfree_str(O->ip);
+        tfree(O, sizeof(*O));
+        O = N;
+    }
+  }
 
   if (DC->ev) { TLS->timer_methods->free (DC->ev); }
   tfree (DC, sizeof (*DC));
