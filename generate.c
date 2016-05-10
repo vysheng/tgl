@@ -1581,6 +1581,7 @@ void gen_constructor_free_ds (struct tl_combinator *c) {
   for (i = 0; i < c->args_num; i++) if (!(c->args[i]->flags & FLAG_OPT_VAR)) {
     assert (gen_field_free_ds (c->args[i], vars, i + 1, empty) >= 0);
   }
+  printf("  tfree (D, sizeof (*D));\n");
   free (vars);
   printf ("}\n"); 
 }

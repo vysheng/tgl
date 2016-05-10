@@ -57,7 +57,7 @@ void tgl_set_rsa_key (struct tgl_state *TLS, const char *key) {
   assert (TLS->rsa_key_num < TGL_MAX_RSA_KEYS_NUM);
   TLS->rsa_key_list[TLS->rsa_key_num ++] = tstrdup (key);
 }
-
+#include <openssl/evp.h>
 void tgl_init (struct tgl_state *TLS) {
   assert (TLS->timer_methods);
   assert (TLS->net_methods);
@@ -95,10 +95,7 @@ void tgl_register_app_id (struct tgl_state *TLS, int app_id, const char *app_has
 }
 
 struct tgl_state *tgl_state_alloc (void) {
-  struct tgl_state *TLS = (struct tgl_state *)malloc (sizeof (*TLS));
-  if (!TLS) { return NULL; }
-  memset (TLS, 0, sizeof (*TLS));
-  return TLS;
+  return (struct tgl_state *)talloc0(sizeof(struct tgl_state));
 }
 
 void tgl_incr_verbosity (struct tgl_state *TLS) {
