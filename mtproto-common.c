@@ -339,21 +339,20 @@ int tgl_pad_rsa_encrypt (struct tgl_state *TLS, char *from, int from_len, char *
   assert (size >= chunks * 256);
   assert (RAND_pseudo_bytes ((unsigned char *) from + from_len, pad) >= 0);
   int i;
-  BIGNUM x, y;
-  BN_init (&x);
-  BN_init (&y);
+  BIGNUM* x = BN_new();
+  BIGNUM* y = BN_new();
   rsa_encrypted_chunks += chunks;
   for (i = 0; i < chunks; i++) {
-    BN_bin2bn ((unsigned char *) from, 255, &x);
-    assert (BN_mod_exp (&y, &x, E, N, TLS->BN_ctx) == 1);
-    unsigned l = 256 - BN_num_bytes (&y);
+    BN_bin2bn ((unsigned char *) from, 255, x);
+    assert (BN_mod_exp (y, x, E, N, TLS->BN_ctx) == 1);
+    unsigned l = 256 - BN_num_bytes (y);
     assert (l <= 256);
     memset (to, 0, l);
-    BN_bn2bin (&y, (unsigned char *) to + l);
+    BN_bn2bin (y, (unsigned char *) to + l);
     to += 256;
   }
-  BN_free (&x);
-  BN_free (&y);
+  BN_free (x);
+  BN_free (y);
   return chunks * 256;
 }
 
@@ -366,26 +365,26 @@ int tgl_pad_rsa_decrypt (struct tgl_state *TLS, char *from, int from_len, char *
   assert (bits >= 2041 && bits <= 2048);
   assert (size >= chunks * 255);
   int i;
-  BIGNUM x, y;
-  BN_init (&x);
-  BN_init (&y);
+  BIGNUM* x = BN_new();
+  BIGNUM* y = BN_new();
+
   for (i = 0; i < chunks; i++) {
     ++rsa_decrypted_chunks;
-    BN_bin2bn ((unsigned char *) from, 256, &x);
-    assert (BN_mod_exp (&y, &x, D, N, TLS->BN_ctx) == 1);
-    int l = BN_num_bytes (&y);
+    BN_bin2bn ((unsigned char *) from, 256, x);
+    assert (BN_mod_exp (y, x, D, N, TLS->BN_ctx) == 1);
+    int l = BN_num_bytes (y);
     if (l > 255) {
-      BN_free (&x);
-      BN_free (&y);
+      BN_free (x);
+      BN_free (y);
       return -1;
     }
     assert (l >= 0 && l <= 255);
     memset (to, 0, 255 - l);
-    BN_bn2bin (&y, (unsigned char *) to + 255 - l);
+    BN_bn2bin (y, (unsigned char *) to + 255 - l);
     to += 255;
   }
-  BN_free (&x);
-  BN_free (&y);
+  BN_free (x);
+  BN_free (y);
   return chunks * 255;
 }
 
