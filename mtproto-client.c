@@ -26,6 +26,7 @@
 #define        _FILE_OFFSET_BITS        64
 
 #include <assert.h>
+#include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -652,6 +653,7 @@ static int process_auth_complete (struct tgl_state *TLS, struct connection *c, c
   } else {
     DC->flags |= 1;
     if (TLS->enable_pfs) {
+      assert(TLS->enable_pfs);
       create_temp_auth_key (TLS, c);
     } else {
       DC->temp_auth_key_id = DC->auth_key_id;
@@ -842,11 +844,17 @@ static int work_container (struct tgl_state *TLS, struct connection *c, long lon
 }
 
 static int work_new_session_created (struct tgl_state *TLS, struct connection *c, long long msg_id) {
-  vlogprintf (E_DEBUG, "work_new_session_created: msg_id = %"_PRINTF_INT64_"d\n", msg_id);
+  struct tgl_session *S = TLS->net_methods->get_session(c);
+  struct tgl_dc *DC = TLS->net_methods->get_dc(c);
+
+  vlogprintf(E_NOTICE, "work_new_session_created: msg_id = %" _PRINTF_INT64_ "d, dc = %d\n", msg_id, DC->id);
   assert (fetch_int () == (int)CODE_new_session_created);
   fetch_long (); // first message id
   fetch_long (); // unique_id
   TLS->net_methods->get_dc (c)->server_salt = fetch_long ();
+
+  tglq_regen_queries_from_old_session(TLS, DC, S);
+
   if (TLS->started && !(TLS->locks & TGL_LOCK_DIFF) && (TLS->DC_working->flags & TGLDCF_LOGGED_IN)) {
     tgl_do_get_difference (TLS, 0, 0, 0);
   }
@@ -906,11 +914,12 @@ static int work_packed (struct tgl_state *TLS, struct connection *c, long long m
 static int work_bad_server_salt (struct tgl_state *TLS, struct connection *c, long long msg_id) {
   assert (fetch_int () == (int)CODE_bad_server_salt);
   long long id = fetch_long ();
-  tglq_query_restart (TLS, id);
+  
   fetch_int (); // seq_no
   fetch_int (); // error_code
   long long new_server_salt = fetch_long ();
   TLS->net_methods->get_dc (c)->server_salt = new_server_salt;
+  tglq_query_restart(TLS, id);
   return 0;
 }
 
@@ -943,7 +952,7 @@ static int work_bad_msg_notification (struct tgl_state *TLS, struct connection *
   long long m1 = fetch_long ();
   int s = fetch_int ();
   int e = fetch_int ();
-  vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %"_PRINTF_INT64_"d, seq = %d, error = %d\n", m1, s, e);
+  vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %" _PRINTF_INT64_ "d, seq = %d, error = %d\n", m1, s, e);
   switch (e) {
   // Too low msg id
   case 16:
@@ -953,8 +962,13 @@ static int work_bad_msg_notification (struct tgl_state *TLS, struct connection *
   case 17:
     tglq_regen_query (TLS, m1);
     break;
+    // Bad container
+  case 64:
+      vlogprintf(E_NOTICE, "bad_msg_notification: msg_id = %" _PRINTF_INT64_ "d, seq = %d, error = %d\n", m1, s, e);
+      tglq_regen_query(TLS, m1);
+      break;
   default:
-    vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %"_PRINTF_INT64_"d, seq = %d, error = %d\n", m1, s, e);
+    vlogprintf (E_NOTICE, "bad_msg_notification: msg_id = %" _PRINTF_INT64_ "d, seq = %d, error = %d\n", m1, s, e);
     break;
   }
 
@@ -977,7 +991,7 @@ static int rpc_execute_answer (struct tgl_state *TLS, struct connection *c, long
   case CODE_update_short_message:
   case CODE_update_short_chat_message:
   case CODE_updates_too_long:
-    tglu_work_any_updates (TLS);
+    tglu_work_any_updates_buf (TLS);
     return 0;
   case CODE_gzip_packed:
     return work_packed (TLS, c, msg_id);
@@ -1260,6 +1274,7 @@ static int tc_becomes_ready (struct tgl_state *TLS, struct connection *c) {
       assert (TLS->enable_pfs);
       if (!DC->temp_auth_key_id) {
         assert (!DC->temp_auth_key_id);
+        assert (TLS->enable_pfs);
         create_temp_auth_key (TLS, c);
       } else {
         bind_temp_auth_key (TLS, c);
@@ -1288,7 +1303,7 @@ static int rpc_close (struct tgl_state *TLS, struct connection *c) {
 
 #define RANDSEED_PASSWORD_FILENAME     NULL
 #define RANDSEED_PASSWORD_LENGTH       0
-void tglmp_on_start (struct tgl_state *TLS) {
+int tglmp_on_start (struct tgl_state *TLS) {
   tgl_prng_seed (TLS, RANDSEED_PASSWORD_FILENAME, RANDSEED_PASSWORD_LENGTH);
 
   int i;
@@ -1308,8 +1323,11 @@ void tglmp_on_start (struct tgl_state *TLS) {
 
   if (!ok) {
     vlogprintf (E_ERROR, "No public keys found\n");
-    exit (1);
+    TLS->error = tstrdup ("No public keys found");
+    TLS->error_code = ENOTCONN;
+    return -1;
   }
+  return 0;
 }
 
 void tgl_dc_authorize (struct tgl_state *TLS, struct tgl_dc *DC) {
@@ -1348,7 +1366,7 @@ void tgln_insert_msg_id (struct tgl_state *TLS, struct tgl_session *S, long long
     TLS->timer_methods->insert (S->ev, ACK_TIMEOUT);
   }
   if (!tree_lookup_long (S->ack_tree, id)) {
-    S->ack_tree = tree_insert_long (S->ack_tree, id, lrand48 ());
+    S->ack_tree = tree_insert_long (S->ack_tree, id, rand ());
   }
 }
 
@@ -1369,8 +1387,10 @@ struct tgl_dc *tglmp_alloc_dc (struct tgl_state *TLS, int flags, int id, char *i
     if (id > TLS->max_dc_num) {
       TLS->max_dc_num = id;
     }
-    DC->ev = TLS->timer_methods->alloc (TLS, regen_temp_key_gw, DC);
-    TLS->timer_methods->insert (DC->ev, 0);
+    if (TLS->enable_pfs) {
+        DC->ev = TLS->timer_methods->alloc(TLS, regen_temp_key_gw, DC);
+        TLS->timer_methods->insert(DC->ev, 0);
+    }
   }
 
   struct tgl_dc *DC = TLS->DC_list[id];
@@ -1417,7 +1437,7 @@ void tglmp_dc_create_session (struct tgl_state *TLS, struct tgl_dc *DC) {
 void tgl_do_send_ping (struct tgl_state *TLS, struct connection *c) {
   int x[3];
   x[0] = CODE_ping;
-  *(long long *)(x + 1) = lrand48 () * (1ll << 32) + lrand48 ();
+  *(long long *)(x + 1) = rand () * (1ll << 32) + rand ();
   tglmp_encrypt_send_message (TLS, c, x, 3, 0);
 }
 
@@ -1458,7 +1478,12 @@ void tglmp_regenerate_temp_auth_key (struct tgl_state *TLS, struct tgl_dc *DC) {
     return;
   }
 
+  if (!TLS->enable_pfs) {
+    return;
+  }
+
   if (S->c) {
+    assert (TLS->enable_pfs);
     create_temp_auth_key (TLS, S->c);
   }
 }
@@ -1483,9 +1508,9 @@ void tgls_free_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
     struct tgl_dc_option *O = DC->options[i];
     while (O) {
       struct tgl_dc_option *N = O->next;
-        tfree_str(O->ip);
-        tfree(O, sizeof(*O));
-        O = N;
+      tfree_str(O->ip);
+      tfree(O, sizeof(*O));
+      O = N;
     }
   }
 

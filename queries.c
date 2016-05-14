@@ -147,8 +147,10 @@ static int alarm_query (struct tgl_state *TLS, struct query *q) {
       TLS->queries_tree = tree_delete_query (TLS->queries_tree, q);
     }
     q->session = q->DC->sessions[0];
+    long long old_id = q->msg_id;
     q->msg_id = tglmp_encrypt_send_message (TLS, q->session->c, q->data, q->data_len, (q->flags & QUERY_FORCE_SEND) | 1);
-    TLS->queries_tree = tree_insert_query (TLS->queries_tree, q, lrand48 ());
+    vlogprintf(E_NOTICE, "Resent query #%" _PRINTF_INT64_ "d as #%" _PRINTF_INT64_ "d of size %d to DC %d\n", old_id, q->msg_id, 4 * q->data_len, q->DC->id);
+    TLS->queries_tree = tree_insert_query(TLS->queries_tree, q, rand());
     q->session_id = q->session->session_id;
     if (!(q->session->dc->flags & 4) && !(q->flags & QUERY_FORCE_SEND)) {
       q->session_id = 0;
@@ -171,6 +173,32 @@ void tglq_regen_query (struct tgl_state *TLS, long long id) {
   }
   vlogprintf (E_NOTICE, "regen query %"_PRINTF_INT64_"d\n", id);
   TLS->timer_methods->insert (q->ev, 0.001);
+}
+
+struct regen_tmp_struct {
+    struct tgl_state *TLS;
+    struct tgl_dc *DC;
+    struct tgl_session *S;
+};
+
+void tglq_regen_query_from_old_session(struct query *q, void *ex) {
+    struct regen_tmp_struct *T = ex;
+    struct tgl_state *TLS = T->TLS;
+    if (q->DC == T->DC) {
+        if (!q->session || q->session_id != T->S->session_id || q->session != T->S) {
+            q->session_id = 0;
+            vlogprintf(E_NOTICE, "regen query from old session %" _PRINTF_INT64_ "d\n", q->msg_id);
+            TLS->timer_methods->insert(q->ev, 0.1);
+        }
+    }
+}
+
+void tglq_regen_queries_from_old_session(struct tgl_state *TLS, struct tgl_dc *DC, struct tgl_session *S) {
+    struct regen_tmp_struct T;
+    T.TLS = TLS;
+    T.DC = DC;
+    T.S = S;
+    tree_act_ex_query(TLS->queries_tree, tglq_regen_query_from_old_session, &T);
 }
 
 void tglq_query_restart (struct tgl_state *TLS, long long id) {
@@ -853,15 +881,15 @@ static int msg_send_on_answer (struct tgl_state *TLS, struct query *q, void *D) 
   UPD->pts = talloc (4);
   *UPD->pts = DS_LVAL (DS_MSM->pts);
 
-  tglu_work_update_new (TLS, 1, UPD);
-  tglu_work_update_new (TLS, 0, UPD);
+  tglu_work_update (TLS, 1, UPD);
+  tglu_work_update (TLS, 0, UPD);
 
   *UPD->pts_count = 0;
   tfree (UPD->random_id, 8);
   UPD->magic = CODE_update_msg_update;
 
-  tglu_work_update_new (TLS, 1, UPD);
-  tglu_work_update_new (TLS, 0, UPD);
+  tglu_work_update (TLS, 1, UPD);
+  tglu_work_update (TLS, 0, UPD);
 
   free_ds_type_update (UPD, TYPE_TO_PARAM (update));
 
@@ -1951,8 +1979,8 @@ void tgl_do_contact_search (struct tgl_state *TLS, const char *name, int name_le
 /* {{{ Forward */
 
 static int send_msgs_on_answer (struct tgl_state *TLS, struct query *q, void *D) {
-  tglu_work_any_updates_new (TLS, 1, D);
-  tglu_work_any_updates_new (TLS, 0, D);
+  tglu_work_any_updates (TLS, 1, D, NULL);
+  tglu_work_any_updates (TLS, 0, D, NULL);
 
   struct messages_send_extra *E = q->extra;
 
@@ -3016,11 +3044,11 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, voi
     }
 
     for (i = 0; i < DS_LVAL (DS_UD->other_updates->cnt); i++) {
-      tglu_work_update_new (TLS, 1, DS_UD->other_updates->data[i]);
+      tglu_work_update (TLS, 1, DS_UD->other_updates->data[i]);
     }
 
     for (i = 0; i < DS_LVAL (DS_UD->other_updates->cnt); i++) {
-      tglu_work_update_new (TLS, -1, DS_UD->other_updates->data[i]);
+      tglu_work_update (TLS, -1, DS_UD->other_updates->data[i]);
     }
 
     for (i = 0; i < ml_pos; i++) {
@@ -4239,7 +4267,17 @@ void tgl_do_abort_exchange (struct tgl_state *TLS, struct tgl_secret_chat *E) {
 }
 
 void tgl_started_cb (struct tgl_state *TLS, void *arg, int success) {
-  assert (success);
+  if (!success) {
+    vlogprintf(E_ERROR, "login problem: error #%d (%s)\n", TLS->error_code, TLS->error);
+    if (TLS->callback.on_failed_login) {
+      TLS->callback.on_failed_login(TLS);
+    }
+    else {
+      assert(success);
+    }
+    return;
+  }
+  
   TLS->started = 1;
   if (TLS->callback.started) {
     TLS->callback.started (TLS);
@@ -4247,7 +4285,17 @@ void tgl_started_cb (struct tgl_state *TLS, void *arg, int success) {
 }
 
 void tgl_export_auth_callback (struct tgl_state *TLS, void *arg, int success) {
-  assert (success);
+  if (!success) {
+    vlogprintf(E_ERROR, "login problem: error #%d (%s)\n", TLS->error_code, TLS->error);
+    if (TLS->callback.on_failed_login) {
+      TLS->callback.on_failed_login(TLS);
+    }
+    else {
+      assert(success);
+    }
+    return;
+  }
+
   int i;
   for (i = 0; i <= TLS->max_dc_num; i++) if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i])) {
     return;
@@ -4442,6 +4490,11 @@ void tgl_sign_in (struct tgl_state *TLS) {
 static void check_authorized (struct tgl_state *TLS, void *arg) {
   int i;
   int ok = 1;
+  for (i = 0; i <= TLS->max_dc_num; i++) {
+    if (TLS->DC_list[i]) {
+      tgl_dc_authorize(TLS, TLS->DC_list[i]);
+    }
+  }
   for (i = 0; i <= TLS->max_dc_num; i++) {
     if (TLS->DC_list[i] && !tgl_signed_dc (TLS, TLS->DC_list[i]) && !tgl_authorized_dc (TLS, TLS->DC_list[i])) {
       ok = 0;
