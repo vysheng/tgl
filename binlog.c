@@ -1212,7 +1212,14 @@ static void add_log_event (struct tgl_state *TLS, const int *data, int len) {
   }
   if (TLS->binlog_enabled) {
     assert (TLS->binlog_fd > 0);
-    assert (write (TLS->binlog_fd, ev, len) == len);
+    if (write(TLS->binlog_fd, ev, len) != len)
+    {
+#ifdef _MSC_VER
+#pragma warning(disable: 4996)
+#endif
+        vlogprintf(E_ERROR, "Could not write to binlog: %s\n", strerror(errno));
+        assert(0);
+    }
   }
   tfree (ev, len);
   in_ptr = in;
