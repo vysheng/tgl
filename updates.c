@@ -107,7 +107,7 @@ static int do_skip_seq (struct tgl_state *TLS, int seq) {
   }
 }
 
-void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_update *DS_U) {
+void tglu_work_update (struct tgl_state *TLS, int check_only, struct tl_ds_update *DS_U) {
   if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     vlogprintf (E_DEBUG, "Update during get_difference. DROP\n");
     return;
@@ -127,6 +127,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
     }
   }
 
+  vlogprintf(E_NOTICE, "update 0x%08x (check=%d)\n", DS_U->magic, check_only);
   if (check_only > 0 && DS_U->magic != CODE_update_message_i_d) { return; }
   switch (DS_U->magic) {
   case CODE_update_new_message:
@@ -436,6 +437,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
     break;
   case CODE_update_msg_update:
     {
+        /// Commment out
       struct tgl_message *M = tgl_message_get (TLS, DS_LVAL (DS_U->id));
       if (M) {
         bl_do_msg_update (TLS, M->id);
@@ -460,7 +462,7 @@ void tglu_work_update_new (struct tgl_state *TLS, int check_only, struct tl_ds_u
   }
 }
 
-void tglu_work_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+void tglu_work_updates(struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
   if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
@@ -469,14 +471,20 @@ void tglu_work_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_
     return;
   }
   int i;
-  for (i = 0; i < DS_LVAL (DS_U->users->cnt); i++) {
-    tglf_fetch_alloc_user_new (TLS, DS_U->users->data[i]);    
+  if (DS_U->users) {
+      for (i = 0; i < DS_LVAL(DS_U->users->cnt); i++) {
+          tglf_fetch_alloc_user_new(TLS, DS_U->users->data[i]);
+      }
   }
-  for (i = 0; i < DS_LVAL (DS_U->chats->cnt); i++) {
-    tglf_fetch_alloc_chat_new (TLS, DS_U->chats->data[i]);
+  if (DS_U->chats) {
+      for (i = 0; i < DS_LVAL(DS_U->chats->cnt); i++) {
+          tglf_fetch_alloc_chat_new(TLS, DS_U->chats->data[i]);
+      }
   }
-  for (i = 0; i < DS_LVAL (DS_U->updates->cnt); i++) {
-    tglu_work_update_new (TLS, check_only, DS_U->updates->data[i]);
+  if (DS_U->updates) {
+      for (i = 0; i < DS_LVAL(DS_U->updates->cnt); i++) {
+          tglu_work_update(TLS, check_only, DS_U->updates->data[i]);
+      }
   }
 
   if (check_only) { return; }
@@ -501,7 +509,7 @@ void tglu_work_updates_combined_new (struct tgl_state *TLS, int check_only, stru
     tglf_fetch_alloc_chat_new (TLS, DS_U->chats->data[i]);
   }
   for (i = 0; i < DS_LVAL (DS_U->updates->cnt); i++) {
-    tglu_work_update_new (TLS, check_only, DS_U->updates->data[i]);
+    tglu_work_update (TLS, check_only, DS_U->updates->data[i]);
   }
 
   if (check_only) { return; }
@@ -580,10 +588,10 @@ void tglu_work_update_short_new (struct tgl_state *TLS, int check_only, struct t
   if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
-  tglu_work_update_new (TLS, check_only, DS_U->update);
+  tglu_work_update (TLS, check_only, DS_U->update);
 }
 
-void tglu_work_any_updates_new (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U) {
+void tglu_work_any_updates (struct tgl_state *TLS, int check_only, struct tl_ds_updates *DS_U, void *extra) {
   if (check_only > 0 || (TLS->locks & TGL_LOCK_DIFF)) {
     return;
   }
@@ -604,19 +612,27 @@ void tglu_work_any_updates_new (struct tgl_state *TLS, int check_only, struct tl
     tglu_work_updates_combined_new (TLS, check_only, DS_U);
     return;
   case CODE_updates:
-    tglu_work_updates_new (TLS, check_only, DS_U);    
+    tglu_work_updates (TLS, check_only, DS_U);    
     return;
   default:
     assert (0);
   }
 }
 
-void tglu_work_any_updates (struct tgl_state *TLS) {
-  struct tl_ds_updates *DS_U = fetch_ds_type_updates (TYPE_TO_PARAM (updates));
-  assert (DS_U);
-  tglu_work_any_updates_new (TLS, 1, DS_U);
-  tglu_work_any_updates_new (TLS, 0, DS_U);
-  free_ds_type_updates (DS_U, TYPE_TO_PARAM (updates)); 
+// void tglu_work_any_updates (struct tgl_state *TLS) {
+//   struct tl_ds_updates *DS_U = fetch_ds_type_updates (TYPE_TO_PARAM (updates));
+//   assert (DS_U);
+//   tglu_work_any_updates_new (TLS, 1, DS_U);
+//   tglu_work_any_updates_new (TLS, 0, DS_U);
+//   free_ds_type_updates (DS_U, TYPE_TO_PARAM (updates)); 
+// }
+
+void tglu_work_any_updates_buf(struct tgl_state *TLS) {
+  struct tl_ds_updates *DS_U = fetch_ds_type_updates(TYPE_TO_PARAM(updates));
+  assert(DS_U);
+  tglu_work_any_updates(TLS, 1, DS_U, NULL);
+  tglu_work_any_updates(TLS, 0, DS_U, NULL);
+  free_ds_type_updates(DS_U, TYPE_TO_PARAM(updates));
 }
 
 #define user_cmp(a,b) (tgl_get_peer_id ((a)->id) - tgl_get_peer_id ((b)->id))
