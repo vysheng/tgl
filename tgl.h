@@ -161,6 +161,7 @@ struct tgl_update_callback {
   void (*notification)(struct tgl_state *TLS, const char *type, const char *message);
   void (*user_status_update)(struct tgl_state *TLS, struct tgl_user *U);
   char *(*create_print_name) (struct tgl_state *TLS, tgl_peer_id_t id, const char *a1, const char *a2, const char *a3, const char *a4);
+  void(*on_failed_login) (struct tgl_state *TLS);
 };
 
 struct tgl_net_methods {
@@ -373,7 +374,7 @@ void tgl_set_ev_base (struct tgl_state *TLS, void *ev_base);
 int tgl_authorized_dc (struct tgl_state *TLS, struct tgl_dc *DC);
 int tgl_signed_dc (struct tgl_state *TLS, struct tgl_dc *DC);
 
-void tgl_init (struct tgl_state *TLS);
+int tgl_init (struct tgl_state *TLS);
 void tgl_dc_authorize (struct tgl_state *TLS, struct tgl_dc *DC);
 
 void tgl_dc_iterator (struct tgl_state *TLS, void (*iterator)(struct tgl_dc *DC));

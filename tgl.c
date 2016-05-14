@@ -58,7 +58,7 @@ void tgl_set_rsa_key (struct tgl_state *TLS, const char *key) {
   TLS->rsa_key_list[TLS->rsa_key_num ++] = tstrdup (key);
 }
 #include <openssl/evp.h>
-void tgl_init (struct tgl_state *TLS) {
+int tgl_init (struct tgl_state *TLS) {
   assert (TLS->timer_methods);
   assert (TLS->net_methods);
   if (!TLS->callback.create_print_name) {
@@ -71,12 +71,15 @@ void tgl_init (struct tgl_state *TLS) {
   TLS->message_list.next_use = &TLS->message_list;
   TLS->message_list.prev_use = &TLS->message_list;
 
-  tglmp_on_start (TLS);
+  if (tglmp_on_start(TLS) < 0) {
+    return -1;
+  }
   
   if (!TLS->app_id) {
     TLS->app_id = TG_APP_ID;
     TLS->app_hash = tstrdup (TG_APP_HASH);
   }
+  return 0;
 }
 
 int tgl_authorized_dc (struct tgl_state *TLS, struct tgl_dc *DC) {
