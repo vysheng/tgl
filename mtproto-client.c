@@ -40,7 +40,7 @@
 #include <windows.h>
 #undef WIN32_LEAN_AND_MEAN
 #pragma warning(disable: 4996)
-#include <openssl/applink.c> 
+#include <openssl/applink.c> // OpenSSL DLL, rsa Public Key load fix
 #pragma warning(default:4265)
 #else
 #include <unistd.h>
