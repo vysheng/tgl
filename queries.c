@@ -3301,6 +3301,13 @@ void tgl_do_load_file_location (struct tgl_state *TLS, struct tgl_file_location 
 }
 
 void tgl_do_load_photo (struct tgl_state *TLS, struct tgl_photo *photo, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
+  if (!photo) {
+    tgl_set_query_error (TLS, EINVAL, "Bad photo (invalid)");
+    if (callback) {
+      callback (TLS, callback_extra, 0, 0);
+    }
+    return;
+  }
   if (!photo->sizes_num) {
     tgl_set_query_error (TLS, EINVAL, "Bad photo (no photo sizes");
     if (callback) {
