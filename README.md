@@ -27,8 +27,9 @@ Install libs: openssl, openssl(android), zlib
 if you want to use provided net/timers then install libevent and add --enable-libevent key to configure
 
 Then,
+
      export ANDROID_NDK=<Path_to_Android_NDK>
-     export OPENSSL_ROOT=<Path_to_Android_OpenSSL_Root_Dir>
+     export OPENSSL_ROOT=<Path_to_Android_version_of_OpenSSL_root_dir>
      ./configure
      make -f Makefile.android
 
