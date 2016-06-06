@@ -1194,10 +1194,7 @@ static int rpc_execute (struct tgl_state *TLS, struct connection *c, int op, int
   vlogprintf (E_DEBUG, "Response_len = %d\n", Response_len);
   assert (TLS->net_methods->read_in (c, Response, Response_len) == Response_len);
 
-#if !defined(WIN32) || !defined(_WIN32)
-  setsockopt(c->fd, IPPROTO_TCP, TCP_QUICKACK, (int[]) { 0 }, 4);
-#endif
-#if !defined(__MACH__) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined (__CYGWIN__)
+#if !defined(__MACH__) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined (__CYGWIN__) && (!defined(WIN32) || !defined(_WIN32))
 //  setsockopt (c->fd, IPPROTO_TCP, TCP_QUICKACK, (int[]){0}, 4);
 #endif
   int o = DC->state;

@@ -161,7 +161,7 @@ void tgl_free_debug (void *ptr, int size __attribute__ ((unused))) {
     return;     
   }
   total_allocated_bytes -= size;
-  (char*)ptr -= RES_PRE;
+  ptr -= RES_PRE;
   if (size != (int)((*(int *)ptr) ^ 0xbedabeda)) {
     logprintf ("size = %d, ptr = %d\n", size, (*(int *)ptr) ^ 0xbedabeda);
   }
@@ -313,7 +313,7 @@ void tgl_check_debug (void) {
 }
 
 void tgl_exists_debug (void *ptr, int size) {
-	(char *)ptr -= RES_PRE;
+	ptr -= RES_PRE;
   if (size != (int)((*(int *)ptr) ^ 0xbedabeda)) {
     logprintf ("size = %d, ptr = %d\n", size, (*(int *)ptr) ^ 0xbedabeda);
   }
