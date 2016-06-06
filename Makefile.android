@@ -1,7 +1,7 @@
 srcdir=.
 
 # ANDROID Config -------------------------------------------------------------
-ANDROID_NDK=/home/xeron/DevelopmentKit/Framwork/Android/NDK
+ANDROID_NDK=
 ANDROID_API=android-18
 ARCH=arm
 MACHINE=armv7-a
@@ -16,7 +16,7 @@ TOOLCHAIN_LFLAGS=-B${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH}/usr/lib 
 #--------------------------------------------------------------------
 
 # OpenSSL --------------------------------------------------
-OPENSSL_ROOT=/home/xeron/DevelopmentKit/LIBRARIES/openssl/
+OPENSSL_ROOT=
 OPENSSL_INCLUDE=-I${OPENSSL_ROOT}/include
 OPENSSL_LIBS=-L${OPENSSL_ROOT}/android
 #----------------------------------------------------------
