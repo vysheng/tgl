@@ -10,9 +10,9 @@ CROSS_COMPILE_CC=${ANDROID_NDK}/toolchains/${ARCH}-linux-androideabi-4.9/prebuil
 CROSS_COMPILE_AR=${ANDROID_NDK}/toolchains/${ARCH}-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/${ARCH}-linux-androideabi-ar
 CROSS_COMPILE_LD=${ANDROID_NDK}/toolchains/${ARCH}-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/${ARCH}-linux-androideabi-ld
    
-TOOLCHAIN_CFLAGS= -I${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH}/usr/include -nostdlib --sysroot=${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH} -mandroid -march=${MACHINE} -Wa,--noexecstack
+TOOLCHAIN_CFLAGS=--sysroot=${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH} -mandroid -march=${MACHINE} -Wa,--noexecstack
 
-TOOLCHAIN_LFLAGS=-B${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH}/usr/lib -L${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH}/usr/lib -lc 
+TOOLCHAIN_LFLAGS=--sysroot=${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH} -nostdlib
 #--------------------------------------------------------------------
 
 # OpenSSL --------------------------------------------------
