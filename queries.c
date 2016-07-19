@@ -3205,7 +3205,7 @@ static void load_next_part (struct tgl_state *TLS, struct download *D, void *cal
       l = tsnprintf (buf, sizeof (buf), "%s/download_%" INT64_PRINTF_MODIFIER "d_%d.jpg", TLS->downloads_directory, D->volume, D->local_id);
     } else {
       if (D->ext) {
-        l = tsnprintf (buf, sizeof (buf), "%s/download_%" INT64_PRINTF_MODIFIER "d.%s", TLS->downloads_directory, D->id, D->ext);
+	l = tsnprintf (buf, sizeof (buf), "%s/%s" , TLS->downloads_directory, D->name);
       } else {
         l = tsnprintf (buf, sizeof (buf), "%s/download_%" INT64_PRINTF_MODIFIER "d", TLS->downloads_directory, D->id);
       }
@@ -3331,7 +3331,7 @@ static void _tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V
   D->id = V->id;
   D->access_hash = V->access_hash;
   D->dc = V->dc_id;
-  D->name = 0;
+  D->name = V->caption;
   D->fd = -1;
   
   if (V->mime_type) {
