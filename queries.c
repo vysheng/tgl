@@ -704,7 +704,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         while (pp < text_len && text[pp] != '"') {
           pp ++;
         }
-        if (pp == text_len || pp == text_len - 1 || text[pp + 1] != '>') {
+        if (pp == text_len || pp == text_len - 1) {
           tgl_set_query_error (TLS, EINVAL, "<a> tag did not close");
           tfree (new_text, 2 * text_len + 1);
           return NULL;
@@ -730,7 +730,10 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         memcpy (r + 1, text + p + 9, len);
         memset (r + 1 + len, 0, (-len-1) & 3);
 
-        p = pp + 1;
+        while (pp < text_len && text[pp] != '>') {
+          pp ++;
+        }
+        p = pp;
         continue;
       }
       if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "</a>", 4)) {
