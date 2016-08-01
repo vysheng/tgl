@@ -24,11 +24,52 @@
 
 #include <gcrypt.h>
 
+#include "../tgl.h"
+#include "../tgl-inner.h"
 #include "err.h"
 
 void TGLC_err_print_errors_fp (FILE *fp) {
   // Can't print anything meaningful, so don't.
   (void) fp;
+}
+
+int TGLC_init (struct tgl_state *TLS) {
+  vlogprintf (E_NOTICE, "Init gcrypt\n");
+  // https://gnupg.org/documentation/manuals/gcrypt/Initializing-the-library.html
+  // https://lists.gnupg.org/pipermail/gcrypt-devel/2003-August/000458.html
+
+  if (gcry_control (GCRYCTL_INITIALIZATION_FINISHED_P)) {
+    // Someone else already *completed* it.
+    vlogprintf (E_NOTICE, "Init gcrypt: already initialized -- good\n");
+    return 0;
+  }
+
+  if (gcry_control (GCRYCTL_ANY_INITIALIZATION_P)) {
+    // Someone else already *started* it without *completing*.
+    vlogprintf (E_WARNING, "Init gcrypt: already started *but not completed* by third party -- bad\n");
+    vlogprintf (E_WARNING, "Init gcrypt: ... not trying to init gcrypt then.\n");
+    return 0;
+  }
+
+  if (!gcry_check_version (GCRYPT_VERSION)) {
+    vlogprintf (E_ERROR, "Init gcrypt: version mismatch!\n");
+    return -1;
+  }
+
+  gcry_error_t err = gcry_control (GCRYCTL_DISABLE_SECMEM, NULL, 0);
+  if (err != GPG_ERR_NO_ERROR) {
+    vlogprintf (E_ERROR, "Init gcrypt: secmem failed?!\n");
+    return -1;
+  }
+
+  /* Tell Libgcrypt that initialization has completed. */
+  err = gcry_control (GCRYCTL_INITIALIZATION_FINISHED, 0);
+  if (err != GPG_ERR_NO_ERROR) {
+    vlogprintf (E_ERROR, "Init gcrypt: init failed?!\n");
+    return -1;
+  }
+
+  return 0;
 }
 
 #endif

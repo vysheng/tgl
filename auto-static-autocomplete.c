@@ -43,6 +43,7 @@ int tglf_extf_autocomplete (struct tgl_state *TLS, const char *text, int text_le
 #ifdef DISABLE_EXTF
   (void) free_vars_to_be_freed;
   assert (0);
+  return 0;
 #else
   if (index == -1) {
     buffer_pos = data;

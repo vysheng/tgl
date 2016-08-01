@@ -144,7 +144,7 @@ enum tgl_dc_state {
 struct tgl_session {
   struct tgl_dc *dc;
   long long session_id;
-  long long last_msg_id;
+  long long last_msg_id; // See tglmp_encrypt_send_message
   int seq_no;
   int received_messages;
   struct connection *c;
