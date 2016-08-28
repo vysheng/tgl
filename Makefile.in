@@ -97,5 +97,10 @@ distclean:
 	rm -rf ${DIR_LIST} config.h config.log config.status
 
 mime-types.c: mime.types
-# xxd is usually packaged with vim-common
-	xxd -i mime.types > mime-types.c
+	@echo xxd -i mime.types > mime-types.c
+	@if command -v xxd >/dev/null 2>&1 ; then \
+		xxd -i mime.types > mime-types.c ; \
+	else \
+		echo "# No xxd installed!  Trying to skip ..." ; \
+		test -r $@ ; \
+	fi
