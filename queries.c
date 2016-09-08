@@ -2569,7 +2569,7 @@ void tgl_do_send_contact (struct tgl_state *TLS, tgl_peer_id_t id, const char *p
   out_cstring (last_name, last_name_len);
 
   struct messages_send_extra *E = talloc0 (sizeof (*E));
-  tglt_secure_random (&E->id, 8);
+  E->id = tgl_peer_id_to_random_msg_id (id);
   out_long (E->id.id);
 
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &send_msgs_methods, E, callback, callback_extra);
