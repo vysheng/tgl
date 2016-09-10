@@ -1576,21 +1576,13 @@ void tgl_do_get_local_history (struct tgl_state *TLS, tgl_peer_id_t id, int offs
 
 static void _tgl_do_get_history (struct tgl_state *TLS, struct get_history_extra *E, void (*callback)(struct tgl_state *TLS,void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra) {
   clear_packet ();
-  tgl_peer_t *C = tgl_peer_get (TLS, E->id);
-  if (tgl_get_peer_type (E->id) != TGL_PEER_CHANNEL || (C && (C->flags & TGLCHF_MEGAGROUP))) {
-    out_int (CODE_messages_get_history);
-    out_peer_id (TLS, E->id);
-  } else {    
-    out_int (CODE_channels_get_important_history);
-    
-    out_int (CODE_input_channel);
-    out_int (tgl_get_peer_id (E->id));
-    out_long (E->id.access_hash);
-  }
-  out_int (E->max_id);
+  out_int (CODE_messages_get_history);
+  out_peer_id (TLS, E->id);
+  out_int (0);
+  out_int (0);
   out_int (E->offset);
   out_int (E->limit);
-  out_int (0);
+  out_int (E->max_id);
   out_int (0);
   tglq_send_query (TLS, TLS->DC_working, packet_ptr - packet_buffer, packet_buffer, &get_history_methods, E, callback, callback_extra);
 }
