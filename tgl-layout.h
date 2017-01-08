@@ -1,4 +1,4 @@
-/* 
+/*
     This file is part of tgl-library
 
     This library is free software; you can redistribute it and/or
@@ -120,9 +120,9 @@
 #define TGL_PERMANENT_ID_SIZE 24
 #pragma pack(push,4)
 
-typedef struct { 
-  int peer_type; 
-  int peer_id; 
+typedef struct {
+  int peer_type;
+  int peer_id;
   long long access_hash;
 } tgl_peer_id_t;
 
@@ -309,7 +309,7 @@ struct tgl_encr_document {
   int size;
   int key_fingerprint;
   int flags;
-  
+
   unsigned char *key;
   unsigned char *iv;
   int w;
@@ -531,6 +531,7 @@ struct tgl_message_action {
     int read_cnt;
     int delete_cnt;
     int screenshot_cnt;
+    int channel_id;
     enum tgl_typing_status typing;
     struct {
       int start_seq_no;
@@ -573,7 +574,7 @@ struct tgl_message_media {
       };
       char *caption;
     };
-    
+
     struct tgl_encr_document *encr_document;
     struct tgl_webpage *webpage;
 
@@ -584,7 +585,7 @@ struct tgl_message_media {
       char *last_name;
       int user_id;
     };
-    
+
     struct {
       void *data;
       int data_size;
