@@ -451,7 +451,7 @@ chatInviteEmpty#69df3769 = ExportedChatInvite;
 chatInviteExported#fc2e05bc link:string = ExportedChatInvite;
 
 chatInviteAlready#5a686d7c chat:Chat = ChatInvite;
-chatInvite#93e99b60 flags:# channel:flags.0?true broadcast:flags.1?true public:flags.2?true megagroup:flags.3?true title:string = ChatInvite;
+chatInvite#93e99b60 flags:# channel:flags.0?true broadcast:flags.1?true public_:flags.2?true megagroup:flags.3?true title:string = ChatInvite;
 
 inputStickerSetEmpty#ffb62b95 = InputStickerSet;
 inputStickerSetID#9de7a269 id:long access_hash:long = InputStickerSet;
