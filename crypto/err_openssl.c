@@ -35,7 +35,7 @@ void TGLC_err_print_errors_fp (FILE *fp) {
 int TGLC_init (struct tgl_state *TLS) {
   // Doesn't seem to need any initialization.
   vlogprintf (6, "Init OpenSSL (no-op)\n");
-  return !0;
+  return 0;
 }
 
 #endif
