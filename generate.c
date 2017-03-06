@@ -2307,7 +2307,6 @@ void gen_skip_source (void) {
   printf ("#include <assert.h>\n");
 
   printf ("#include \"auto/auto-skip.h\"\n");
-  printf ("#include \"auto-static-skip.c\"\n");
   printf ("#include \"mtproto-common.h\"\n");
 
   int i, j;

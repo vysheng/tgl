@@ -106,6 +106,7 @@ static void print_offset (void) {
 char *tglf_extf_fetch (struct tgl_state *TLS, struct paramed_type *T) {
 #ifdef DISABLE_EXTF
   assert (0);
+  return 0;
 #else
   out_buf_pos = 0;
   if (fetch_type_any (T) < 0) { return 0; }

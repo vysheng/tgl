@@ -236,6 +236,12 @@ void tgl_do_messages_mark_read (struct tgl_state *TLS, tgl_peer_id_t id, int max
 // also marks messages from this chat as read
 void tgl_do_get_history (struct tgl_state *TLS, tgl_peer_id_t id, int offset, int limit, int offline_mode, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
 
+// like tgl_do_get_history, but will fetch any messages between *min_id* and *max_id*
+// when *limit* is too small, the older messages will not be displayed despite being bigger than *min_id*
+// when *max_id* is 0, all messages newer than *min_id* are fetched
+// when *min_id* is 0, all messages older than *max_id* are fetched
+void tgl_do_get_history_range (struct tgl_state *TLS, tgl_peer_id_t id, int min_id, int max_id, int limit, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, int size, struct tgl_message *list[]), void *callback_extra);
+
 // sends typing event to chat
 // set status=tgl_typing_typing for default typing event
 void tgl_do_send_typing (struct tgl_state *TLS, tgl_peer_id_t id, enum tgl_typing_status status, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success), void *callback_extra);
