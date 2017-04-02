@@ -600,13 +600,13 @@ struct tgl_message_media {
   };
 };
 
-struct tgl_message_reply_markup {
+typedef struct tgl_message_reply_markup {
   int refcnt;
   int flags;
   int rows;
   int *row_start;
   char **buttons;
-};
+} tgl_message_reply_markup;
 
 typedef struct tgl_message_id {
   unsigned peer_type;
