@@ -36,6 +36,12 @@ TGLC_WRAPPER_ASSOC(rsa,RSA)
 // TODO: Refactor crucial struct-identity into its own header.
 TGLC_WRAPPER_ASSOC(bn,BIGNUM)
 
+/*
+ * Since OpenSSL version 1.1.0 the RSA struct (rsa_st) is opaque,
+ * see also https://wiki.openssl.org/index.php/OpenSSL_1.1.0_Changes
+ */
+#if (OPENSSL_VERSION_NUMBER < 0x10100000L)
+
 TGLC_rsa *TGLC_rsa_new (unsigned long e, int n_bytes, const unsigned char *n) {
   RSA *ret = RSA_new ();
   ret->e = unwrap_bn (TGLC_bn_new ());
@@ -47,7 +53,30 @@ TGLC_rsa *TGLC_rsa_new (unsigned long e, int n_bytes, const unsigned char *n) {
 #define RSA_GETTER(M)                                                          \
   TGLC_bn *TGLC_rsa_ ## M (TGLC_rsa *key) {                                    \
     return wrap_bn (unwrap_rsa (key)->M);                                      \
-  }                                                                            \
+  }
+
+#else // OPENSSL_VERSION_NUMBER
+
+TGLC_rsa *TGLC_rsa_new (unsigned long e, int n_bytes, const unsigned char *n) {
+  RSA *ret = RSA_new ();
+  BIGNUM *ret_e = unwrap_bn (TGLC_bn_new ());
+  BIGNUM *ret_n = unwrap_bn (TGLC_bn_bin2bn (n, n_bytes, NULL));
+  RSA_set0_key (ret, ret_n, ret_e, NULL);
+  TGLC_bn_set_word (wrap_bn (ret_e), e);
+  return wrap_rsa (ret);
+}
+
+#define RSA_GETTER(M)                       \
+TGLC_bn *TGLC_rsa_ ## M (TGLC_rsa *key) {   \
+    BIGNUM *rsa_n, *rsa_e, *rsa_d;          \
+    RSA_get0_key(unwrap_rsa (key),          \
+        (const BIGNUM **) &rsa_n,           \
+        (const BIGNUM **) &rsa_e,           \
+        (const BIGNUM **) &rsa_d);          \
+    return wrap_bn (rsa_ ## M);             \
+}
+
+#endif // OPENSSL_VERSION_NUMBER
 
 RSA_GETTER(n);
 RSA_GETTER(e);
@@ -60,4 +89,4 @@ TGLC_rsa *TGLC_pem_read_RSAPublicKey (FILE *fp) {
   return wrap_rsa (PEM_read_RSAPublicKey (fp, NULL, NULL, NULL));
 }
 
-#endif
+#endif // TGL_AVOID_OPENSSL
