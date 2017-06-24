@@ -361,7 +361,7 @@ struct tgl_user {
   int blocked;
   char *real_first_name;
   char *real_last_name;
-
+  int bot;
   struct tgl_bot_info *bot_info;
 };
 

@@ -314,8 +314,10 @@ struct tgl_user *tglf_fetch_alloc_user (struct tgl_state *TLS, struct tl_ds_user
 
   if (DS_LVAL (DS_U->flags) & (1 << 14)) {
     flags |= TGLUF_BOT;
+    U->bot = 1;
   } else {
     flags &= ~TGLUF_BOT;
+    U->bot = 0;
   }
   /*
   if (DS_LVAL (DS_U->flags) & (1 << 15)) {
