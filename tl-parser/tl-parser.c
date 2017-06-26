@@ -1900,12 +1900,11 @@ struct tl_combinator_tree *tl_parse_args134 (struct tree *T) {
       }
     }
     if (tt >= 0) {
-      //assert (S->data);
       char *name = S->data;
+      static char s[21];
       if (!name) {
-        static char s[20];
         sprintf (s, "%lld", lrand48 () * (1ll << 32) + lrand48 ());
-        name = s;
+        name = s;  // will be strdup'd, so reference-to-stack is fine.
       }
       struct tl_var *v = tl_add_var (name, S, tt);
       if (!v) {TL_FAIL;}
