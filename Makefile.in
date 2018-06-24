@@ -31,6 +31,7 @@ DEPENDENCE_LIST=${DEPENDENCE}
 
 INCLUDE=-I. -I${srcdir}
 CC=@CC@
+AR=@AR@
 
 # Check if -fstack-protector-strong is supported before enabling it
 SPUNSUPPORTED = $(shell $(CC) -fstack-protector-strong 2>&1 | grep -c 'stack-protector-strong')
@@ -63,7 +64,7 @@ ${TGL_OBJECTS_AUTO}: ${OBJ}/auto/%.o: ${AUTO}/%.c | create_dirs
 	${CC} ${INCLUDE} ${COMPILE_FLAGS} -iquote ${srcdir}/tgl -c -MP -MD -MF ${DEP}/$*.d -MQ ${OBJ}/$*.o -o $@ $<
 
 ${LIB}/libtgl.a: ${TGL_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
-	rm -f $@ && ar ruv $@ $^
+	rm -f $@ && ${AR} ruv $@ $^
 
 ${LIB}/libtgl.so: ${TGL_OBJECTS} ${COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
 	${CC} -shared -o $@ $^ ${LINK_FLAGS}

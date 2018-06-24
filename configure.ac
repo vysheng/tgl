@@ -8,6 +8,7 @@ m4_include([m4_ax_check_zlib.m4])
 
 # Checks for programs.
 AC_PROG_CC
+AC_CHECK_TOOL(AR, ar, [AC_MSG_ERROR([No ar found.  Huh?])])
 
 # BSD locations for headers and libraries from packages, Linux locations for self-compiled stuff.
 CPPFLAGS="$CPPFLAGS -I/usr/local/include"
