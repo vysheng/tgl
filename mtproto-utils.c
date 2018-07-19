@@ -6,7 +6,13 @@
 #include "mtproto-utils.h"
 
 static unsigned long long gcd (unsigned long long a, unsigned long long b) {
-  return b ? gcd (b, a % b) : a;
+  unsigned long long c;
+  while (b) {
+    c = a % b;
+    a = b;
+    b = c;
+  }
+  return a;
 }
 
 static int check_prime (struct tgl_state *TLS, TGLC_bn *p) {
