@@ -29,6 +29,18 @@ Then,
      ./configure
      make
 
+#### Android
+Install libs: openssl, openssl(android), zlib
+if you want to use provided net/timers then install libevent and add --enable-libevent key to configure
+
+Then,
+
+     export ANDROID_NDK=<Path_to_Android_NDK>
+     export OPENSSL_ROOT=<Path_to_Android_version_of_OpenSSL_root_dir>
+     ./configure
+     make -f Makefile.android
+
+
 ### Contacts 
 If you would like to ask a question, you can write to my telegram or to the github (or both). To contact me via telegram, you should use import_card method with argument 000653bf:0738ca5d:5521fbac:29246815:a27d0cda
 
