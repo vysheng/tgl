@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <wordexp.h>
 #ifndef WIN32
 #include <sys/utsname.h>
 #endif
@@ -2120,7 +2121,12 @@ static void send_file_thumb (struct tgl_state *TLS, struct send_file *f, const v
 
 
 static void _tgl_do_send_photo (struct tgl_state *TLS, tgl_peer_id_t to_id, const char *file_name, tgl_peer_id_t avatar, int w, int h, int duration, const void *thumb_data, int thumb_len, const char *caption, int caption_len, unsigned long long flags, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, struct tgl_message *M), void *callback_extra) {
-  int fd = open (file_name, O_RDONLY | O_BINARY);
+  wordexp_t wrdexp;
+  int status = wordexp(file_name,&wrdexp,0);
+  int fd=-1;
+  if(status == 0)
+    fd = open (wrdexp.we_wordv[0], O_RDONLY | O_BINARY);
+  wordfree(&wrdexp);
   if (fd < 0) {
     tgl_set_query_error (TLS, EBADF, "Can not open file: %s", strerror(errno));
     if (!avatar.peer_id) {
