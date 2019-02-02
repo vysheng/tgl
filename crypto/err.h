@@ -25,4 +25,10 @@
 
 void TGLC_err_print_errors_fp (FILE *fp);
 
+// Don't want to include tgl.h just for this
+struct tgl_state;
+
+// Init crypto backend, log to TLS
+int TGLC_init (struct tgl_state *TLS);
+
 #endif

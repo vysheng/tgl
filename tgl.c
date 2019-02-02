@@ -22,6 +22,7 @@
 #include "config.h"
 #endif
 
+#include "crypto/err.h"
 #include "crypto/rsa_pem.h"
 #include "tgl.h"
 #include "tools.h"
@@ -82,10 +83,14 @@ int tgl_init (struct tgl_state *TLS) {
   TLS->message_list.next_use = &TLS->message_list;
   TLS->message_list.prev_use = &TLS->message_list;
 
+  if (TGLC_init (TLS) != 0) {
+    return -1;
+  }
+
   if (tglmp_on_start (TLS) < 0) {
     return -1;
   }
-  
+
   if (!TLS->app_id) {
     TLS->app_id = TG_APP_ID;
     TLS->app_hash = tstrdup (TG_APP_HASH);

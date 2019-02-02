@@ -2072,7 +2072,7 @@ void tgls_free_message_media (struct tgl_state *TLS, struct tgl_message_media *M
   case tgl_message_media_geo:
     return;
   case tgl_message_media_photo:
-    tgls_free_photo (TLS, M->photo);
+    if (M->photo) { tgls_free_photo (TLS, M->photo); }
     if (M->caption) { tfree_str (M->caption); }
     M->photo = NULL;
     return;
@@ -2571,11 +2571,22 @@ void tgls_free_message_gw (struct tgl_message *M, void *TLS) {
   tgls_free_message (TLS, M);
 }
 
+void tgls_remove_message_gw (struct tgl_state *TLS, struct tgl_message *M) {
+  if (tree_lookup_message (TLS->message_unsent_tree, M)) {
+      tglm_message_remove_unsent (TLS, M);
+  }
+}
+
+void tgls_remove_and_free_message_gw (struct tgl_message *M, void *TLS) {
+  tgls_remove_message_gw (TLS, M);
+  tgls_free_message (TLS, M);
+}
+
 void tgl_free_all (struct tgl_state *TLS) {
   tree_act_ex_peer (TLS->peer_tree, tgls_free_peer_gw, TLS);
   TLS->peer_tree = tree_clear_peer (TLS->peer_tree);
   TLS->peer_by_name_tree = tree_clear_peer_by_name (TLS->peer_by_name_tree);
-  tree_act_ex_message (TLS->message_tree, tgls_free_message_gw, TLS);
+  tree_act_ex_message (TLS->message_tree, tgls_remove_and_free_message_gw, TLS);
   TLS->message_tree = tree_clear_message (TLS->message_tree);
   tree_act_ex_message (TLS->message_unsent_tree, tgls_free_message_gw, TLS);
   TLS->message_unsent_tree = tree_clear_message (TLS->message_unsent_tree);
