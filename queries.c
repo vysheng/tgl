@@ -3787,13 +3787,14 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, voi
     }
 
     for (i = 0; i < ml_pos; i++) {
+      // Ignore invalid messages, would cause a null ptr deref otherwise
+      if (ML[i] == NULL) continue;
       bl_do_msg_update (TLS, &ML[i]->permanent_id);
     }
     for (i = 0; i < el_pos; i++) {
       // messages to secret chats that no longer exist are not initialized and NULL
-      if (EL[i]) {
-        bl_do_msg_update (TLS, &EL[i]->permanent_id);
-      }
+      if (EL[i] == NULL) continue;
+      bl_do_msg_update (TLS, &EL[i]->permanent_id);
     }
 
     tfree (ML, ml_pos * sizeof (void *));
