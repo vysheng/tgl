@@ -314,7 +314,7 @@ int tglq_query_error (struct tgl_state *TLS, long long id) {
   char *error = fetch_str (error_len);
   struct query *q = tglq_query_get (TLS, id);
   if (!q) {
-    vlogprintf (E_WARNING, "error for query '%s' #%" INT64_PRINTF_MODIFIER "d: #%d :%.*s\n", q->methods->name, id, error_code, error_len, error);
+    vlogprintf (E_WARNING, "error for query ?! #%" INT64_PRINTF_MODIFIER "d: #%d :%.*s\n", id, error_code, error_len, error);
     vlogprintf (E_WARNING, "No such query\n");
   } else {
     if (!(q->flags & QUERY_ACK_RECEIVED)) {

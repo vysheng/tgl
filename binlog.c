@@ -105,7 +105,8 @@ void bl_do_set_auth_key (struct tgl_state *TLS, int num, unsigned char *buf) /* 
   assert (num > 0 && num <= MAX_DC_ID);
   assert (TLS->DC_list[num]);
 
-  memcpy (TLS->DC_list[num]->auth_key, buf, 256);
+  if (TLS->DC_list[num]->auth_key != (char *)buf)
+    memcpy (TLS->DC_list[num]->auth_key, buf, 256);
   
   static unsigned char sha1_buffer[20];
   TGLC_sha1 ((void *)TLS->DC_list[num]->auth_key, 256, sha1_buffer);
