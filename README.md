@@ -1,9 +1,22 @@
-This is library that handles telegram api and protocol.
+# Telegram library
+
+This is library that handles Telegram API and protocol.
+
+> This is a fork of [vysheng's repository](https://github.com/vysheng/tgl).
+
+If you're looking for client CLI implementation, check [TG repository](https://github.com/vysheng/tg) instead. 
+
+Build status:
+
+| Repository                                             | Status|
+| ------------------------------------------------------ | ----- |
+| [vysheng](https://github.com/vysheng/tgl) (main)       | [![Build Status](https://travis-ci.org/vysheng/tgl.svg)](https://travis-ci.org/vysheng/tgl) |
+| [kenorb-contrib](https://github.com/kenorb-contrib/tgl) | [![Build Status](https://travis-ci.org/kenorb-contrib/tgl.svg)](https://travis-ci.org/kenorb-contrib/tgl) |
 
 Current versions:
 
-- scheme.tl: Layer 38
-- encrypted_scheme.tl: Layer 23
+- `scheme.tl`: Layer 38
+- `encrypted_scheme.tl`: Layer 23
 
 ### API, Protocol documentation
 
@@ -13,9 +26,9 @@ Documentation for MTproto protocol is available here: https://core.telegram.org/
 
 ### Installation
 
-Clone GitHub Repository
+Clone this GitHub repository with `--recursive` parameter to clone submodules.
 
-     git clone --recursive  https://github.com/vysheng/tgl.git && cd tgl
+     git clone --recursive https://github.com/CHANGETHIS/tgl.git && cd tgl
 
 #### Linux and BSDs
 
