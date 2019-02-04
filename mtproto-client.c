@@ -678,11 +678,12 @@ static double get_server_time (struct tgl_dc *DC) {
 
 static long long generate_next_msg_id (struct tgl_state *TLS, struct tgl_dc *DC, struct tgl_session *S) {
   long long next_id = (long long) (get_server_time (DC) * (1LL << 32)) & -4;
-  if (next_id <= S->last_msg_id) {
-    next_id = S->last_msg_id  += 4;
+  if (next_id <= TLS->last_msg_id) {
+    next_id = TLS->last_msg_id  += 4;
   } else {
-    S->last_msg_id = next_id;
+    TLS->last_msg_id = next_id;
   }
+  S->last_msg_id = next_id; // See tglmp_encrypt_send_message
   return next_id;
 }
 
@@ -754,7 +755,7 @@ long long tglmp_encrypt_send_message (struct tgl_state *TLS, struct connection *
   assert (l > 0);
   rpc_send_message (TLS, c, &enc_msg, l + UNENCSZ);
 
-  return S->last_msg_id;
+  return S->last_msg_id; // Pray that this was set by generate_next_msg_id somehow
 }
 
 int tglmp_encrypt_inner_temp (struct tgl_state *TLS, struct connection *c, int *msg, int msg_ints, int useful, void *data, long long msg_id) {

@@ -8,6 +8,7 @@ m4_include([m4_ax_check_zlib.m4])
 
 # Checks for programs.
 AC_PROG_CC
+AC_CHECK_TOOL(AR, ar, [AC_MSG_ERROR([No ar found.  Huh?])])
 
 # BSD locations for headers and libraries from packages, Linux locations for self-compiled stuff.
 CPPFLAGS="$CPPFLAGS -I/usr/local/include"
@@ -83,9 +84,7 @@ AC_TYPE_UID_T
 AC_C_INLINE
 
 # Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
-AC_CHECK_FUNCS([alarm endpwent memset memmove mkdir select socket strdup strndup uname])
+AC_CHECK_FUNCS([alarm endpwent malloc memset memmove mkdir realloc select socket strdup strndup uname])
 
 AC_SUBST(EXTRA_LIBS)
 AC_SUBST(EXTRA_OBJECTS)

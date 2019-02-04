@@ -1,0 +1,134 @@
+srcdir=.
+
+# ANDROID Config -------------------------------------------------------------
+ANDROID_NDK=
+ANDROID_API=android-18
+ARCH=arm
+MACHINE=armv7-a
+
+CROSS_COMPILE_CC=${ANDROID_NDK}/toolchains/${ARCH}-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/${ARCH}-linux-androideabi-gcc
+CROSS_COMPILE_AR=${ANDROID_NDK}/toolchains/${ARCH}-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/${ARCH}-linux-androideabi-ar
+CROSS_COMPILE_LD=${ANDROID_NDK}/toolchains/${ARCH}-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/${ARCH}-linux-androideabi-ld
+   
+TOOLCHAIN_CFLAGS=--sysroot=${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH} -mandroid -march=${MACHINE} -Wa,--noexecstack
+
+TOOLCHAIN_LFLAGS=--sysroot=${ANDROID_NDK}/platforms/${ANDROID_API}/arch-${ARCH} -nostdlib
+#--------------------------------------------------------------------
+
+# OpenSSL --------------------------------------------------
+OPENSSL_ROOT=
+OPENSSL_INCLUDE=-I${OPENSSL_ROOT}/include
+OPENSSL_LIBS=-L${OPENSSL_ROOT}/android
+#----------------------------------------------------------
+
+#Cross Compiler Configs -------------------------------------------------------------
+CROSS_COMPILE_CFLAGS=-g -O2
+CROSS_COMPILE_CPPFLAGS= ${TOOLCHAIN_CFLAGS} ${OPENSSL_INCLUDE}
+CROSS_COMPILE_DEFS=-DHAVE_CONFIG_H
+CROSS_COMPILE_FLAGS=${CROSS_COMPILE_CFLAGS} ${CROSS_COMPILE_CPPFLAGS} ${CROSS_COMPILE_DEFS} -Wall -Wextra -Werror -Wno-deprecated-declarations -fno-strict-aliasing -fno-omit-frame-pointer -ggdb -Wno-unused-parameter -fPIC
+
+CROSS_COMPILE_LDFLAGS= ${TOOLCHAIN_LFLAGS} ${OPENSSL_LIBS}
+CROSS_COMPILE_EXTRA_LIBS=-lm -lssl -lcrypto
+CROSS_COMPILE_LOCAL_LDFLAGS=-rdynamic -ggdb ${CROSS_COMPILE_EXTRA_LIBS}
+CROSS_COMPILE_LINK_FLAGS=${CROSS_COMPILE_LDFLAGS} ${CROSS_COMPILE_LOCAL_LDFLAGS}
+# -----------------------------------------------------------------------------------
+
+CFLAGS=-g -O2
+LDFLAGS= -L/usr/local/lib -L/usr/lib -L/usr/lib 
+CPPFLAGS= -I/usr/local/include -I/usr/include -I/usr/include 
+DEFS=-DHAVE_CONFIG_H
+COMPILE_FLAGS=${CFLAGS} ${CPFLAGS} ${CPPFLAGS} ${DEFS} -Wall -Wextra -Werror -Wno-deprecated-declarations -fno-strict-aliasing -fno-omit-frame-pointer -ggdb -Wno-unused-parameter -fPIC
+
+EXTRA_LIBS=-lz -lm -lssl -lcrypto
+LOCAL_LDFLAGS=-rdynamic -ggdb ${EXTRA_LIBS}
+LINK_FLAGS=${LDFLAGS} ${LOCAL_LDFLAGS}
+
+DEP=dep
+AUTO=auto
+OBJ=objs
+CROSS_OBJ=${OBJ}/cross_objs
+LIB=libs
+EXE=bin
+DIR_LIST=${DEP} ${AUTO} ${EXE} ${OBJ} ${CROSS_OBJ} ${LIB} ${DEP}/auto ${CROSS_OBJ}/auto
+
+LIB_LIST=${LIB}/libtgl.a ${LIB}/libtgl.so
+
+TGL_OBJECTS=${CROSS_OBJ}/mtproto-common.o ${CROSS_OBJ}/mtproto-client.o ${CROSS_OBJ}/queries.o ${CROSS_OBJ}/structures.o ${CROSS_OBJ}/binlog.o ${CROSS_OBJ}/tgl.o ${CROSS_OBJ}/updates.o ${CROSS_OBJ}/tg-mime-types.o ${CROSS_OBJ}/mtproto-utils.o 
+TGL_OBJECTS_AUTO=${CROSS_OBJ}/auto/auto-skip.o ${CROSS_OBJ}/auto/auto-fetch.o ${CROSS_OBJ}/auto/auto-store.o ${CROSS_OBJ}/auto/auto-autocomplete.o ${CROSS_OBJ}/auto/auto-types.o ${CROSS_OBJ}/auto/auto-fetch-ds.o  ${CROSS_OBJ}/auto/auto-free-ds.o ${CROSS_OBJ}/auto/auto-store-ds.o ${CROSS_OBJ}/auto/auto-print-ds.o
+TLD_OBJECTS=${OBJ}/dump-tl-file.o
+GENERATE_OBJECTS=${OBJ}/generate.o
+COMMON_OBJECTS=${OBJ}/tools.o
+CROSS_COMMON_OBJECTS=${CROSS_OBJ}/tools.o
+OBJ_C=${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${TLD_OBJECTS}
+TGL_OBJECTS_C=${CROSS_COMMON_OBJECTS} ${TGL_OBJECTS}
+
+DEPENDENCE=$(subst ${OBJ}/,${DEP}/,$(patsubst %.o,%.d,${OBJ_C}))
+DEPENDENCE_LIST=${DEPENDENCE}
+
+INCLUDE=-I. -I${srcdir}
+CC=gcc
+
+.SUFFIXES:
+
+.SUFFIXES: .c .h .o
+
+all: ${LIB_LIST}
+create_dirs_and_headers: ${DIR_LIST}  ${AUTO}/auto-skip.h ${AUTO}/auto-fetch.h ${AUTO}/auto-store.h ${AUTO}/auto-autocomplete.h ${AUTO}/auto-types.h
+create_dirs: ${DIR_LIST}
+dump-tl: ${EXE}/dump-tl-file
+
+include ${srcdir}/Makefile.tl-parser
+
+${DIR_LIST}:
+	@test -d $@ || mkdir -p $@
+
+-include ${DEPENDENCE_LIST}
+
+${TGL_OBJECTS}: ${AUTO}/constants.h ${AUTO}/auto-skip.h ${AUTO}/auto-fetch.h ${AUTO}/auto-store.h ${AUTO}/auto-autocomplete.h ${AUTO}/auto-types.h ${AUTO}/auto-fetch-ds.h ${AUTO}/auto-free-ds.h ${AUTO}/auto-store-ds.h ${AUTO}/auto-print-ds.h
+
+${OBJ_C}: ${OBJ}/%.o: ${srcdir}/%.c | create_dirs
+	${CC} ${INCLUDE} ${COMPILE_FLAGS} -c -MP -MD -MF ${DEP}/$*.d -MQ ${OBJ}/$*.o -o $@ $<
+
+${TGL_OBJECTS_C}: ${CROSS_OBJ}/%.o: ${srcdir}/%.c | create_dirs
+	${CROSS_COMPILE_CC} ${INCLUDE} ${CROSS_COMPILE_FLAGS} -c -MP -MD -MF ${DEP}/$*.d -MQ ${CROSS_OBJ}/$*.o -o $@ $<
+
+${TGL_OBJECTS_AUTO}: ${CROSS_OBJ}/auto/%.o: ${AUTO}/%.c | create_dirs
+	${CROSS_COMPILE_CC} ${INCLUDE} ${CROSS_COMPILE_FLAGS} -iquote ${srcdir}/tgl -c -MP -MD -MF ${DEP}/$*.d -MQ ${CROSS_OBJ}/$*.o -o $@ $<
+
+${LIB}/libtgl.a: ${TGL_OBJECTS} ${CROSS_COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
+	rm -f $@ && ${CROSS_COMPILE_AR} ruv $@ ${TGL_OBJECTS} ${CROSS_COMMON_OBJECTS}
+
+${LIB}/libtgl.so: ${TGL_OBJECTS} ${CROSS_COMMON_OBJECTS} ${TGL_OBJECTS_AUTO}
+	export LD=${CROSS_COMPILE_LD} && ${CROSS_COMPILE_CC} -shared -o $@ ${TGL_OBJECTS} ${CROSS_COMMON_OBJECTS} ${CROSS_COMPILE_LINK_FLAGS}
+
+${EXE}/generate: ${GENERATE_OBJECTS} ${COMMON_OBJECTS}
+	${CC} ${GENERATE_OBJECTS} ${COMMON_OBJECTS} ${LINK_FLAGS} -o $@
+
+${AUTO}/scheme.tlo: ${AUTO}/scheme.tl ${EXE}/tl-parser
+	${EXE}/tl-parser -e $@ ${AUTO}/scheme.tl
+
+${AUTO}/scheme.tl: ${srcdir}/scheme.tl ${srcdir}/encrypted_scheme.tl ${srcdir}/binlog.tl ${srcdir}/mtproto.tl ${srcdir}/append.tl | ${AUTO}
+	cat $^ > $@
+
+${AUTO}/scheme2.tl: ${AUTO}/scheme.tl ${EXE}/tl-parser
+	${EXE}/tl-parser -E ${AUTO}/scheme.tl 2> $@  || ( cat $@ && rm $@ && false )
+
+${AUTO}/auto.c: ${AUTO}/scheme.tlo ${EXE}/generate
+	${EXE}/generate ${AUTO}/scheme.tlo > $@
+
+${AUTO}/auto-%.c: ${AUTO}/scheme.tlo ${EXE}/generate auto/constants.h ${AUTO}/auto-%.h | create_dirs_and_headers
+	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.c,%,$@) ${AUTO}/scheme.tlo > $@ || rm $@
+
+${AUTO}/auto-%.h: ${AUTO}/scheme.tlo ${EXE}/generate
+	${EXE}/generate -g $(patsubst ${AUTO}/auto-%.h,%-header,$@) ${AUTO}/scheme.tlo > $@ || rm $@
+
+
+${AUTO}/constants.h: ${AUTO}/scheme2.tl ${srcdir}/gen_constants_h.awk
+	awk -f ${srcdir}/gen_constants_h.awk < $< > $@
+
+${EXE}/dump-tl-file: ${OBJ}/auto/auto.o ${TLD_OBJECTS}
+	${CC} ${OBJ}/auto/auto.o ${TLD_OBJECTS} ${LINK_FLAGS} -o $@
+
+clean:
+	rm -rf ${DIR_LIST} config.log config.status > /dev/null || echo "all clean"
+
