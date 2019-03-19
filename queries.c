@@ -1863,7 +1863,6 @@ static void send_avatar_end (struct tgl_state *TLS, struct send_file *f, void *c
     break;
   case TGL_PEER_USER:
     out_int (CODE_photos_upload_profile_photo);
-    out_int (CODE_photos_upload_profile_photo);
     break;
   case TGL_PEER_CHANNEL:
     out_int (CODE_channels_edit_photo);
