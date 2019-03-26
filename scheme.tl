@@ -150,6 +150,13 @@ messageActionChatJoinedByLink#f89cf5e8 inviter_id:int = MessageAction;
 messageActionChannelCreate#95d2ac92 title:string = MessageAction;
 messageActionChatMigrateTo#51bdb021 channel_id:int = MessageAction;
 messageActionChannelMigrateFrom#b055eaee title:string chat_id:int = MessageAction;
+messageActionPinMessage#94bd38ed = MessageAction;
+messageActionHistoryClear#9fbab604 = MessageAction;
+messageActionGameScore#92a72876 game_id:long score:int = MessageAction;
+messageActionPaymentSent#40699cd0 currency:string total_amount:long = MessageAction;
+messageActionScreenshotTaken#4792929b = MessageAction;
+messageActionCustomAction#fae69f56 message:string = MessageAction;
+messageActionBotAllowed#abe9affe domain:string = MessageAction;
 
 dialog#c1dd804a peer:Peer top_message:int read_inbox_max_id:int unread_count:int notify_settings:PeerNotifySettings = Dialog;
 dialogChannel#5b8496b2 peer:Peer top_message:int top_important_message:int read_inbox_max_id:int unread_count:int unread_important_count:int notify_settings:PeerNotifySettings pts:int = Dialog;
