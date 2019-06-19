@@ -38,15 +38,19 @@ TGLC_WRAPPER_ASSOC(bn,BIGNUM)
 
 TGLC_rsa *TGLC_rsa_new (unsigned long e, int n_bytes, const unsigned char *n) {
   RSA *ret = RSA_new ();
-  ret->e = unwrap_bn (TGLC_bn_new ());
-  TGLC_bn_set_word (wrap_bn (ret->e), e);
-  ret->n = unwrap_bn (TGLC_bn_bin2bn (n, n_bytes, NULL));
+  BIGNUM *ep = unwrap_bn (TGLC_bn_new ());
+  BIGNUM *np = unwrap_bn (TGLC_bn_bin2bn (n, n_bytes, NULL));
+  TGLC_bn_set_word (wrap_bn (ep), e);
+
+  RSA_set0_key(ret, np, ep, NULL);
   return wrap_rsa (ret);
 }
 
 #define RSA_GETTER(M)                                                          \
   TGLC_bn *TGLC_rsa_ ## M (TGLC_rsa *key) {                                    \
-    return wrap_bn (unwrap_rsa (key)->M);                                      \
+    const BIGNUM *pn = NULL, *pe = NULL, *pd = NULL;                           \
+    RSA_get0_key(unwrap_rsa (key), &pn, &pe, &pd);                             \
+    return wrap_bn (p##M);                                                     \
   }                                                                            \
 
 RSA_GETTER(n);
