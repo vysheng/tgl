@@ -4,6 +4,7 @@
 #include "tgl.h"
 #include "tools.h"
 #include "mtproto-utils.h"
+#include <boost/lexical_cast.hpp>
 
 static unsigned long long gcd (unsigned long long a, unsigned long long b) {
   return b ? gcd (b, a % b) : a;
@@ -94,18 +95,13 @@ int tglmp_check_g_a (struct tgl_state *TLS, TGLC_bn *p, TGLC_bn *g_a) {
   return 0;
 }
 
-static unsigned long long BN2ull (TGLC_bn *b) {
-  if (sizeof (unsigned long) == 8) {
-    return TGLC_bn_get_word (b);
-  } else if (sizeof (unsigned long long) == 8) {
-    assert (0); // As long as nobody ever uses this code, assume it is broken.
-    unsigned long long tmp;
-    /* Here be dragons, but it should be okay due to be64toh */
-    TGLC_bn_bn2bin (b, (unsigned char *) &tmp);
-    return be64toh (tmp);
-  } else {
-    assert (0);
-  }
+static unsigned long long BN2ull (const TGLC_bn &b) {
+    if (sizeof(unsigned long) == 8 ) {
+      return TGLC_bn_get_word(b);
+    } else if ( sizeof (unsigned long long) == 8 ) {
+      char *tmp = BN_bn2dec(b);
+      return boost::lexical_cast<unsigned long long int>(tmp); 
+    }
 }
 
 static void ull2BN (TGLC_bn *b, unsigned long long val) {
