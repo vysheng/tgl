@@ -2183,8 +2183,7 @@ void tgl_do_send_document (struct tgl_state *TLS, tgl_peer_id_t to_id, const cha
       flags |= TGLDF_AUDIO;
     }
   }
-  tgl_peer_id_t x;
-  x.peer_id = 0;
+  tgl_peer_id_t x = { .peer_id=0 };
   _tgl_do_send_photo (TLS, to_id, file_name, x, 100, 100, 100, 0, 0, caption, caption_len, flags, callback, callback_extra);
 }
 
